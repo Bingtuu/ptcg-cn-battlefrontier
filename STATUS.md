@@ -4,12 +4,12 @@
 
 ## 当前
 
-M1 进行中。task 001 ✅，下一步：**task 002 随机源与 GameState 数据模型**。
+M1 进行中。task 001 ✅ / 002 ✅，下一步：**task 003 阶段机与合法行动枚举**。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
 
-- 🔵 M1 引擎骨架（白板对局 + 同种子复现）——task 001 ✅ / 002 ⬜ / 003 ⬜ / 004 ⬜
+- 🔵 M1 引擎骨架（白板对局 + 同种子复现）——task 001 ✅ / 002 ✅ / 003 ⬜ / 004 ⬜
 - ⬜ M2 DSL + 解释器 + 首批原语（第一套目标卡组）
 - ⬜ M3 启发式 Agent + Runner + 结果库（百局端到端）
 - ⬜ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）
@@ -27,7 +27,12 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 ### 2026-08-25 task 001 项目脚手架 ✅
 
 - venv（Python 3.14.6）+ `pip install -e .` 成功；4 测试全绿 + ruff 零告警；`bfsim` 入口可用
-- ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装，`test_ptcgdb_sdk_importable` 绿）：选择器字段设计、单局性能基线、dsl-authoring skill、目标卡组池名单（M1 启动时按 WUR 锁定）
+- ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装，`test_ptcgdb_sdk_importable` 绿）
+
+### 2026-08-25 task 002 随机源与 GameState ✅
+
+- `engine/rng.py` RandomSource（同种子序列一致 / 快照恢复）+ `engine/state.py` GameState（区域完整 / 不可变 / 序列化往返 / 可见视图过滤）
+- 17 测试全绿 + ruff 零告警；遗留：牌库实际抽洗操作归 task 003：选择器字段设计、单局性能基线、dsl-authoring skill、目标卡组池名单（M1 启动时按 WUR 锁定）
 
 ## 决策日志
 

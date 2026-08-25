@@ -38,7 +38,9 @@ class CardDef(FrozenModel):
     supertype: Supertype
     hp: int | None = None
     stage: int = 0
+    evolves_from: str | None = None
     attack_damage: int | None = None
+    attack_cost: int = 0
     retreat_cost: int = 0
 
 
@@ -69,6 +71,10 @@ class PlayerState(FrozenModel):
     prizes: tuple[CardInstance, ...] = ()
     active: InPlayPokemon | None = None
     bench: tuple[InPlayPokemon, ...] = ()
+    # 每回合规则标记（回合结束重置）：能量附着 / 登场 / 已进化（存场上宝可梦栈顶 iid）
+    energy_attached_this_turn: bool = False
+    entered_play_this_turn: frozenset[int] = frozenset()
+    evolved_this_turn: frozenset[int] = frozenset()
 
     @model_validator(mode="after")
     def _zone_limits(self) -> PlayerState:
@@ -107,6 +113,9 @@ class GameState(FrozenModel):
     turn: int = 1
     current_player: int = 0
     phase: str = "setup"
+    first_player: int = 0
+    winner: int | None = None
+    is_draw: bool = False
 
     def visible_state(self, player: int) -> VisibleGameState:
         opp = self.players[1 - player]

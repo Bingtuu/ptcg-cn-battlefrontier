@@ -24,6 +24,18 @@
 
 本项目不自带卡牌数据，消费 [ptcg-cn-db](https://github.com/Bingtuu/ptcg-cn-db) 的 SDK（`ptcgdb.sdk`）与导出件（`dist/`）。
 
+本机接入两步（路径均为机器相关，**不入库**）：
+
+```bash
+# 1. 安装 SDK：以可编辑路径安装本机的 ptcg-cn-db 检出
+pip install -e "C:/path/to/ptcg-cn-db"
+
+# 2. 运行时配置：复制模板并填写本机路径
+cp config/battlefrontier.example.yml config/battlefrontier.local.yml
+```
+
+`battlefrontier.local.yml` 已 gitignore；支持两种后端：`sqlite`（`open_db` 直读 `data/ptcg-cn.db`）与 `jsonl`（`open_jsonl` 读 `dist/` 导出目录）。
+
 ## ⚖️ 合规声明
 
 本项目与 Nintendo、The Pokémon Company、宝可梦（上海）**无任何隶属或背书关系**。卡面文本与卡牌数据版权归宝可梦（上海）/ The Pokémon Company 所有；本项目不采集、不存储、不分发卡图与卡牌数据，仅限本地研究与工具自用。

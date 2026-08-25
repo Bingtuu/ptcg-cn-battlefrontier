@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "battlefrontier"
+version = "0.1.0"
+description = "AI 宝可梦卡牌（PTCG 简中环境）对战模拟与卡组强度测试引擎"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+# ptcgdb SDK（数据层）以本地可编辑路径安装，路径机器相关不入库，见 README「数据依赖」
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+bfsim = "battlefrontier.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["battlefrontier*"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

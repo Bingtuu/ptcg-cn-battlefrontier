@@ -1,0 +1,8 @@
+# BattleFrontier 本机配置 —— 模板
+# 复制为 battlefrontier.local.yml（已 gitignore）后按本机实际情况填写。
+
+# 数据层（ptcg-cn-db）接入：二选一或都填，运行时按 backend 选择
+db:
+  backend: sqlite                              # sqlite = open_db(sqlite_path)；jsonl = open_jsonl(dist_dir)
+  sqlite_path: C:/path/to/ptcg-cn-db/data/ptcg-cn.db
+  dist_dir: C:/path/to/ptcg-cn-db/dist         # 十四件套导出目录（open_jsonl 后端）

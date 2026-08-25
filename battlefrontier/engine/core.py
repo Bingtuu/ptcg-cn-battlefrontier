@@ -125,7 +125,7 @@ class GameEngine:
             ] if len(p.bench) < 5 else []
             return actions + [Action(kind="confirm_setup")]
         if s.phase == "promote":
-            # 【规则书·气绝】战斗场气绝后须从备战区换上 1 只
+            # 【规则书·昏厥】战斗场昏厥后须从备战区换上 1 只
             return [Action(kind="promote", bench_index=i) for i in range(len(p.bench))]
         if s.phase == "main":
             return self._main_actions(player)
@@ -289,7 +289,7 @@ class GameEngine:
                    into=new_active.current.card.name, paid=cost)
 
     def _do_attack(self, player: int, action: Action) -> None:
-        """【规则书·招式】固定伤害（白板）；攻击后回合结束。气绝结算见 _resolve_knockout。"""
+        """【规则书·招式】固定伤害（白板）；攻击后回合结束。昏厥结算见 _resolve_knockout。"""
         s = self.state
         atk = s.players[player].active
         dmg = atk.current.card.attack_damage
@@ -304,9 +304,9 @@ class GameEngine:
         self._begin_turn(defender)
 
     def _resolve_knockout(self, attacker: int, defender: int) -> bool:
-        """气绝判定：返回 True 表示攻击方回合不再正常结束（终局或待换上）。
+        """昏厥判定：返回 True 表示攻击方回合不再正常结束（终局或待换上）。
 
-        【规则书·气绝/胜负】伤害 ≥ HP 气绝 → 整叠（进化链+能量）进弃牌堆，
+        【规则书·昏厥/胜负】伤害 ≥ HP 昏厥 → 整叠（进化链+能量）进弃牌堆，
         对手拿 1 张奖赏卡；拿完 6 张奖赏卡立即获胜；无备战区可换上判负。
         """
         d = self.state.players[defender]

@@ -36,9 +36,11 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ### 2026-08-25 task 003 阶段机与合法行动枚举 ✅
 
-- `engine/core.py` GameEngine（开局+mulligan / 阶段机 / 主阶段四行动 / 气绝奖赏换上 / 三种胜负）+ `actions.py` / `events.py` / `agent/base.py` Agent 协议
+- `engine/core.py` GameEngine（开局+mulligan / 阶段机 / 主阶段四行动 / 昏厥奖赏换上 / 三种胜负）+ `actions.py` / `events.py` / `agent/base.py` Agent 协议
 - 45 测试全绿 + ruff 零告警；规则出处逐条注释在 core.py
-- 遗留：特殊状态回合间结算（M2 随效果落地）、mulligan 抽牌与让先选择权 Agent 化：选择器字段设计、单局性能基线、dsl-authoring skill、目标卡组池名单（M1 启动时按 WUR 锁定）
+- 术语修正：knockout 统一为官方用词「昏厥」（全仓替换，规则决议日志首条）
+- 新增 `docs/rules-reference.md` 规则事实源（官方规则梳理 + 术语表 + 决议日志附录 A）；PRD 补 §6.6 训练家卡与 ACE SPEC 骨架规划
+- 遗留：特殊状态回合间结算（M2 随效果落地）、mulligan 抽牌与让先选择权 Agent 化
 
 ## 决策日志
 

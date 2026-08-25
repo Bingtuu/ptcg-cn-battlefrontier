@@ -1,8 +1,8 @@
-"""task 003-C/D：主阶段规则（进化/能量/撤退）与战斗结算（伤害/气绝/奖赏/胜负）。
+"""task 003-C/D：主阶段规则（进化/能量/撤退）与战斗结算（伤害/昏厥/奖赏/胜负）。
 
 规则出处：官方规则书「回合的进行」——每只宝可梦每回合限进化 1 次、
 登场当回合不可进化；能量每回合限附着 1 张；撤退需丢弃撤退费用数量的能量，
-撤退后特殊状态恢复；招式需足够能量；气绝后对手拿 1 张奖赏卡，无备战区可换
+撤退后特殊状态恢复；招式需足够能量；昏厥后对手拿 1 张奖赏卡，无备战区可换
 上则判负；拿完 6 张奖赏卡获胜。
 """
 
@@ -110,19 +110,19 @@ def test_attack_deals_damage_and_ends_turn() -> None:
     assert e.state.phase == "main"
 
 
-# ── D：气绝 / 奖赏 / 胜负 ────────────────────────────────
+# ── D：昏厥 / 奖赏 / 胜负 ────────────────────────────────
 
 def test_knockout_prize_and_promote() -> None:
     state = main_state()
-    hurt = state.players[1].active.model_copy(update={"damage": 60})  # 70HP，再打 20 气绝
+    hurt = state.players[1].active.model_copy(update={"damage": 60})  # 70HP，再打 20 昏厥
     p1 = state.players[1].model_copy(update={
         "active": hurt, "bench": (in_play(3, basic("小火龙")),),
     })
     e = engine_at(state.model_copy(update={"players": (state.players[0], p1)}))
     e.apply(0, Action(kind="attack"))
     p0, p1 = e.state.players
-    assert p1.active is None  # 气绝待换上
-    assert any(c.iid == 2 for c in p1.discard)  # 气绝宝可梦进弃牌堆
+    assert p1.active is None  # 昏厥待换上
+    assert any(c.iid == 2 for c in p1.discard)  # 昏厥宝可梦进弃牌堆
     assert len(p1.discard) == 2  # 附着的 1 能量一并弃置
     assert len(p0.prizes) == 5 and len(p0.hand) == 3  # 拿 1 奖赏
     # 换上阶段：只有 promote 可选

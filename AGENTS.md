@@ -4,6 +4,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 [ptcg-cn-db](https://github.com/Bingtuu/ptcg-cn-db)（数据基建层）之上的应用层：完整规则引擎 + 效果 DSL + AI 智能体，通过大规模模拟对局产出卡组胜率、最优策略（决策数据聚合报告）与换卡敏感性分析。
 
 **权威文档**：`docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md`（PRD v1.0）——一切设计以它为准，含 12 条决策记录（D1–D12）与一期里程碑 M1–M6。
+**规则事实源**：`docs/rules-reference.md`——官方规则系统梳理与术语表（「昏厥」等官方用词），引擎实现与 DSL harness prompt 均以它为准；争议规则进其附录 A 规则决议日志。
 **数据契约**：上游 db 项目 PRD 的 FR-10 sim 骨架契约——模拟结果永远落独立库，主库只读，经 card_id / name_group / 快照 id 关联。
 
 ## 当前状态

@@ -19,6 +19,10 @@ from battlefrontier.engine.state import (
 )
 
 
+class DeckConfigError(Exception):
+    """卡组不满足开局条件（无基础宝可梦 / 张数不足），明确报错而非死循环。"""
+
+
 class GameEngine:
     """持有随机源与事件流；状态本身不可变，apply/new_game 产出新 GameState。"""
 
@@ -52,6 +56,12 @@ class GameEngine:
         选择权留待 Agent 层）；奖赏卡 6 张。
         """
         self.events = []
+        for cards in (deck_a, deck_b):
+            basics = [c for c in cards if c.supertype == Supertype.POKEMON and c.stage == 0]
+            if not basics:
+                raise DeckConfigError("卡组无基础宝可梦，无法开局")
+            if len(cards) < 13:
+                raise DeckConfigError("卡组张数不足以开局（需 ≥13：起手 7 + 奖赏 6）")
         decks: list[tuple[CardInstance, ...]] = []
         for cards in (deck_a, deck_b):
             base = len(decks) * 10000  # 双方实例 id 区间隔离
@@ -378,3 +388,8 @@ class GameEngine:
             "phase": "game_over", "winner": winner, "is_draw": is_draw,
         })
         self._emit("game_over", winner, reason=reason, is_draw=is_draw)
+
+    def force_draw(self, reason: str) -> None:
+        """死循环保护等强制判平入口（上限值由调用方配置）。"""
+        self._emit(reason, None)
+        self._game_over(winner=None, reason=reason, is_draw=True)

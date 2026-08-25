@@ -29,6 +29,10 @@ class RandomSource:
         """掷币：True = 正面。"""
         return bool(self._r.getrandbits(1))
 
+    def randbelow(self, n: int) -> int:
+        """返回 [0, n) 的整数（Agent 均匀随机选择用）。"""
+        return self._r.randrange(n)
+
     def snapshot(self) -> object:
         """当前内部状态快照（可 JSON 化由调用方另行处理）。"""
         return self._r.getstate()

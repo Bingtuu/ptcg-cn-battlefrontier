@@ -4,12 +4,12 @@
 
 ## 当前
 
-M1 进行中。task 001 ✅ / 002 ✅ / 003 ✅，下一步：**task 004 白板对局端到端与确定性验收**。
+**M1 引擎骨架达成**（task 001–004 全 ✅）。下一步：M2 拆解（DSL schema + 解释器 + 首批原语，先按 db WUR 锁定第一套目标卡组）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
 
-- 🔵 M1 引擎骨架（白板对局 + 同种子复现）——task 001 ✅ / 002 ✅ / 003 ✅ / 004 ⬜
+- ✅ M1 引擎骨架（白板对局 + 同种子复现）——task 001–004 全 ✅（2026-08-25）
 - ⬜ M2 DSL + 解释器 + 首批原语（第一套目标卡组）
 - ⬜ M3 启发式 Agent + Runner + 结果库（百局端到端）
 - ⬜ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）
@@ -33,6 +33,12 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 - `engine/rng.py` RandomSource（同种子序列一致 / 快照恢复）+ `engine/state.py` GameState（区域完整 / 不可变 / 序列化往返 / 可见视图过滤）
 - 17 测试全绿 + ruff 零告警；遗留：牌库实际抽洗操作归 task 003
+
+### 2026-08-25 task 004 白板对局端到端与 M1 确定性验收 ✅（M1 达成）
+
+- `runner/play.py`（play_game / 2 进程并行 / 事件流 sha256）+ `agent/random_agent.py` + `report/render.py` 人类可读回合记录
+- M1 硬验收全过：同种子 hash 一致 / 串行与并行逐局一致 / 100 局零异常 / 回合上限判平 / 异常卡组 DeckConfigError
+- 54 测试全绿 + ruff 零告警；遗留：play.py 非正式 Runner（M3 接管）
 
 ### 2026-08-25 task 003 阶段机与合法行动枚举 ✅
 

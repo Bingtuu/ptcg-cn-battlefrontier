@@ -37,3 +37,11 @@ def test_shuffle_returns_tuple_and_keeps_source() -> None:
     out = RandomSource(0).shuffle(cards)
     assert isinstance(out, tuple) and sorted(out) == [1, 2, 3]
     assert cards == (1, 2, 3)
+
+
+def test_randbelow_deterministic_and_bounded() -> None:
+    a, b = RandomSource(5), RandomSource(5)
+    seq_a = [a.randbelow(10) for _ in range(50)]
+    seq_b = [b.randbelow(10) for _ in range(50)]
+    assert seq_a == seq_b
+    assert all(0 <= x < 10 for x in seq_a)

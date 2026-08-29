@@ -4,7 +4,7 @@
 
 ## 当前
 
-**M3 进行中**：task 018 ✅（通用启发式 Agent：HeuristicParams 参数对象 + 评估函数五因子 + 行动排序/斩杀检测/布阵优先级，确定性 tie-break 不耗随机源，全量 243 绿）。M2 已全部完成（task 005–017 ✅，沙奈朵卡组 DSL 全覆盖、定义库 23 卡）。下一步：task 019 正式 Runner + 实验定义 YAML + 结果库三层表 + bfsim 实验子命令（百局端到端落库）。
+**M3 达成**：task 018 ✅（通用启发式 Agent）+ task 019 ✅（实验定义 YAML + 正式 Runner + 结果库三层表 + `bfsim run`）。M3 验收实跑：沙奈朵镜像 heuristic vs random 100 局落库（A胜 63/B胜 37/失败 0，4 workers 约 4.4s），并行 vs 串行重跑 games 层逐局一致（§8.4 硬验收过）。M2 已全部完成（task 005–017 ✅，定义库 23 卡）。下一步：M4 报告层（胜率报告 + 决策聚合 + 换卡敏感性）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -17,6 +17,16 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-29 task 019 实验定义 + 正式 Runner + 结果库 + bfsim run ✅（M3 达成）
+
+- `runner/experiment.py`：ExperimentDef（Pydantic 强校验：未知 agent type/参数名/来源 不猜报错）+ parse_decklist（`N 卡名` 行格式，经 db search_cards 解析 + 60 张校验）+ build_agents（worker 内同种子规则重建，与 play.py 默认偏移一致）+ prepare/execute/run 三段式；多进程 spawn 池 imap 保序，worker 载荷纯可序列化配置
+- `runner/results_db.py`：三层表 experiments/games/game_events（WAL；games 带 error 列——DSL 显式报错等失败局落库继续实验，不掩盖不崩溃）；`play.py` GameResult 补 first_player（§8.3 先后手）
+- `bfsim run <实验.yml> [--workers N] [--results PATH] [--db PATH] [--cards-dir DIR]`：装载告警透传，完成回显实验 id/胜负平/失败数/数据版本/种子区间；cli 补 `__main__` 入口
+- 验收：TDD 23 新测试（schema/解析/构建/落库/生命周期/CLI e2e 真实卡组）；§8.4 硬验收双保险——stub 卡组两次重跑+串并一致（CI），真实沙奈朵镜像 100 局 4 workers vs 串行重跑逐局一致（实测）
+- **M3 里程碑实跑**：heuristic vs random 100 局 = A胜 63/B胜 37/平 0/失败 0，4 workers 约 4.4s（性能基线首记录，PRD §8.2 2000 局分钟级口径达标）；数据版本 2026-07-16 (user_version=13)
+- 全量 266 绿 + ruff 零告警；`results/` 进 gitignore；示例实验 `experiments/gardevoir-mirror.example.yml` 入库
+- 遗留：copy_attack 嵌套 chooser（残忍箭矢运行时选择）归 task 020——本次百局 0 失败但 CLI 初测曾触发，属已知引擎缺口非 Runner 问题；M4 报告层（Wilson CI/决策聚合/换卡敏感性）
 
 ### 2026-08-29 task 018 通用启发式 Agent（M3 启动）✅
 

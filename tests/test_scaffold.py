@@ -17,7 +17,7 @@ def test_subpackages_importable() -> None:
 def test_cli_entrypoint_returns_zero() -> None:
     from battlefrontier.cli import main
 
-    assert main() == 0
+    assert main([]) == 0
 
 
 def test_ptcgdb_sdk_importable() -> None:

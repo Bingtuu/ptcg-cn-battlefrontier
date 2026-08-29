@@ -1,0 +1,11 @@
+# 示例实验：沙奈朵镜像，启发式 vs 随机（M3 验收基线，task 019）
+# 用法：bfsim run experiments/gardevoir-mirror.example.yml --workers 4
+name: gardevoir-mirror
+games: 100
+seed_start: 1000
+decks:
+  a: {source: db, deck_id: "mik_moe:644634"}
+  b: {source: db, deck_id: "mik_moe:644634"}
+agents:
+  a: {type: heuristic}
+  b: {type: random}

@@ -7,3 +7,4 @@ dist/
 config/*.local.yml
 .pytest_cache/
 .ruff_cache/
+results/

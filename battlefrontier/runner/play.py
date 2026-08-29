@@ -29,6 +29,7 @@ class GameResult:
     is_draw: bool
     turns: int
     phase: str
+    first_player: int = 0
     events: list[GameEvent] = field(default_factory=list)
     events_hash: str = ""
 
@@ -70,6 +71,7 @@ def play_game(
         is_draw=s.is_draw,
         turns=s.turn,
         phase=s.phase,
+        first_player=s.first_player,
         events=engine.events,
         events_hash=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
     )

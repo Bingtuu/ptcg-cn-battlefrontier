@@ -1,0 +1,12 @@
+# 吉雉鸡ex（CSV8C-135，基础）
+# text_raw 原文：「残忍箭矢：给对手的1只宝可梦，造成100伤害。[备战宝可梦不计算弱点、抗性。]」
+# 备战不计算弱点抗性是贯穿规则（rules-manual §6），引擎骨架已保证，DSL 无需特判。
+# 特性「化危为吉」（跨回合触发 + 同名共享限次）归 task 013+。
+card:
+  name_group: 吉雉鸡ex
+  card_ids: [CSV8C-135]
+effects:
+  - trigger: on_attack
+    attack: 残忍箭矢
+    actions:
+      - {action: damage, selector: opponent_pokemon_any, choose: 1, args: {amount: 100}}

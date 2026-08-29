@@ -42,9 +42,12 @@ class Effect(FrozenModel):
     """一个效果块：触发器 + 可选条件/限次 + 成本 + 动作序列 + 统计锚点。
 
     condition 为开放字符串（条件内容解析归解释器）；limit 取 limits 词表。
+    attack：on_attack 触发器的招式绑定（task 012，PRD §5.1）——绑定后该招式的
+    伤害与效果全部由本效果块结算；仅 on_attack 使用，其余触发器须为 None。
     """
 
     trigger: str
+    attack: str | None = None
     condition: str | None = None
     limit: str | None = None
     cost: tuple[ActionNode, ...] = ()

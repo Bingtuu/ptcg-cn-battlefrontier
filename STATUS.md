@@ -4,7 +4,7 @@
 
 ## 当前
 
-**M2 进行中**：task 005 ✅（锁定沙奈朵卡组 + 首批原语清单）、task 006 ✅（DSL schema + 词表 + loader）、task 007 ✅（解释器骨架 + 事件流 + play_trainer）、task 008 ✅（CardDef 升级：能量类型成本/多招式/弱点抗性/规则盒奖赏 + check_knockouts 任意时机入口）、task 009 ✅（chooser 挂起-恢复机制 + 检索/回收/选择式弃牌四原语，高级球/巢穴球/夜间担架 e2e）、task 010 ✅（卡组装载层 db → CardDef + DSL 定义库 cards/ 落盘，沙奈朵卡组 60 张装载零告警 + e2e）、task 011 ✅（特性框架 ability_manual：use_ability 枚举 + 三种限次 + 可行性门；chooser 两段式选择 carry 协议；attach_energy/draw until_hand 原语；精神拥抱/再起动 e2e，全量 141 绿）。下一步：task 012+ 招式附加效果（on_attack）/ 混乱状态 / 道具·竞技场骨架 / 计数表达式 / 剩余特性（化危为吉跨回合触发、亢奋脑力转伤、妖精领域弱点改写），直至沙奈朵卡组全覆盖。
+**M2 进行中**：task 005 ✅（锁定沙奈朵卡组 + 首批原语清单）、task 006 ✅（DSL schema + 词表 + loader）、task 007 ✅（解释器骨架 + 事件流 + play_trainer）、task 008 ✅（CardDef 升级：能量类型成本/多招式/弱点抗性/规则盒奖赏 + check_knockouts 任意时机入口）、task 009 ✅（chooser 挂起-恢复机制 + 检索/回收/选择式弃牌四原语，高级球/巢穴球/夜间担架 e2e）、task 010 ✅（卡组装载层 db → CardDef + DSL 定义库 cards/ 落盘，沙奈朵卡组 60 张装载零告警 + e2e）、task 011 ✅（特性框架 ability_manual：use_ability 枚举 + 三种限次 + 可行性门；chooser 两段式选择 carry 协议；attach_energy/draw until_hand 原语；精神拥抱/再起动 e2e）、task 012 ✅（on_attack 招式效果框架：Effect.attack 绑定 + damage/clear_status 原语 + 计数表达式求值，变量伤害与任意目标落 DSL，弱点抗性仅战斗场结算；定义库 11 卡，全量 153 绿）。下一步：task 013+ 混乱状态（精神幻觉 + D1 掷币结算）/ 基因侵入 copy / 剩余特性（化危为吉跨回合、亢奋脑力转伤、妖精领域弱点改写）/ 道具·竞技场骨架，直至沙奈朵卡组全覆盖。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -17,6 +17,15 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-29 task 012 on_attack 招式效果框架 + 变量伤害 ✅
+
+- `Effect.attack` 绑定字段（PRD §5.1 同步）：on_attack 绑定招式的伤害与效果全经 DSL 结算，AttackDef.damage 退为装载/展示数据（奇迹之力 190 单次结算测试锁定）
+- 原语 `damage`（固定/变量公式 base+per×n、per×n；opponent_active 自动目标 / opponent_pokemon_any chooser 选目标；弱点抗性仅战斗场结算——备战不计算是贯穿规则）+ `clear_status`；计数表达式六词求值（未知词 DslError 不猜）
+- 引擎：攻击枚举含 DSL 绑定纯效果招式；completion="attack" 完成推进对手回合，昏厥 promote/终局不覆盖
+- 定义库 11 卡（+吉雉鸡ex 残忍箭矢 / 吼叫尾 凶暴吼叫 / 奇鲁莉安 精神强念 / 莉莉艾的皮皮ex 满月回旋曲 / 飘飘球 气球炸弹 / 沙奈朵ex 奇迹之力）
+- TDD：12 新测试红→绿；全量 153 绿 + ruff 零告警；含效果招式卡组同种子 hash 一致
+- 遗留：混乱状态 / 基因侵入 copy / 剩余特性三枚 / 道具·竞技场骨架归 task 013+
 
 ### 2026-08-29 task 011 特性框架 + 精神拥抱/再起动落地 ✅
 

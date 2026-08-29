@@ -52,6 +52,15 @@ def _energy_satisfied(attached: tuple[CardInstance, ...], cost: tuple[str, ...])
     return len(remaining) >= colorless
 
 
+def _weakness_resistance(atk_card: CardDef, defender: InPlayPokemon, dmg: int) -> int:
+    """弱点 ×2 / 抗性 -30（rules-manual §6；仅战斗场目标结算，备战目标不计算）。"""
+    if defender.current.card.weakness is not None and defender.current.card.weakness == atk_card.energy_type:
+        dmg *= 2
+    if defender.current.card.resistance is not None and defender.current.card.resistance == atk_card.energy_type:
+        dmg -= 30  # 现行规则抗性恒 -30（rules-manual §6）
+    return max(dmg, 0)
+
+
 def _attack_damage(
     attack: AttackDef, atk_card: CardDef, defender: InPlayPokemon, *, to_bench: bool = False
 ) -> int:
@@ -65,10 +74,7 @@ def _attack_damage(
         return 0
     # 插入点：攻击方身上附加的增伤效果（task 009+ 修饰原语）
     if not to_bench:
-        if defender.current.card.weakness is not None and defender.current.card.weakness == atk_card.energy_type:
-            dmg *= 2
-        if defender.current.card.resistance is not None and defender.current.card.resistance == atk_card.energy_type:
-            dmg -= 30  # 现行规则抗性恒 -30（rules-manual §6）
+        dmg = _weakness_resistance(atk_card, defender, dmg)
     # 插入点：防御方身上附加的减伤效果（task 009+）
     return max(dmg, 0)
 
@@ -241,14 +247,20 @@ class GameEngine:
             for i in range(len(p.bench)):
                 actions.append(Action(kind="retreat", bench_index=i))
 
-        # 攻击：每个有伤害且能量满足的招式一条行动（rules-manual §6 能量需求）；
+        # 攻击：能量满足 且（有伤害 或 有 on_attack DSL 绑定）的招式各一条行动
+        # （rules-manual §6 能量需求；纯效果招式经 DSL 结算，task 012）；
         # 先攻方第一回合不能攻击（规则书·回合的进行）
         first_turn_ban = s.turn == 1 and player == s.first_player
         if p.active and not first_turn_ban:
+            atk_doc = self.card_effects.get(p.active.current.card.name)
             for i, attack in enumerate(p.active.current.card.attacks):
-                if attack.damage is not None and _energy_satisfied(
-                    p.active.attached_energy, attack.cost
-                ):
+                if not _energy_satisfied(p.active.attached_energy, attack.cost):
+                    continue
+                has_dsl = atk_doc is not None and any(
+                    e.trigger == "on_attack" and e.attack == attack.name
+                    for e in atk_doc.effects
+                )
+                if attack.damage is not None or has_dsl:
                     actions.append(Action(kind="attack", attack_index=i))
 
         # 训练家卡：物品每回合不限次数；支援者每回合限 1 张且先攻方首回合禁用
@@ -417,11 +429,26 @@ class GameEngine:
                    into=new_active.current.card.name, paid=cost)
 
     def _do_attack(self, player: int, action: Action) -> None:
-        """【rules-manual §6】按 attack_index 选招式，伤害经 _attack_damage 结算；
-        攻击后回合结束。昏厥统一走 check_knockouts。"""
+        """【rules-manual §6】按 attack_index 选招式；攻击后回合结束。昏厥统一走 check_knockouts。
+
+        招式有 on_attack DSL 绑定时（task 012）：伤害与附加效果全部由 DSL 结算
+        （damage 原语负责伤害与目标，AttackDef.damage 不重复结算），可挂起（chooser），
+        完成且无昏厥分支时推进对手回合（completion="attack"）。
+        """
         s = self.state
         atk = s.players[player].active
         attack = atk.current.card.attacks[action.attack_index]
+        doc = self.card_effects.get(atk.current.card.name)
+        effect_index = next(
+            (i for i, e in enumerate(doc.effects)
+             if e.trigger == "on_attack" and e.attack == attack.name),
+            None,
+        ) if doc else None
+        if effect_index is not None:
+            self._emit("attack", player, name=atk.current.card.name, attack=attack.name)
+            self._run_or_suspend(player, atk.current, effect_index, start=0,
+                                 completion="attack")
+            return
         defender = 1 - player
         d = s.players[defender]
         dmg = _attack_damage(attack, atk.current.card, d.active)
@@ -575,15 +602,20 @@ class GameEngine:
                 "phase": "choice", "current_player": player, "pending_choice": pending,
             })
             return
-        # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置。
+        # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置；
+        # 攻击结算完毕推进对手回合（rules-manual §6：攻击后回合结束）。
         # 效果内若已触发换上/终局（check_knockouts），不覆盖其阶段。
         if completion == "trainer":
             p = self.state.players[player]
             self._set_player(player, p.model_copy(update={"discard": p.discard + (card,)}))
         if self.state.phase in ("main", "choice"):
-            self.state = self.state.model_copy(update={
-                "phase": "main", "pending_choice": None,
-            })
+            if completion == "attack":
+                self.state = self.state.model_copy(update={"pending_choice": None})
+                self._begin_turn(1 - player)
+            else:
+                self.state = self.state.model_copy(update={
+                    "phase": "main", "pending_choice": None,
+                })
         else:
             self.state = self.state.model_copy(update={"pending_choice": None})
 

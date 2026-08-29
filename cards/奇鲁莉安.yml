@@ -1,0 +1,11 @@
+# 奇鲁莉安（CSV2C-054，1阶，进化自拉鲁拉丝）
+# text_raw 原文：「精神强念：追加造成对手战斗宝可梦身上附着的能量数量×20伤害。」
+# 「魔法射击」（超+无，30 伤）为白板固定伤害招式，无需 DSL。
+card:
+  name_group: 奇鲁莉安
+  card_ids: [CSV2C-054]
+effects:
+  - trigger: on_attack
+    attack: 精神强念
+    actions:
+      - {action: damage, selector: opponent_active, count: attached_energy_on_opponent_active, args: {base: 60, per: 20, op: "+"}}

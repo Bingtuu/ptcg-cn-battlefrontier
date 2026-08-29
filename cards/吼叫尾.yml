@@ -1,0 +1,12 @@
+# 吼叫尾（CSV6C-065，基础）
+# text_raw 原文：「凶暴吼叫：给对手的1只宝可梦，造成这只宝可梦身上放置的
+# 伤害指示物数量×20伤害。[备战宝可梦不计算弱点、抗性。]」
+# 「巴掌」（超×1，30 伤）为白板固定伤害招式，无需 DSL。
+card:
+  name_group: 吼叫尾
+  card_ids: [CSV6C-065]
+effects:
+  - trigger: on_attack
+    attack: 凶暴吼叫
+    actions:
+      - {action: damage, selector: opponent_pokemon_any, choose: 1, count: damage_counters_on_target, args: {per: 20, op: "×"}}

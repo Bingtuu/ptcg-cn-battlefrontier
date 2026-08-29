@@ -1,0 +1,11 @@
+# 莉莉艾的皮皮ex（CSV10C-082，基础）
+# text_raw 原文：「满月回旋曲：追加造成双方备战宝可梦数量×20伤害。」
+# 特性「妖精领域」（passive_static 弱点改写）归 task 013+。
+card:
+  name_group: 莉莉艾的皮皮ex
+  card_ids: [CSV10C-082]
+effects:
+  - trigger: on_attack
+    attack: 满月回旋曲
+    actions:
+      - {action: damage, selector: opponent_active, count: bench_count_both, args: {base: 20, per: 20, op: "+"}}

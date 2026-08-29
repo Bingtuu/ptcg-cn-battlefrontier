@@ -208,3 +208,116 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
         "attached": len(energies), "energy_iids": sorted(energy_iids),
         "target_iid": target_iid, "damage_counters": counters,
     }
+
+
+# ── task 012：on_attack 招式效果（伤害 / 计数表达式 / 状态恢复）────────────
+
+
+def _eval_counter(ctx: ExecutionContext, word: str, target: InPlayPokemon | None = None) -> int:
+    """计数表达式求值（counters 词表；damage 等数值上下文）。
+
+    未知词 / 非数值词（如 all）= DslError（不猜）。target 仅供 *_on_target 词。
+    """
+    engine, player = ctx.engine, ctx.player
+    p = engine.state.players[player]
+    opp = engine.state.players[1 - player]
+    if word == "own_remaining_prizes":
+        return len(p.prizes)
+    if word == "opponent_remaining_prizes":
+        return len(opp.prizes)
+    if word == "damage_counters_on_self":
+        mons = ([p.active] if p.active else []) + list(p.bench)
+        mon = next((m for m in mons if m.current.iid == ctx.source.iid), None)
+        if mon is None:
+            raise DslError("damage_counters_on_self：来源宝可梦不在场上")
+        return mon.damage // 10
+    if word == "damage_counters_on_target":
+        if target is None:
+            raise DslError("damage_counters_on_target 需要已选目标（choose 挂起后求值）")
+        return target.damage // 10
+    if word == "attached_energy_on_opponent_active":
+        return len(opp.active.attached_energy) if opp.active else 0
+    if word == "bench_count_both":
+        return len(p.bench) + len(opp.bench)
+    raise DslError(f"计数表达式 {word!r} 非数值或未知（数值上下文不猜）")
+
+
+def _resolve_damage_amount(ctx: ExecutionContext, node: ActionNode, target: InPlayPokemon | None) -> int:
+    """伤害公式：args.amount 固定 / {base, per, op:"+"} / {per, op:"×"}（count=计数词）。"""
+    args = node.args
+    if "amount" in args:
+        if node.count is not None:
+            raise DslError("damage 的 amount 与 count 互斥（公式二选一）")
+        amount = args["amount"]
+        if not isinstance(amount, int) or amount < 0:
+            raise DslError(f"damage 的 amount 须为非负 int（收到 {amount!r}）")
+        return amount
+    if not isinstance(node.count, str):
+        raise DslError("damage 需要 args.amount 或 count=计数表达式（counters 词表）")
+    n = _eval_counter(ctx, node.count, target)
+    op, per = args.get("op"), args.get("per")
+    if not isinstance(per, int) or per <= 0:
+        raise DslError(f"damage 公式的 per 须为正 int（收到 {per!r}）")
+    if op == "×":
+        return n * per
+    if op == "+":
+        base = args.get("base", 0)
+        if not isinstance(base, int) or base < 0:
+            raise DslError(f"damage 公式的 base 须为非负 int（收到 {base!r}）")
+        return base + n * per
+    raise DslError(f"damage 公式的 op 须为 + 或 ×（收到 {op!r}）")
+
+
+@register("damage")
+def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
+    """造成伤害：selector=opponent_active（自动目标）/ opponent_pokemon_any（choose=1 挂起选目标）。
+
+    弱点 ×2 / 抗性 -30 由引擎规则骨架结算、仅对战斗场目标生效（rules-manual §6；
+    备战区不计算是贯穿规则）。伤害后统一 check_knockouts（rules-manual §8）。
+    """
+    from battlefrontier.engine.core import _weakness_resistance
+
+    if node.selector not in ("opponent_active", "opponent_pokemon_any"):
+        raise DslError(f"damage 暂仅支持 opponent_active / opponent_pokemon_any（收到 {node.selector!r}）")
+    engine = ctx.engine
+    defender_idx = 1 - ctx.player
+    d = engine.state.players[defender_idx]
+
+    if node.selector == "opponent_pokemon_any":
+        if node.choose != 1:
+            raise DslError("damage 选目标暂仅支持 choose=1")
+        if choice is None:
+            return NeedChoice(pool="opponent_pokemon_any", min_choose=1, max_choose=1)
+        slot, idx, target = engine._find_in_play(d, choice[0])
+    else:
+        _require_no_choose(node, "damage")
+        if d.active is None:
+            raise DslError("damage opponent_active：对手战斗场为空")
+        slot, idx, target = "active", -1, d.active
+
+    amount = _resolve_damage_amount(ctx, node, target)
+    # 弱点/抗性仅对战斗场目标（rules-manual §6）
+    final = _weakness_resistance(ctx.source.card, target, amount) if slot == "active" else amount
+    engine._set_player(defender_idx, engine._replace_in_play(
+        d, slot, idx, target.model_copy(update={"damage": target.damage + final}),
+    ))
+    engine.check_knockouts()
+    return {
+        "amount": amount, "final": final, "target_iid": target.current.iid,
+        "target": target.current.card.name, "to_bench": slot == "bench",
+    }
+
+
+@register("clear_status")
+def _clear_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """恢复特殊状态（selector=self：来源宝可梦全部状态，如奇迹之力）。"""
+    _require_no_choose(node, "clear_status")
+    if node.selector != "self":
+        raise DslError(f"clear_status 暂仅支持 selector=self（收到 {node.selector!r}）")
+    p = ctx.player_state
+    slot, idx, mon = ctx.engine._find_in_play(p, ctx.source.iid)
+    cleared = sorted(mon.conditions)
+    ctx.set_player_state(ctx.engine._replace_in_play(
+        p, slot, idx, mon.model_copy(update={"conditions": frozenset()}),
+    ))
+    return {"cleared": cleared}

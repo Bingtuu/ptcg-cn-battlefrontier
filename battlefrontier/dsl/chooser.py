@@ -99,13 +99,21 @@ def matches(card: CardInstance, filters: tuple[str, ...]) -> bool:
     return all(_match_one(card, f) for f in filters)
 
 
-def resolve_pool(p: PlayerState, pool: str, filters: tuple[str, ...]) -> tuple:
+def resolve_pool(
+    p: PlayerState, pool: str, filters: tuple[str, ...],
+    opponent: PlayerState | None = None,
+) -> tuple:
     """从真实状态计算候选池（挂起瞬间调用一次，结果冻结进 PendingChoice.pool_iids）。
 
-    own_pokemon_in_play 返回 InPlayPokemon 维度（iid = 栈顶卡）；其余为卡区域。
+    own_pokemon_in_play / opponent_pokemon_any 返回 InPlayPokemon 维度（iid = 栈顶卡）；
+    其余为卡区域。对手池需传 opponent（公开信息：对手场上宝可梦双方可见）。
     """
     if pool == "own_pokemon_in_play":
         return resolve_in_play_pool(p, filters)
+    if pool == "opponent_pokemon_any":
+        if opponent is None:
+            raise DslError("opponent_pokemon_any 池需要对手状态（chooser 内部约定）")
+        return resolve_in_play_pool(opponent, filters)
     if pool == "own_hand":
         cards = p.hand
     elif pool == "own_deck":
@@ -135,7 +143,10 @@ def build_pending(
     cursor: int, need: NeedChoice, completion: str = "trainer",
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
-    pool_cards = resolve_pool(engine.state.players[player], need.pool, need.filters)
+    pool_cards = resolve_pool(
+        engine.state.players[player], need.pool, need.filters,
+        opponent=engine.state.players[1 - player],
+    )
     iids = tuple(
         c.current.iid if isinstance(c, InPlayPokemon) else c.iid for c in pool_cards
     )

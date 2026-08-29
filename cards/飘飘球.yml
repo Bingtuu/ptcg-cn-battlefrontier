@@ -1,0 +1,11 @@
+# 飘飘球（CSV2C-060，基础）
+# text_raw 原文：「气球炸弹：造成这只宝可梦身上放置的伤害指示物数量×30伤害。」
+# 「起风」（无×2，10 伤）为白板固定伤害招式，无需 DSL。
+card:
+  name_group: 飘飘球
+  card_ids: [CSV2C-060]
+effects:
+  - trigger: on_attack
+    attack: 气球炸弹
+    actions:
+      - {action: damage, selector: opponent_active, count: damage_counters_on_self, args: {per: 30, op: "×"}}

@@ -1,0 +1,10 @@
+# 能量转移（CSVH1aC-008，物品）
+# text_raw 原文：「选择自己场上宝可梦身上附着的1个基本能量，转附于自己其他宝可梦身上。」
+# 两段式：先选能量（own_attached_energy），再选目标（排除来源宝可梦 = 「其他」）。
+card:
+  name_group: 能量转移
+  card_ids: [CSVH1aC-008]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: move_energy, selector: own_attached_energy, filters: [basic_energy], choose: 1}

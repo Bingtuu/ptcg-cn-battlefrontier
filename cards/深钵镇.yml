@@ -1,0 +1,14 @@
+# 深钵镇（CSV2C-127，竞技场）
+# text_raw 原文：「双方玩家，每次在自己的回合有1次机会，可选择自己牌库中的1张
+# 【基础】宝可梦（除「拥有规则的宝可梦」外），放于备战区。并重洗牌库。」
+# stadium_grant = 双方各每回合 1 次的授予行动（引擎 use_stadium 骨架，task 017）；
+# 「除拥有规则的宝可梦外」= basic_pokemon_no_rule 过滤器（规则盒 ex/V/光辉等除外）；
+# 「每次在自己的回合有1次机会」= stadium_used_this_turn（引擎强制，DSL 不重复声明 limit）。
+card:
+  name_group: 深钵镇
+  card_ids: [CSV2C-127]
+effects:
+  - trigger: stadium_grant
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon_no_rule], choose: 1, destination: bench}
+      - {action: shuffle_deck}

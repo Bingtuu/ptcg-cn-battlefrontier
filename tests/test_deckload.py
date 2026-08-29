@@ -103,6 +103,7 @@ def test_prize_mismatch_warns_not_guesses() -> None:
         is_ace_spec = False
         provides = None
         evolves_from_text = None
+        evolution_chain_id = None
 
     card, warnings = carddef_from_db(FakeCard())
     assert card.rule_box == "ex"
@@ -129,6 +130,7 @@ def test_unknown_stage_raises() -> None:
         is_ace_spec = False
         provides = None
         evolves_from_text = None
+        evolution_chain_id = None
 
     with pytest.raises(ValueError, match="stage"):
         carddef_from_db(FakeCard())

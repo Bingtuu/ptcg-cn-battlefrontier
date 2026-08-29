@@ -1,7 +1,11 @@
 # 梦幻ex（151C-151，基础，特性：再起动）
 # text_raw 原文：「特性: 再起动
-# 在自己的回合可以使用1次。从牌库上方抽取卡牌，直到自己的手牌变为3张为止。」
-# 招式「基因侵入」（复制对手战斗宝可梦招式）归 copy_attack 原语落地（task 012+）。
+# 在自己的回合可以使用1次。从牌库上方抽取卡牌，直到自己的手牌变为3张为止。
+# 【无】【无】【无】 基因侵入
+# 选择对手战斗宝可梦所拥有的1个招式，作为这个招式使用。」
+# 基因侵入（task 017 copy_attack）：被复制招式不需再付能量；有 DSL 绑定则以我方
+# 视角跑对方效果块（含运行时选择的被复制招式 = 嵌套挂起，显式 DslError 不猜）；
+# 白板伤害按梦幻属性结算弱点抗性。
 card:
   name_group: 梦幻ex
   card_ids: [151C-151]
@@ -10,3 +14,7 @@ effects:
     limit: once_per_turn
     actions:
       - {action: draw, args: {until_hand: 3}}
+  - trigger: on_attack
+    attack: 基因侵入
+    actions:
+      - {action: copy_attack, selector: opponent_active_attack, choose: 1}

@@ -1,0 +1,15 @@
+# 奇树（CSV3C-123，支援者）
+# text_raw 原文：「双方玩家，各将自己所有的手牌反面朝上重洗，放回牌库下方。然后，
+# 各从牌库上方抽取与自己剩余奖赏卡张数相同数量的卡牌。」
+# 顺序：双方手牌先各自洗回库底（hand_to_deck_bottom × 2），再各抽=自身剩余奖赏数
+# （draw 计数表达式）；「反面朝上重洗」= rng.shuffle 手牌后放库底（单一随机源）。
+card:
+  name_group: 奇树
+  card_ids: [CSV3C-123]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: hand_to_deck_bottom, selector: own_hand, count: all}
+      - {action: hand_to_deck_bottom, selector: opponent_hand, count: all}
+      - {action: draw, count: own_remaining_prizes}
+      - {action: draw, selector: opponent_deck, count: opponent_remaining_prizes}

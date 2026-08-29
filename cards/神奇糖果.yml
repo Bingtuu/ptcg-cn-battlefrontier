@@ -1,0 +1,13 @@
+# 神奇糖果（CSVH1C-045，物品）
+# text_raw 原文：「选择自己手牌中的1张【2阶进化】宝可梦，放于自己场上能够进化成该宝可梦
+# 的【基础】宝可梦身上，跳过【1阶进化】进行进化。（在自己最初的回合，以及对这个回合
+# 刚出场的宝可梦无法使用。）」
+# 卡面限制落点：「自己最初的回合」= playable_feasible first_turn 门；「刚出场不可」=
+# 目标池 exclude entered_play_this_turn；同链判定读 CardDef.evolution_chain（db 数据）。
+card:
+  name_group: 神奇糖果
+  card_ids: [CSVH1C-045]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: evolve, selector: own_hand, choose: 1, filters: [stage2_pokemon], args: {mode: skip_stage}}

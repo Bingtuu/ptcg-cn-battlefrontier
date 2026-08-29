@@ -1,0 +1,14 @@
+# 派帕（CSV1C-123，支援者）
+# text_raw 原文：「选择自己牌库中「物品」和「宝可梦道具」各1张，在给对手看过之后，
+# 加入手牌。并重洗牌库。」
+# 两段检索各 choose=1（up-to 语义：牌库非公开可以不找）；「给对手看过」= 事件流
+# 记录入手的卡（回放/人工 check 保真）；检索后必洗牌（shuffle_deck 节点纪律）。
+card:
+  name_group: 派帕
+  card_ids: [CSV1C-123]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [trainer_item], choose: 1, destination: hand}
+      - {action: search_deck, selector: own_deck, filters: [trainer_tool], choose: 1, destination: hand}
+      - {action: shuffle_deck}

@@ -1,0 +1,18 @@
+# 秘密箱（CSV8C-176，物品，ACE SPEC）
+# text_raw 原文：「这张卡牌，只有将自己的3张手牌放于弃牌区后才可使用。
+# 选择自己牌库中「物品」「宝可梦道具」「支援者」「竞技场」各1张，
+# 在给对手看过之后，加入手牌。并重洗牌库。」
+# 「各1张」= 四类顺序检索各 ≤1（up-to 语义）；ACE SPEC 每卡组限 1 张为构筑校验（db validate_deck）。
+card:
+  name_group: 秘密箱
+  card_ids: [CSV8C-176]
+effects:
+  - trigger: on_play
+    cost:
+      - {action: discard, selector: own_hand, choose: 3}
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [trainer_item], choose: 1, destination: hand}
+      - {action: search_deck, selector: own_deck, filters: [trainer_tool], choose: 1, destination: hand}
+      - {action: search_deck, selector: own_deck, filters: [trainer_supporter], choose: 1, destination: hand}
+      - {action: search_deck, selector: own_deck, filters: [trainer_stadium], choose: 1, destination: hand}
+      - {action: shuffle_deck}

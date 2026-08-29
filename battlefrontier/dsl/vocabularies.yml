@@ -22,6 +22,9 @@ actions:
   - hand_to_deck_bottom     # 手牌洗回牌库下方
   - copy_attack             # 复制招式
   - reveal                  # 给对手看过（展示）
+  - modify_hp               # 声明式：常驻 HP 修正（道具 passive_static，引擎读声明，解释器不执行）
+  - grant_attack            # 声明式：授予招式（道具 passive_static；discard_at_turn_end 等标记）
+  - modify_weakness         # 声明式：弱点改写（特性 passive_static，如妖精领域；引擎读声明）
 
 # 选择器（作用对象）
 selectors:
@@ -32,9 +35,12 @@ selectors:
   - own_deck                # 自己的牌库
   - own_discard             # 自己的弃牌区
   - own_pokemon_in_play     # 自己场上的宝可梦
+  - own_attached_energy     # 自己场上宝可梦身上附着的能量（能量转移等）
   - own_bench               # 自己的备战区
   - opponent_pokemon_any    # 对手的 1 只宝可梦（含备战）
   - opponent_bench          # 对手的备战区
+  - opponent_hand           # 对手的手牌（奇树：双方手牌洗回库底）
+  - opponent_deck           # 对手的牌库（奇树：对手抽牌）
 
 # 触发器（区分主动发动与被动监听）
 triggers:

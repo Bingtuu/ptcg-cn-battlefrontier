@@ -4,7 +4,7 @@
 
 ## 当前
 
-**M2 进行中**：task 005 ✅（锁定沙奈朵卡组 + 首批原语清单）、task 006 ✅（DSL schema + 词表 + loader）、task 007 ✅（解释器骨架 + 事件流 + play_trainer）、task 008 ✅（CardDef 升级：能量类型成本/多招式/弱点抗性/规则盒奖赏 + check_knockouts 任意时机入口）、task 009 ✅（chooser 挂起-恢复机制 + 检索/回收/选择式弃牌四原语，高级球/巢穴球/夜间担架 e2e）、task 010 ✅（卡组装载层 db → CardDef + DSL 定义库 cards/ 落盘，沙奈朵卡组 60 张装载零告警 + e2e）、task 011 ✅（特性框架 ability_manual：use_ability 枚举 + 三种限次 + 可行性门；chooser 两段式选择 carry 协议；attach_energy/draw until_hand 原语；精神拥抱/再起动 e2e）、task 012 ✅（on_attack 招式效果框架：Effect.attack 绑定 + damage/clear_status 原语 + 计数表达式求值，变量伤害与任意目标落 DSL，弱点抗性仅战斗场结算；定义库 11 卡，全量 153 绿）。下一步：task 013+ 混乱状态（精神幻觉 + D1 掷币结算）/ 基因侵入 copy / 剩余特性（化危为吉跨回合、亢奋脑力转伤、妖精领域弱点改写）/ 道具·竞技场骨架，直至沙奈朵卡组全覆盖。
+**M3 进行中**：task 018 ✅（通用启发式 Agent：HeuristicParams 参数对象 + 评估函数五因子 + 行动排序/斩杀检测/布阵优先级，确定性 tie-break 不耗随机源，全量 243 绿）。M2 已全部完成（task 005–017 ✅，沙奈朵卡组 DSL 全覆盖、定义库 23 卡）。下一步：task 019 正式 Runner + 实验定义 YAML + 结果库三层表 + bfsim 实验子命令（百局端到端落库）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -17,6 +17,62 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-29 task 018 通用启发式 Agent（M3 启动）✅
+
+- `agent/heuristic.py`：`HeuristicParams` 参数对象（评分权重 + 评估函数五因子权重 + 决策开关全暴露，默认值=PRD 通用启发式）；`pokemon_score`（HP+最大招式伤害+撤退费惩罚，D10 只用通用字段不按卡名分支）；`evaluate` 评估函数（奖赏差/场面战力/手牌质量/能量就绪度/牌库资源线性加权，纯函数为 MCTS rollout 预留）
+- 决策规则：开局布阵最高分优先（`max_bench_setup=3` 后 confirm）→ 主阶段排序「特性→进化→能量→斩杀检测→道具→物品→支援者→竞技场→攻击→end_turn」；能量附着「仍有付不起的招式才补能」（全就绪不浪费每回合 1 次）；斩杀检测读弱点 ×2/抗性 -30，凌驾物品/支援者；保守撤退（战斗场无就绪招式且备战区有就绪打手才撤）
+- chooser 选择策略：按池内卡评分取最高分子集；promote 取最高分备战；tie-break 全部 iid/下标升序，**不消费引擎随机源**（确定性测试锁定：同视图两次调用 + 跨实例一致）
+- `play_game` 增 `agents` 可选注入（默认仍为双 RandomAgent，task 019 Runner 复用）
+- TDD 24 新测试（16 首红后修两处口径：能量跳过条件「存在付不起的招式」、evaluate 奖赏差符号=我方领先为正）；全量 243 绿 + ruff 零告警
+- 遗留：HeuristicAgent vs RandomAgent 胜率对照实验、参数进实验定义 YAML 归 task 019；评估函数目前仅用于报告/测试，未参与决策（决策为规则式，符合 PRD §7.2 允许口径）
+
+### 2026-08-29 task 017 M2 收口批：三特性 + 基因侵入 + 竞技场骨架 + 支援者两枚 ✅
+
+- 化危为吉：`own_ko_during_opponent_turn` 跨回合标记（对手回合内昏厥置位、我方回合结束 `_on_turn_end` 清除——四条回合结束路径合并）+ condition 注册词；限次复用 once_per_turn_shared
+- 亢奋脑力：参数化 condition 前缀 `holder_has_energy:<属性>` + `move_damage_counters` 原语（两段式 chooser；「最多3个」降级 min(3, 来源) 全转，记决议）
+- 妖精领域：声明式 `modify_weakness` + `GameEngine._effective_weakness`（龙无弱点=赋予；白板攻击与 DSL damage 两路径共用；备战不结算弱点贯穿规则不变）
+- 基因侵入：`copy_attack` 原语 + `opponent_active_attack` 招式维度池（pool_iids=招式索引）；被复制招式不付能量；DSL 绑定以我方视角结算（嵌套挂起=显式 DslError）；白板按我方属性结算弱点
+- 竞技场骨架：play_stadium（每回合限 1/同名不可/旧场进 stadium_owner 弃牌区）+ use_stadium（stadium_grant 每方每回合 1 次，可行性门复用 playable_feasible）；深钵镇检索基础（除规则盒 basic_pokemon_no_rule）入备战
+- 奇树：`hand_to_deck_bottom`（own/opponent，shuffle 后库底）+ draw 扩展（str 计数表达式 + opponent_deck）；派帕：纯 YAML 组合（两段 search_deck + shuffle）
+- 特性枚举补 condition 门（task 011 只查 limit+可行性；未知词 DslError 不猜）
+- 定义库 23 卡（+深钵镇/奇树/派帕，四卡补 effect）；TDD 24 新测试（20 首红）；全量 219 绿 + ruff 零告警；真实卡组两 seeds 整局 hash 一致、use_stadium 实际发动
+- 遗留：chooser 嵌套游标 / 数值选择建模 / 宝可梦检查（中毒灼伤）/ 同时昏厥顺序 归 M3+ 按需
+
+### 2026-08-29 task 016 evolve 原语（神奇糖果跳阶 + 学习器「进化」）+ 授予招式执行 ✅
+
+- `evolve` 原语注册双模式：`skip_stage`（神奇糖果：手牌 stage2 → 同链基础两段式 chooser，卡面限制「最初回合」走可行性门 first_turn、「刚出场不可」走目标池 exclude entered_play_this_turn）+ `from_deck`（学习器「进化」：≤2 备战逐只牌库检索 evolves_from 匹配形态，即选即进化，carry=(已进化数, 当前, *剩余)）
+- 链拓扑数据驱动：`CardDef.evolution_chain` ← db evolution_chain_id（引擎零硬编码）；chooser 新增参数化过滤器前缀 `evolves_from:<名>` / `evolve_skip:<chain>`、`stage2_pokemon`、own_bench 池
+- 授予招式执行：attached_tool 招式并入攻击枚举（索引接自身后、能量持有者支付、DSL 文档与效果源取道具卡）；无绑定的授予招式维持不枚举
+- cards/ 神奇糖果（CSVH1C-045）入库 + 学习器补 on_attack 绑定（定义库 20 卡）；进化突变统一 `_apply_evolution`（状态清除/伤害保留/evolved_this_turn + evolve 事件）
+- TDD 12 新测试红→绿一次通过；全量 195 绿 + ruff 零告警；真实卡组（mik_moe:644634 含两卡）装载零告警 + 整局同种子 hash 一致
+- 遗留：竞技场骨架（深钵镇 stadium_grant）/ 剩余特性三枚 / 基因侵入 copy 归 task 017
+
+### 2026-08-29 task 015 宝可梦道具骨架 + 勇气护符 passive HP + 招式学习器框架 ✅
+
+- `InPlayPokemon.attached_tool` 状态位；`attach_tool` 主阶段行动（trainer_subtype==宝可梦道具、每只限 1、不限次，规则行动无需 DSL 文档）；昏厥整叠含道具进弃牌区
+- `GameEngine._effective_hp`：道具 passive_static 的 modify_hp 声明式求和（condition holder_is_basic 判定栈顶 stage）；check_knockouts 与 would_survive_20 守卫（chooser hp_of 透传，ability_feasible 签名改 (effect, engine, player)）全走有效 HP；进化后加成立即失效
+- `_discard_turn_end_tools`：grant_attack args.discard_at_turn_end 道具在自己回合结束四条路径（end_turn / 白板攻击 / DSL 攻击 / 混乱反面）统一弃置，对手回合末不弃；无 on_attack 绑定的授予招式不枚举（task 016 解锁）
+- cards/ 勇气护符（CSV1C-118）+ 招式学习器 进化（CSV5C-119）入库（注释引用 text_raw 原文），定义库 19 卡；词表 actions 补 modify_hp / grant_attack
+- TDD 11 新测试（8 首红）；全量 183 绿 + ruff 零告警；含道具卡组同种子 hash 一致
+- 遗留：学习器「进化」招式 on_attack + 神奇糖果（evolve 跳阶）归 task 016；竞技场骨架 / 剩余特性三枚 / 基因侵入 copy 归 016/017
+
+### 2026-08-29 task 014 物品批五张 + switch/move_energy 原语 ✅
+
+- 大地容器（弃1→检索≤2基本能量）/ 秘密箱（弃3→四类训练家各≤1顺序检索）/ 厉害钓竿（≤3回牌库 up-to）/ 反击捕捉器（condition 奖赏比多门 + gust 互换 + 换下清状态）/ 能量转移（两段式转附，exclude 来源）
+- chooser：trainer 子类过滤器四词、新池 own_attached_energy/opponent_bench、`NeedChoice.exclude_iids`、`condition_met` 注册表（未知词 DslError）、可行性门增 switch/move_energy 落点（无效果不可使用）
+- 原语：switch / move_energy / recover_from_discard 增 destination=deck；词表 selectors 补 own_attached_energy
+- 定义库 17 卡；TDD 10 新测试（8 首红）；全量 172 绿 + ruff 零告警；含物品卡组同种子 hash 一致
+- 遗留：神奇糖果 evolve 跳阶 / 道具·竞技场骨架 / 剩余特性三枚 / 基因侵入归 task 015+
+
+### 2026-08-29 task 013 混乱状态 + apply_status + 精神幻觉 ✅
+
+- 混乱全链路（D1 决议落地）：攻击入口掷币——正面正常结算不解除 / 反面招式完全失败
+  （白板/DSL 同检，无 effect_primitive）+ 自身 3 指示物 → check_knockouts
+- `GameState.turn_after_promote`：自我昏厥换上后回合权给对手（默认换上方回合不变）
+- `apply_status` 原语（status 对齐 SpecialCondition 枚举，未知词 DslError；前序致昏厥空结算）
+- cards/愿增猿.yml 入库（定义库 12 卡）；TDD 9 新测试（7 首红）；全量 162 绿 + ruff 零告警
+- 遗留：宝可梦检查（中毒/灼伤回合间）随来源卡落地；剩余特性三枚 / 基因侵入 / 道具·竞技场归 task 014+
 
 ### 2026-08-29 task 012 on_attack 招式效果框架 + 变量伤害 ✅
 

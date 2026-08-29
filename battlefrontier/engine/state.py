@@ -53,6 +53,9 @@ class CardDef(FrozenModel):
     hp: int | None = None
     stage: int = 0
     evolves_from: str | None = None
+    # 进化链标识（db evolution_chain_id；跳阶进化的同链判定用，如神奇糖果。
+    # 链拓扑是数据不是规则——引擎不硬编码任何卡名/链关系）
+    evolution_chain: str | None = None
     # 宝可梦属性 / 能量卡属性（开放字符串，对齐 db 词表；rules-manual §1.1/§1.2）
     energy_type: str | None = None
     # 基本能量标记（对齐 db is_basic_energy；撤退/效果过滤器用，如「基本能量」回收）
@@ -82,6 +85,8 @@ class InPlayPokemon(FrozenModel):
 
     stack: tuple[CardInstance, ...]
     attached_energy: tuple[CardInstance, ...] = ()
+    # 宝可梦道具（rules-manual §5：每只限 1 个；昏厥随整叠进弃牌区）
+    attached_tool: CardInstance | None = None
     damage: int = 0
     conditions: frozenset[SpecialCondition] = frozenset()
 
@@ -131,6 +136,12 @@ class PlayerState(FrozenModel):
     # 特性限次（task 011）：once_per_turn 按栈顶 iid；once_per_turn_shared 按卡名（如「化危为吉」）
     abilities_used_this_turn: frozenset[int] = frozenset()
     shared_abilities_used_this_turn: frozenset[str] = frozenset()
+    # 跨回合标记（task 017）：「上一个对手的回合」内我方宝可梦被昏厥（化危为吉条件）；
+    # 昏厥发生时 owner != current_player 置位，我方回合结束清除
+    own_ko_during_opponent_turn: bool = False
+    # 竞技场（task 017）：每回合限打出 1 张 / stadium_grant 行动每回合 1 次
+    stadium_played_this_turn: bool = False
+    stadium_used_this_turn: bool = False
 
     @model_validator(mode="after")
     def _zone_limits(self) -> PlayerState:
@@ -177,6 +188,8 @@ class VisibleSelfState(FrozenModel):
     evolved_this_turn: frozenset[int]
     abilities_used_this_turn: frozenset[int]
     shared_abilities_used_this_turn: frozenset[str]
+    stadium_played_this_turn: bool
+    stadium_used_this_turn: bool
 
 
 class VisibleGameState(FrozenModel):
@@ -205,6 +218,11 @@ class GameState(FrozenModel):
     winner: int | None = None
     is_draw: bool = False
     pending_choice: PendingChoice | None = None
+    # 换上后回合权归属（默认 None = 换上方回合，普通昏厥语义）；
+    # 混乱反面自我昏厥时置为对手（攻击已消耗，D1 决议 task 013），_do_promote 读后清零
+    turn_after_promote: int | None = None
+    # 竞技场放置方（task 017：旧竞技场被替换时进其放置方弃牌区，rules-manual §5）
+    stadium_owner: int | None = None
 
     def visible_state(self, player: int) -> VisibleGameState:
         own = self.players[player]
@@ -231,6 +249,8 @@ class GameState(FrozenModel):
                 evolved_this_turn=own.evolved_this_turn,
                 abilities_used_this_turn=own.abilities_used_this_turn,
                 shared_abilities_used_this_turn=own.shared_abilities_used_this_turn,
+                stadium_played_this_turn=own.stadium_played_this_turn,
+                stadium_used_this_turn=own.stadium_used_this_turn,
             ),
             opponent=VisibleOpponentState(
                 hand_count=len(opp.hand),

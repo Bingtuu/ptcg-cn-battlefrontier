@@ -1,0 +1,13 @@
+# 大地容器（CSV6C-115，物品）
+# text_raw 原文：「这张卡牌，只有将自己的1张手牌放于弃牌区后才可使用。
+# 选择自己牌库中最多2张基本能量，在给对手看过之后，加入手牌。并重洗牌库。」
+card:
+  name_group: 大地容器
+  card_ids: [CSV6C-115]
+effects:
+  - trigger: on_play
+    cost:
+      - {action: discard, selector: own_hand, choose: 1}
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_energy], choose: 2, destination: hand}
+      - {action: shuffle_deck}

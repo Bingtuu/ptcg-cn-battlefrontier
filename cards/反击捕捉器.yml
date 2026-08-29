@@ -1,0 +1,12 @@
+# 反击捕捉器（CSV6C-114，物品）
+# text_raw 原文：「这张卡牌，只有在自己的剩余奖赏卡张数，比对手的剩余奖赏卡张数多时
+# 才可使用。选择对手的1只备战宝可梦，将其与战斗宝可梦互换。」
+# condition 落在条件门（不满足不枚举）；被换下回备战区的宝可梦特殊状态清除（§4）。
+card:
+  name_group: 反击捕捉器
+  card_ids: [CSV6C-114]
+effects:
+  - trigger: on_play
+    condition: own_prizes_more_than_opponent
+    actions:
+      - {action: switch, selector: opponent_bench, choose: 1}

@@ -39,11 +39,13 @@ def play_game(
     seed: int,
     max_turns: int = DEFAULT_MAX_TURNS,
     card_effects: dict | None = None,
+    agents: list | None = None,
 ) -> GameResult:
-    """两个随机 Agent 打完整局。同种子逐事件一致（事件流 hash 可比对）。"""
+    """两个 Agent 打完整局（默认随机 Agent）。同种子逐事件一致（事件流 hash 可比对）。"""
     engine = GameEngine(RandomSource(seed), card_effects=card_effects)
-    agents = [RandomAgent(RandomSource(seed + 1_000_001)),
-              RandomAgent(RandomSource(seed + 2_000_002))]
+    if agents is None:
+        agents = [RandomAgent(RandomSource(seed + 1_000_001)),
+                  RandomAgent(RandomSource(seed + 2_000_002))]
     engine.new_game(deck_a, deck_b)
 
     while engine.state.phase != "game_over":

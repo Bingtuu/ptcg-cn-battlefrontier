@@ -1,10 +1,17 @@
 # 莉莉艾的皮皮ex（CSV10C-082，基础）
-# text_raw 原文：「满月回旋曲：追加造成双方备战宝可梦数量×20伤害。」
-# 特性「妖精领域」（passive_static 弱点改写）归 task 013+。
+# text_raw 原文：「特性: 妖精领域
+# 只要这只宝可梦在场上，对手场上所有【龙】宝可梦的弱点全部变为【超】属性。
+# ［弱点按「×2」计算伤害。］
+# 满月回旋曲：追加造成双方备战宝可梦数量×20伤害。」
+# 妖精领域 = 声明式 modify_weakness（引擎 _effective_weakness 读声明；龙卡面无弱点
+# 时为弱点赋予）。弱点抗性仍仅战斗场结算（rules-manual §6 贯穿规则不变）。
 card:
   name_group: 莉莉艾的皮皮ex
   card_ids: [CSV10C-082]
 effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_weakness, args: {scope: opponent_field, target_type: 龙, becomes: 超}}
   - trigger: on_attack
     attack: 满月回旋曲
     actions:

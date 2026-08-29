@@ -1,0 +1,12 @@
+# 勇气护符（CSV1C-118，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的【基础】宝可梦的最大HP「+50」。」
+# 声明式常驻修正：引擎读 passive_static 声明经 modify_hp 求和进有效 HP（解释器不执行）；
+# condition holder_is_basic 判定持有者当前栈顶是否为基础（进化后即失效）。
+card:
+  name_group: 勇气护符
+  card_ids: [CSV1C-118]
+effects:
+  - trigger: passive_static
+    condition: holder_is_basic
+    actions:
+      - {action: modify_hp, args: {amount: 50}}

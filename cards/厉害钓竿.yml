@@ -1,0 +1,11 @@
+# 厉害钓竿（CSV1C-109，物品）
+# text_raw 原文：「选择自己弃牌区中的宝可梦和基本能量合计最多3张，
+# 在给对手看过之后，放回牌库并重洗牌库。」
+card:
+  name_group: 厉害钓竿
+  card_ids: [CSV1C-109]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [pokemon_or_basic_energy], choose: 3, destination: deck}
+      - {action: shuffle_deck}

@@ -42,7 +42,7 @@ card:
 effects:
   - trigger: on_play
     actions:
-      - {action: copy_attack, selector: opponent_active_attack}
+      - {action: reveal, selector: own_hand}
 """)
 
 COUNTER_DOC = parse_card_doc("""
@@ -178,6 +178,8 @@ def test_supporter_marker_resets_next_turn():
 
 
 def test_unimplemented_primitive_raises_dsl_error():
+    """词表有而未实现的原语（reveal）= DslError「未实现」（copy_attack 已于 task 017 实现，
+    本测试改用 reveal 锁定「词表有而未实现」路径）。"""
     state = main_state(p0_extra_hand=(inst(60, item("测试复制")),))
     engine = engine_at(state)
     engine.card_effects = {"测试复制": COPY_DOC}
@@ -194,12 +196,16 @@ def test_search_deck_requires_choose():
         engine.apply(0, Action(kind="play_trainer", iid=60))
 
 
-def test_counter_expression_not_yet_supported():
+def test_draw_counter_expression_supported():
+    """task 017：draw 支持计数表达式（own_remaining_prizes = 剩余奖赏 6 张 → 抽 6）。"""
     state = main_state(p0_extra_hand=(inst(60, item("测试计数")),))
     engine = engine_at(state)
     engine.card_effects = {"测试计数": COUNTER_DOC}
-    with pytest.raises(DslError, match="计数表达式"):
-        engine.apply(0, Action(kind="play_trainer", iid=60))
+    hand_before = len(state.players[0].hand) - 1  # 本体打出后
+    deck_before = len(state.players[0].deck)
+    engine.apply(0, Action(kind="play_trainer", iid=60))
+    assert len(engine.state.players[0].hand) == hand_before + 6
+    assert len(engine.state.players[0].deck) == deck_before - 6
 
 
 def test_draw_caps_at_deck_size():

@@ -1,0 +1,23 @@
+# 愿增猿（CSV8C-094，基础）
+# text_raw 原文：「特性: 亢奋脑力
+# 如果这只宝可梦身上附着了【恶】能量的话，则在自己的回合可以使用1次。选择自己场上
+# 1只宝可梦身上放置的最多3个伤害指示物，转放于对手场上1只宝可梦身上。
+# 精神幻觉：令对手的战斗宝可梦陷入【混乱】状态。」（60 伤 + 混乱）
+# 混乱判定见 rules-reference 附录 A D1 决议（攻击时掷币：正面正常且不解除，
+# 反面招式失败 + 自身 3 指示物）。
+# 「最多3个」降级：转放数量 = min(3, 来源指示物数) 全转（chooser 不建模数值选择，
+# rules-reference 附录 A 决议，task 017）。
+card:
+  name_group: 愿增猿
+  card_ids: [CSV8C-094]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    condition: holder_has_energy:恶
+    actions:
+      - {action: move_damage_counters, selector: own_pokemon_in_play, choose: 1, args: {max_counters: 3, target_pool: opponent_pokemon_any}}
+  - trigger: on_attack
+    attack: 精神幻觉
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 60}}
+      - {action: apply_status, selector: opponent_active, args: {status: confused}}

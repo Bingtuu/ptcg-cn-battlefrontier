@@ -1,0 +1,22 @@
+# 招式学习器 进化（CSV5C-119，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的宝可梦，可以使用这张卡牌上的招式。[需要满足使用
+# 招式所需能量。]放于宝可梦身上的这张卡牌，将在自己的回合结束时被放于弃牌区。
+# 【无】 进化 选择自己最多2只备战宝可梦，从自己牌库中选择从该宝可梦进化而来的卡牌
+# 各1张，各放于其身上进行进化。并重洗牌库。」
+# grant_attack 声明授予招式 + discard_at_turn_end 回合末弃置（引擎读声明，task 015）；
+# 授予招式的能量由持有者附着能量支付（「需要满足使用招式所需能量」）。
+# on_attack（task 016）：evolve from_deck 逐只检索进化（「各1张」= 每只 up-to 1，
+# 牌库非公开可以不找）；检索后必洗牌（shuffle_deck 节点，DSL 编写纪律）。
+card:
+  name_group: 招式学习器 进化
+  card_ids: [CSV5C-119]
+effects:
+  - trigger: passive_static
+    actions:
+      - action: grant_attack
+        args: {attack: 进化, discard_at_turn_end: true}
+  - trigger: on_attack
+    attack: 进化
+    actions:
+      - {action: evolve, selector: own_bench, choose: 2, args: {mode: from_deck}}
+      - {action: shuffle_deck}

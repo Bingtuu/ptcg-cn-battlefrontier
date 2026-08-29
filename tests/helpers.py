@@ -3,6 +3,7 @@
 from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import (
+    AttackDef,
     CardDef,
     CardInstance,
     GameState,
@@ -11,22 +12,32 @@ from battlefrontier.engine.state import (
 )
 
 
+def _attacks(damage: int | None, cost: int) -> tuple[AttackDef, ...]:
+    """白板 stub：单个固定伤害招式，成本为 cost 个无色能量。"""
+    if damage is None:
+        return ()
+    return (AttackDef(name="打击", cost=("无",) * cost, damage=damage),)
+
+
 def basic(name: str, hp: int = 70, damage: int = 20, cost: int = 1, retreat: int = 1) -> CardDef:
     return CardDef(
         card_id=f"stub-{name}", name=name, supertype="pokemon",
-        hp=hp, stage=0, attack_damage=damage, attack_cost=cost, retreat_cost=retreat,
+        hp=hp, stage=0, attacks=_attacks(damage, cost), retreat_cost=retreat,
     )
 
 
 def stage1(name: str, evolves_from: str, hp: int = 90, damage: int = 40, cost: int = 2) -> CardDef:
     return CardDef(
         card_id=f"stub-{name}", name=name, supertype="pokemon",
-        hp=hp, stage=1, evolves_from=evolves_from, attack_damage=damage, attack_cost=cost,
+        hp=hp, stage=1, evolves_from=evolves_from, attacks=_attacks(damage, cost),
     )
 
 
-def energy(name: str = "基本能量") -> CardDef:
-    return CardDef(card_id=f"stub-{name}", name=name, supertype="energy")
+def energy(name: str = "基本能量", energy_type: str | None = None) -> CardDef:
+    return CardDef(
+        card_id=f"stub-{name}", name=name, supertype="energy",
+        energy_type=energy_type, is_basic_energy=True,
+    )
 
 
 def deck60() -> list[CardDef]:

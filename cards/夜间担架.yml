@@ -1,0 +1,9 @@
+# 夜间担架（CSV8C-183，物品）
+# text_raw 原文：「选择自己弃牌区中的1张宝可梦或1张基本能量，在给对手看过之后，加入手牌。」
+card:
+  name_group: 夜间担架
+  card_ids: [CSV8C-183]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [pokemon_or_basic_energy], choose: 1, destination: hand}

@@ -1,0 +1,11 @@
+# 博士的研究（CSV1C-121，支援者）
+# text_raw 原文：「将自己的手牌全部放于弃牌区，从牌库上方抽取7张卡牌。」
+card:
+  name_group: 博士的研究
+  card_ids: [CSV1C-121]
+effects:
+  - trigger: on_play
+    cost:
+      - {action: discard, selector: own_hand, count: all}
+    actions:
+      - {action: draw, count: 7}

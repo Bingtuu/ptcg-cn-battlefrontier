@@ -30,8 +30,22 @@ class FrozenModel(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class AttackDef(FrozenModel):
+    """招式定义（rules-manual §6）：成本为能量属性符号列表（"无"=无色，任意属性可抵）。
+
+    damage=None 表示纯效果招式，效果文本走 DSL on_attack（task 009+）；
+    白板期只枚举有伤害的招式。
+    """
+
+    name: str
+    cost: tuple[str, ...] = ()
+    damage: int | None = None
+    # 伤害修饰符（开放字符串：+/- /× 等，对齐 db damage_modifier；白板结算忽略，DSL 结算时用）
+    damage_modifier: str | None = None
+
+
 class CardDef(FrozenModel):
-    """卡定义（白板期 stub）：只含规则骨架所需字段，效果留空给 DSL。"""
+    """卡定义：规则骨架所需字段（属性/招式/弱点抗性/规则盒），效果留空给 DSL。"""
 
     card_id: str
     name: str
@@ -39,9 +53,21 @@ class CardDef(FrozenModel):
     hp: int | None = None
     stage: int = 0
     evolves_from: str | None = None
-    attack_damage: int | None = None
-    attack_cost: int = 0
+    # 宝可梦属性 / 能量卡属性（开放字符串，对齐 db 词表；rules-manual §1.1/§1.2）
+    energy_type: str | None = None
+    # 基本能量标记（对齐 db is_basic_energy；撤退/效果过滤器用，如「基本能量」回收）
+    is_basic_energy: bool = False
+    attacks: tuple[AttackDef, ...] = ()
     retreat_cost: int = 0
+    # 弱点/抗性属性（rules-manual §6：弱点 ×2 / 抗性 -30）
+    weakness: str | None = None
+    resistance: str | None = None
+    # 规则盒标记（开放字符串：ex/V/VSTAR/VMAX/光辉…，rules-manual §1.4）→ 昏厥奖赏张数
+    rule_box: str | None = None
+    # 训练家卡子类（开放字符串：物品/支援者/竞技场/宝可梦道具）；M2 起随效果落地扩字段
+    trainer_subtype: str | None = None
+    # ACE SPEC 标记（对齐 db is_ace_spec；规则：每卡组限 1 张 ACE SPEC，rules-reference 附录 A）
+    is_ace_spec: bool = False
 
 
 class CardInstance(FrozenModel):
@@ -64,6 +90,31 @@ class InPlayPokemon(FrozenModel):
         return self.stack[-1]
 
 
+class PendingChoice(FrozenModel):
+    """挂起的效果执行（chooser 机制，PRD §5.2）：等待 Agent 选择，恢复信息全在此。
+
+    Effect 树不入状态——恢复时按 (source.card.name, effect_index) 从 card_effects
+    重取，cursor 指向扁平步骤（cost 段在前，actions 段在后）。
+    pool/filters/min~max/destination 供合法选择枚举，无需重跑原语。
+    """
+
+    player: int
+    source: CardInstance
+    effect_index: int
+    cursor: int
+    pool: str                              # own_hand / own_deck / own_discard / own_pokemon_in_play
+    filters: tuple[str, ...] = ()
+    min_choose: int = 0
+    max_choose: int = 1
+    destination: str | None = None
+    # 挂起瞬间解析冻结的候选池（choice 阶段状态不变，池不会漂移）
+    pool_iids: tuple[int, ...] = ()
+    # 同节点两段式选择的中间结果（task 011，如 attach_energy 已选的能量 iids）
+    payload: tuple[int, ...] = ()
+    # 完成模式：trainer = 效果完成后本体进弃牌区；ability = 特性不弃置
+    completion: str = "trainer"
+
+
 class PlayerState(FrozenModel):
     deck: tuple[CardInstance, ...] = ()
     hand: tuple[CardInstance, ...] = ()
@@ -71,10 +122,15 @@ class PlayerState(FrozenModel):
     prizes: tuple[CardInstance, ...] = ()
     active: InPlayPokemon | None = None
     bench: tuple[InPlayPokemon, ...] = ()
-    # 每回合规则标记（回合结束重置）：能量附着 / 登场 / 已进化（存场上宝可梦栈顶 iid）
+    # 每回合规则标记（回合结束重置）：能量附着 / 支援者 / 撤退 / 登场 / 已进化（存场上宝可梦栈顶 iid）
     energy_attached_this_turn: bool = False
+    supporter_played_this_turn: bool = False
+    retreated_this_turn: bool = False
     entered_play_this_turn: frozenset[int] = frozenset()
     evolved_this_turn: frozenset[int] = frozenset()
+    # 特性限次（task 011）：once_per_turn 按栈顶 iid；once_per_turn_shared 按卡名（如「化危为吉」）
+    abilities_used_this_turn: frozenset[int] = frozenset()
+    shared_abilities_used_this_turn: frozenset[str] = frozenset()
 
     @model_validator(mode="after")
     def _zone_limits(self) -> PlayerState:
@@ -86,7 +142,11 @@ class PlayerState(FrozenModel):
 
 
 class VisibleOpponentState(FrozenModel):
-    """对手可见视图：手牌/牌库/奖赏只剩数量；弃牌堆与场上公开（PRD §6.3）。"""
+    """对手可见视图：手牌/牌库/奖赏只剩数量；弃牌堆与场上公开（PRD §6.3）。
+
+    布阵阶段（setup）双方宝可梦背面放置：active/bench 内容隐藏，
+    只公开已放置数量 face_down_pokemon（rules-reference §1）。
+    """
 
     hand_count: int
     deck_count: int
@@ -94,17 +154,45 @@ class VisibleOpponentState(FrozenModel):
     discard: tuple[CardInstance, ...]
     active: InPlayPokemon | None
     bench: tuple[InPlayPokemon, ...]
+    face_down_pokemon: int = 0
+
+
+class VisibleSelfState(FrozenModel):
+    """自己可见视图：手牌/弃牌堆/场上全量 + 回合规则标记；
+
+    牌库顺序与奖赏卡内容对 Agent 隐藏（PRD §6.3：牌库对引擎确定、对 Agent 隐藏；
+    奖赏卡背面放置，双方均不可见内容，只余数量）。
+    """
+
+    hand: tuple[CardInstance, ...]
+    deck_count: int
+    prizes_count: int
+    discard: tuple[CardInstance, ...]
+    active: InPlayPokemon | None
+    bench: tuple[InPlayPokemon, ...]
+    energy_attached_this_turn: bool
+    supporter_played_this_turn: bool
+    retreated_this_turn: bool
+    entered_play_this_turn: frozenset[int]
+    evolved_this_turn: frozenset[int]
+    abilities_used_this_turn: frozenset[int]
+    shared_abilities_used_this_turn: frozenset[str]
 
 
 class VisibleGameState(FrozenModel):
-    """Agent 可见视图：自己全量 + 对手过滤后。"""
+    """Agent 可见视图：自己侧隐藏牌库顺序/奖赏卡内容 + 对手侧隐藏手牌/牌库/奖赏内容。
 
-    own: PlayerState
+    pending_pool：chooser 挂起时向选择方揭示的检索池内容（仅当池在非公开区域，
+    如牌库检索——rules-manual §3：检索时选择方可查看牌库选卡；对手视图恒 None）。
+    """
+
+    own: VisibleSelfState
     opponent: VisibleOpponentState
     stadium: CardInstance | None
     turn: int
     current_player: int
     phase: str
+    pending_pool: tuple[CardInstance, ...] | None = None
 
 
 class GameState(FrozenModel):
@@ -116,21 +204,48 @@ class GameState(FrozenModel):
     first_player: int = 0
     winner: int | None = None
     is_draw: bool = False
+    pending_choice: PendingChoice | None = None
 
     def visible_state(self, player: int) -> VisibleGameState:
+        own = self.players[player]
         opp = self.players[1 - player]
+        face_down = self.phase in ("setup_active", "setup_bench")
+        # chooser 挂起：仅向选择方揭示非公开区域（牌库）的检索池内容
+        pending_pool = None
+        pc = self.pending_choice
+        if pc is not None and pc.player == player and pc.pool == "own_deck":
+            by_iid = {c.iid: c for c in own.deck}
+            pending_pool = tuple(by_iid[i] for i in pc.pool_iids)
         return VisibleGameState(
-            own=self.players[player],
+            own=VisibleSelfState(
+                hand=own.hand,
+                deck_count=len(own.deck),
+                prizes_count=len(own.prizes),
+                discard=own.discard,
+                active=own.active,
+                bench=own.bench,
+                energy_attached_this_turn=own.energy_attached_this_turn,
+                supporter_played_this_turn=own.supporter_played_this_turn,
+                retreated_this_turn=own.retreated_this_turn,
+                entered_play_this_turn=own.entered_play_this_turn,
+                evolved_this_turn=own.evolved_this_turn,
+                abilities_used_this_turn=own.abilities_used_this_turn,
+                shared_abilities_used_this_turn=own.shared_abilities_used_this_turn,
+            ),
             opponent=VisibleOpponentState(
                 hand_count=len(opp.hand),
                 deck_count=len(opp.deck),
                 prizes_count=len(opp.prizes),
                 discard=opp.discard,
-                active=opp.active,
-                bench=opp.bench,
+                active=None if face_down else opp.active,
+                bench=() if face_down else opp.bench,
+                face_down_pokemon=(
+                    (1 if opp.active else 0) + len(opp.bench) if face_down else 0
+                ),
             ),
             stadium=self.stadium,
             turn=self.turn,
             current_player=self.current_player,
             phase=self.phase,
+            pending_pool=pending_pool,
         )

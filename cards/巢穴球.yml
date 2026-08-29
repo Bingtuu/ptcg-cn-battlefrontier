@@ -1,0 +1,10 @@
+# 巢穴球（CSVH1C-043，物品）
+# text_raw 原文：「选择自己牌库中的1张【基础】宝可梦，放于备战区。并重洗牌库。」
+card:
+  name_group: 巢穴球
+  card_ids: [CSVH1C-043]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon], choose: 1, destination: bench}
+      - {action: shuffle_deck}

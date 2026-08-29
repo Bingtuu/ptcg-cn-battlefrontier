@@ -1,0 +1,13 @@
+# 高级球（CSV1C-112，物品）
+# text_raw 原文：「这张卡牌，只有将自己的2张手牌放于弃牌区后才可使用。
+# 选择自己牌库中的1张宝可梦，在给对手看过之后，加入手牌。并重洗牌库。」
+card:
+  name_group: 高级球
+  card_ids: [CSV1C-112]
+effects:
+  - trigger: on_play
+    cost:
+      - {action: discard, selector: own_hand, choose: 2}
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [pokemon], choose: 1, destination: hand}
+      - {action: shuffle_deck}

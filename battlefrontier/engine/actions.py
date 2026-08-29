@@ -14,6 +14,8 @@ class Action(BaseModel):
     iid: int | None = None
     target_iid: int | None = None
     bench_index: int | None = None
+    attack_index: int = 0  # 多招式卡的招式下标（CardDef.attacks）
+    choices: tuple[int, ...] = ()  # chooser 选择的 iid 集合（phase="choice"）
 
 
 class IllegalActionError(Exception):

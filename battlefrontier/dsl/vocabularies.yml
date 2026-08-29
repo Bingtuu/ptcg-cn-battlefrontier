@@ -1,0 +1,71 @@
+# DSL 词表（PRD §5.2 + 硬性规矩「枚举开放」）：原语/选择器/触发器等一律
+# 开放字符串 + 本文件，代码不写死。需要新词 = 在本文件对应段追加一行（零代码）。
+# 初版 = task 005 首批原语清单（对齐 db effect_tags.yml 29+3 词表的语义边界）。
+
+# 动作原语（原子操作）
+actions:
+  - draw                    # 抽牌（固定 N / 补至 N / 计数抽）
+  - discard                 # 弃置（手牌→弃牌区；效果或成本）
+  - search_deck             # 检索牌库（过滤器 + up-to-N + 去向）
+  - shuffle_deck            # 重洗牌库
+  - recover_from_discard    # 弃牌区回收（入手牌 / 回牌库 / 附着）
+  - damage                  # 造成伤害（固定 / 变量公式）
+  - place_damage_counters   # 放置伤害指示物（铺伤）
+  - move_damage_counters    # 转放伤害指示物
+  - attach_energy           # 额外附着能量（不受每回合 1 次限制）
+  - move_energy             # 场上转附能量（不增量）
+  - apply_status            # 施加特殊状态
+  - clear_status            # 恢复特殊状态
+  - switch                  # 换位（含强制对手 gust）
+  - put_into_play           # 直接放上场（如基础宝可梦直放备战区）
+  - evolve                  # 进化（含跳阶 / 从牌库进化）
+  - hand_to_deck_bottom     # 手牌洗回牌库下方
+  - copy_attack             # 复制招式
+  - reveal                  # 给对手看过（展示）
+
+# 选择器（作用对象）
+selectors:
+  - self                    # 这只宝可梦
+  - opponent_active         # 对手战斗宝可梦
+  - opponent_active_attack  # 对手战斗宝可梦所拥有的招式（复制目标）
+  - own_hand                # 自己的手牌
+  - own_deck                # 自己的牌库
+  - own_discard             # 自己的弃牌区
+  - own_pokemon_in_play     # 自己场上的宝可梦
+  - own_bench               # 自己的备战区
+  - opponent_pokemon_any    # 对手的 1 只宝可梦（含备战）
+  - opponent_bench          # 对手的备战区
+
+# 触发器（区分主动发动与被动监听）
+triggers:
+  - on_play                 # 训练家卡从手牌使用
+  - ability_manual          # 特性：自己回合主动发动
+  - on_attack               # 招式附加效果
+  - passive_static          # 常驻修正（如 HP+50 / 弱点改写）
+  - trigger_on_event        # 事件监听（如跨回合昏厥条件）
+  - stadium_grant           # 竞技场赋予双方每回合行动
+
+# 计数表达式（count 字段除 int 外的合法字符串；all = 全部）
+counters:
+  - all
+  - own_remaining_prizes           # 自己剩余奖赏卡张数
+  - opponent_remaining_prizes      # 对手剩余奖赏卡张数
+  - damage_counters_on_target      # 目标身上伤害指示物数量
+  - damage_counters_on_self        # 自身身上伤害指示物数量
+  - attached_energy_on_opponent_active  # 对手战斗宝可梦附着能量数量
+  - bench_count_both               # 双方备战宝可梦数量
+
+# 去向（destination 字段）
+destinations:
+  - hand
+  - bench
+  - deck
+  - deck_bottom
+  - discard
+  - attach                # 附着于宝可梦
+
+# 限次（limit 字段）
+limits:
+  - once_per_turn           # 每回合 1 次（每只/每张独立）
+  - once_per_turn_shared    # 每回合 1 次（同名全卡组共享，如「化危为吉」）
+  - unlimited               # 任意次

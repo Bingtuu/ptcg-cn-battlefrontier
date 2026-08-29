@@ -7,7 +7,16 @@
 """
 
 
-from helpers import basic, engine_at, in_play, inst, main_state, stage1
+from helpers import (
+    basic,
+    engine_at,
+    finish_setup,
+    in_play,
+    inst,
+    main_state,
+    new_game,
+    stage1,
+)
 
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.state import GameState, PlayerState, SpecialCondition
@@ -15,6 +24,34 @@ from battlefrontier.engine.state import GameState, PlayerState, SpecialCondition
 
 def kinds_of(e, player=0):
     return {a.kind for a in e.legal_actions(player)}
+
+
+# ── C：主阶段铺备战区（规则书·行动阶段：放置基础宝可梦不限次，≤5）─────────
+
+def test_place_basic_to_bench_in_main_phase() -> None:
+    e = engine_at(main_state())  # p0 手牌含小火龙(50，基础)
+    places = [a for a in e.legal_actions(0) if a.kind == "place_bench"]
+    assert len(places) == 1 and places[0].iid == 50
+    e.apply(0, places[0])
+    p0 = e.state.players[0]
+    assert len(p0.bench) == 1
+    assert [c.iid for c in p0.hand] == [51]
+    assert 50 in p0.entered_play_this_turn  # 当回合登场 → 不可进化（联动规则）
+
+
+def test_place_bench_main_stage1_not_placeable() -> None:
+    hand_evo = inst(60, stage1("妙蛙草", "妙蛙种子"))
+    e = engine_at(main_state(p0_extra_hand=(hand_evo,)))
+    places = [a for a in e.legal_actions(0) if a.kind == "place_bench"]
+    assert {a.iid for a in places} == {50}  # 只有基础宝可梦可放
+
+
+def test_place_bench_main_blocked_when_full() -> None:
+    state = main_state()
+    full_bench = tuple(in_play(10 + i, basic("超音蝠")) for i in range(5))
+    p0 = state.players[0].model_copy(update={"bench": full_bench})
+    e = engine_at(state.model_copy(update={"players": (p0, state.players[1])}))
+    assert "place_bench" not in kinds_of(e)
 
 
 # ── C：能量附着 ──────────────────────────────────────────
@@ -63,6 +100,21 @@ def test_cannot_evolve_twice_same_turn() -> None:
     e = engine_at(main_state(p0_extra_hand=hand))
     e.apply(0, next(a for a in e.legal_actions(0) if a.kind == "evolve"))
     assert "evolve" not in kinds_of(e)  # 栈顶 iid 变了，但同回合已进化锁定
+
+
+def test_cannot_evolve_on_first_turn_after_setup() -> None:
+    """【rules-manual §1.1】setup 放置的宝可梦视为刚登场：双方各自第一回合不可进化，
+    到自己的第二回合才解锁。"""
+    e = new_game(seed=0)  # first_player=1，其起手含妙蛙草、战斗场为妙蛙种子
+    finish_setup(e)
+    fp = e.state.first_player
+    assert e.state.turn == 1
+    assert "evolve" not in {a.kind for a in e.legal_actions(fp)}
+    # 双方各自结束第一回合（先攻首回合不可攻击）→ 进入先攻方第二回合
+    e.apply(fp, Action(kind="end_turn"))
+    e.apply(1 - fp, Action(kind="end_turn"))
+    assert e.state.turn == 2 and e.state.current_player == fp
+    assert "evolve" in {a.kind for a in e.legal_actions(fp)}
 # ── C：撤退 ─────────────────────────────────────────────
 
 def test_retreat_pays_cost_and_clears_conditions() -> None:
@@ -91,6 +143,25 @@ def test_retreat_blocked_without_energy() -> None:
     p0 = state.players[0].model_copy(update={"bench": (in_play(3, basic("小火龙")),)})
     e = engine_at(state.model_copy(update={"players": (p0, state.players[1])}))
     assert "retreat" not in kinds_of(e)
+
+
+def test_retreat_once_per_turn() -> None:
+    """【官方规则·撤退】撤退在自己的回合只有 1 次机会（pokemon.cn basic_rules05）。"""
+    bench = (in_play(3, basic("小火龙")), in_play(4, basic("超音蝠")))
+    state = main_state(p0_active_energies=1)
+    p0 = state.players[0].model_copy(update={"bench": bench})
+    e = engine_at(state.model_copy(update={"players": (p0, state.players[1])}))
+    retreats = [a for a in e.legal_actions(0) if a.kind == "retreat"]
+    assert retreats
+    e.apply(0, retreats[0])
+    # 撤退后战斗场是小火龙（无能量），但即使有能量本回合也不能再撤退
+    p0_after = e.state.players[0]
+    assert p0_after.retreated_this_turn is True
+    assert "retreat" not in kinds_of(e)
+    # 次回合重置
+    e.apply(0, Action(kind="end_turn"))
+    e.apply(1, Action(kind="end_turn"))
+    assert e.state.players[0].retreated_this_turn is False
 
 
 # ── D：攻击与伤害 ────────────────────────────────────────
@@ -125,6 +196,10 @@ def test_knockout_prize_and_promote() -> None:
     assert any(c.iid == 2 for c in p1.discard)  # 昏厥宝可梦进弃牌堆
     assert len(p1.discard) == 2  # 附着的 1 能量一并弃置
     assert len(p0.prizes) == 5 and len(p0.hand) == 3  # 拿 1 奖赏
+    # take_prize 事件记录拿到的是哪张（回放保真）
+    prize_events = [ev for ev in e.events if ev.kind == "take_prize"]
+    assert len(prize_events) == 1
+    assert {"iid", "name"} <= set(prize_events[0].detail)
     # 换上阶段：只有 promote 可选
     promotes = e.legal_actions(1)
     assert {a.kind for a in promotes} == {"promote"}

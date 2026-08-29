@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from battlefrontier.engine.state import (
+    AttackDef,
     CardDef,
     CardInstance,
     GameState,
@@ -22,7 +23,7 @@ def _pokemon(name: str, hp: int = 70, damage: int = 20, stage: int = 0) -> CardD
         supertype="pokemon",
         hp=hp,
         stage=stage,
-        attack_damage=damage,
+        attacks=(AttackDef(name="打击", cost=("无",), damage=damage),),
     )
 
 
@@ -117,6 +118,23 @@ def test_visible_state_hides_opponent_hidden_zones() -> None:
     assert not hasattr(view.opponent, "hand")
     assert view.opponent.active is not None
     assert len(view.opponent.bench) == 1
+
+
+def test_visible_state_hides_own_deck_order_and_prizes() -> None:
+    """PRD §6.3：牌库内容对 Agent 隐藏；奖赏卡背面放置，双方均不可见内容。
+
+    自己侧可见：手牌（全量）、牌库/奖赏数量、弃牌堆、场上、回合规则标记。
+    """
+    state = _sample_state()
+    view = state.visible_state(0)
+    assert "deck" not in type(view.own).model_fields
+    assert "prizes" not in type(view.own).model_fields
+    assert view.own.deck_count == len(state.players[0].deck)
+    assert view.own.prizes_count == 6
+    assert [c.iid for c in view.own.hand] == [3, 4]
+    # 决策所需的回合标记保留可见
+    assert view.own.energy_attached_this_turn is False
+    assert view.own.supporter_played_this_turn is False
 
 
 def test_visible_state_is_serializable_for_agent() -> None:

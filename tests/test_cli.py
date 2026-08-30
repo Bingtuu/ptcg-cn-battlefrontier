@@ -47,3 +47,43 @@ def test_cli_run_end_to_end(tmp_path, capsys):
         assert len(db.games(exp_id)) == 2
     finally:
         db.close()
+
+
+def _seed_pair(results: Path):
+    """造 base/variant 两实验供 sensitivity 子命令冒烟。"""
+    from battlefrontier.runner.play import GameResult
+
+    db = ResultsDB(results)
+    ids = []
+    for variant, wins in (("", 3), ("v1", 1)):
+        exp_id = db.start_experiment(name="grp", definition_yaml="y",
+                                     code_version="c", data_version="d",
+                                     group_name="grp", variant=variant)
+        for seed in range(4):
+            res = GameResult(winner=0 if seed < wins else 1, is_draw=False,
+                             turns=8, phase="main", first_player=0)
+            db.record_game(exp_id, seed=seed, first_player=0, result=res,
+                           deck_a_id="a", deck_b_id="b")
+        db.finish_experiment(exp_id)
+        ids.append(exp_id)
+    db.close()
+    return ids
+
+
+def test_cli_sensitivity(tmp_path, capsys):
+    """task 023：bfsim sensitivity <base> <variant...> 并排 ΔWR 报告。"""
+    results = tmp_path / "r.db"
+    base_id, var_id = _seed_pair(results)
+    rc = main(["sensitivity", str(base_id), str(var_id),
+               "--results", str(results)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "ΔWR" in out and "v1" in out
+
+
+def test_cli_sensitivity_bad_id(tmp_path, capsys):
+    results = tmp_path / "r.db"
+    _seed_pair(results)
+    rc = main(["sensitivity", "999", "1", "--results", str(results)])
+    assert rc == 1
+    assert "错误" in capsys.readouterr().out

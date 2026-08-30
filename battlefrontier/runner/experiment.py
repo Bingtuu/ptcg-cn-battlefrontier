@@ -84,6 +84,43 @@ class AgentSides(FrozenModel):
     b: AgentCfg = Field(default_factory=AgentCfg)
 
 
+# ── 换卡敏感性：variants（PRD §9，task 023）───────────────
+
+class SwapCfg(FrozenModel):
+    """一次换卡：side 方卡组拿出 out×out_count，放入 in×in_count（`in` 为关键字走别名）。"""
+
+    model_config = ConfigDict(frozen=True, populate_by_name=True)
+
+    side: str = "a"
+    out: str
+    out_count: int = Field(gt=0)
+    in_: str = Field(alias="in")
+    in_count: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _check_side(self) -> SwapCfg:
+        if self.side not in ("a", "b"):
+            raise ValueError(f"未知 side: {self.side}（仅 a/b）")
+        return self
+
+
+class VariantCfg(FrozenModel):
+    """对照组定义：相对 baseline 卡组仅差 swaps 声明的若干张卡。"""
+
+    name: str = Field(min_length=1)
+    swaps: list[SwapCfg] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _check_balanced(self) -> VariantCfg:
+        total_out = sum(s.out_count for s in self.swaps)
+        total_in = sum(s.in_count for s in self.swaps)
+        if total_out != total_in:
+            raise ValueError(
+                f"variant「{self.name}」换卡不平衡（不猜）：拿出 {total_out} 张 / "
+                f"放入 {total_in} 张，卡组须保持 60 张")
+        return self
+
+
 class ExperimentDef(FrozenModel):
     name: str
     games: int = Field(gt=0)
@@ -91,6 +128,14 @@ class ExperimentDef(FrozenModel):
     decks: DeckSides
     agents: AgentSides = Field(default_factory=AgentSides)
     snapshot_date: str | None = None
+    variants: list[VariantCfg] = []
+
+    @model_validator(mode="after")
+    def _check_variants(self) -> ExperimentDef:
+        names = [v.name for v in self.variants]
+        if len(names) != len(set(names)):
+            raise ValueError(f"variant 重名（不猜）: {sorted(n for n in names if names.count(n) > 1)}")
+        return self
 
 
 def load_experiment(path: str | Path) -> ExperimentDef:
@@ -119,8 +164,33 @@ def parse_decklist(text: str) -> list[tuple[int, str]]:
     return entries
 
 
-# ── Agent 构建（worker 内同规则重建）─────────────────────
+# ── 换卡应用（纯函数，可单测）────────────────────────────
 
+def apply_swaps(deck: list[CardDef], swaps: list[SwapCfg],
+                in_cards: dict[str, CardDef]) -> list[CardDef]:
+    """对一份 60 张卡组应用换卡声明；out 存量不足 / in 未解析显式报错（不猜）。"""
+    new_deck = list(deck)
+    for swap in swaps:
+        remaining = swap.out_count
+        kept: list[CardDef] = []
+        for card in new_deck:
+            if card.name == swap.out and remaining > 0:
+                remaining -= 1
+            else:
+                kept.append(card)
+        if remaining > 0:
+            raise ValueError(
+                f"卡组中「{swap.out}」存量不足：需拿出 {swap.out_count} 张，"
+                f"差 {remaining} 张")
+        in_card = in_cards.get(swap.in_)
+        if in_card is None:
+            raise ValueError(f"换入卡「{swap.in_}」未解析（不猜）")
+        kept.extend([in_card] * swap.in_count)
+        new_deck = kept
+    return new_deck
+
+
+# ── Agent 构建（worker 内同规则重建）─────────────────────
 def _build_one(cfg: AgentCfg, seed: int, offset: int):
     if cfg.type == "heuristic":
         return HeuristicAgent(HeuristicParams(**cfg.params))
@@ -232,6 +302,50 @@ def prepare_experiment(defn: ExperimentDef, db_path: str,
         data_version=_data_version(db_path, defn.snapshot_date), warnings=warnings)
 
 
+def prepare_variant(prep: PreparedExperiment, variant: VariantCfg,
+                    db_path: str,
+                    cards_dir: str | Path = DEFAULT_CARDS_DIR) -> PreparedExperiment:
+    """baseline 准备结果应用 variant 换卡声明；换入卡经 db 解析（与 decklist 同规则）。
+
+    换入卡可能不在 baseline 卡组里，其 DSL 文档需从定义库补入 card_effects。
+    """
+    from ptcgdb.sdk import open_db
+
+    db = open_db(db_path)
+    try:
+        in_cards: dict[str, CardDef] = {}
+        for swap in variant.swaps:
+            if swap.in_ in in_cards:
+                continue
+            found = db.search_cards(name=swap.in_, limit=1)
+            if not found:
+                raise ValueError(f"换入卡名未命中（不猜）: {swap.in_}")
+            card_def, _ = carddef_from_db(db.get_card(found[0].card_id))
+            in_cards[swap.in_] = card_def
+    finally:
+        db.close()
+
+    sides = {"a": list(prep.deck_a), "b": list(prep.deck_b)}
+    ids = {"a": prep.deck_a_id, "b": prep.deck_b_id}
+    touched: set[str] = set()
+    for swap in variant.swaps:
+        sides[swap.side] = apply_swaps(sides[swap.side], [swap], in_cards)
+        touched.add(swap.side)
+    for side in touched:
+        ids[side] = f"{ids[side]} [variant:{variant.name}]"
+
+    card_effects = dict(prep.card_effects)
+    names = {c.name for d in sides.values() for c in d}
+    missing = names - set(card_effects)
+    if missing:
+        all_effects = load_card_dir(cards_dir)
+        card_effects.update({n: doc for n, doc in all_effects.items() if n in missing})
+    return PreparedExperiment(
+        deck_a=sides["a"], deck_b=sides["b"], card_effects=card_effects,
+        deck_a_id=ids["a"], deck_b_id=ids["b"], data_version=prep.data_version,
+        warnings=list(prep.warnings))
+
+
 # ── 执行（§8.2/§8.4）────────────────────────────────────
 
 def _code_version() -> str:
@@ -269,13 +383,15 @@ def _run_one_experiment(payload: dict) -> tuple[int, GameResult | None, str | No
 
 def execute_experiment(prep: PreparedExperiment, defn: ExperimentDef,
                        results_path: str | Path, *, workers: int = 1,
-                       definition_yaml: str = "") -> int:
+                       definition_yaml: str = "",
+                       group_name: str = "", variant: str = "") -> int:
     """跑完实验并增量落库；返回 experiment_id。异常时状态记 aborted 后抛出。"""
     db = ResultsDB(results_path)
     try:
         exp_id = db.start_experiment(
             name=defn.name, definition_yaml=definition_yaml,
-            code_version=_code_version(), data_version=prep.data_version)
+            code_version=_code_version(), data_version=prep.data_version,
+            group_name=group_name, variant=variant)
         seeds = [defn.seed_start + i for i in range(defn.games)]
 
         def record(seed: int, result: GameResult) -> None:
@@ -320,6 +436,46 @@ def execute_experiment(prep: PreparedExperiment, defn: ExperimentDef,
         return exp_id
     finally:
         db.close()
+
+
+def execute_group(defn: ExperimentDef, preps: list[PreparedExperiment],
+                  results_path: str | Path, *, workers: int = 1,
+                  definition_yaml: str = "") -> list[int]:
+    """换卡敏感性分组执行（PRD §9）：baseline + 各 variant 同种子区间依次跑。
+
+    preps[0] 为 baseline，其后与各 variant 一一对应；同 defn.games/seed_start
+    保证配对可比。返回 [base_id, *variant_ids]。
+    """
+    if len(preps) != 1 + len(defn.variants):
+        raise ValueError(
+            f"preps 数 {len(preps)} 与 1+variants 数 {len(defn.variants)} 不符")
+    ids = [execute_experiment(preps[0], defn, results_path, workers=workers,
+                              definition_yaml=definition_yaml,
+                              group_name=defn.name)]
+    for variant, prep in zip(defn.variants, preps[1:], strict=True):
+        ids.append(execute_experiment(prep, defn, results_path, workers=workers,
+                                      definition_yaml=definition_yaml,
+                                      group_name=defn.name, variant=variant.name))
+    return ids
+
+
+def run_group(defn: ExperimentDef, db_path: str,
+              results_path: str | Path = DEFAULT_RESULTS_PATH, *,
+              workers: int = 1, cards_dir: str | Path = DEFAULT_CARDS_DIR,
+              definition_yaml: str = "") -> tuple[list[int], list[str]]:
+    """prepare（baseline + variants）+ execute_group 一步走（CLI 入口用）。
+
+    返回 (实验 id 列表, 装载告警列表)。
+    """
+    prep = prepare_experiment(defn, db_path, cards_dir=cards_dir)
+    preps = [prep] + [prepare_variant(prep, v, db_path, cards_dir=cards_dir)
+                      for v in defn.variants]
+    warnings = [f"[{label}] {w}" for label, p in
+                zip(["baseline"] + [v.name for v in defn.variants], preps, strict=True)
+                for w in p.warnings]
+    ids = execute_group(defn, preps, results_path, workers=workers,
+                        definition_yaml=definition_yaml)
+    return ids, warnings
 
 
 def run_experiment(defn: ExperimentDef, db_path: str,

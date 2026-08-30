@@ -83,3 +83,28 @@ def test_results_db_is_separate_sqlite(tmp_path):
             "SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] >= 3
     finally:
         conn.close()
+
+
+def test_old_schema_migrates_group_columns(tmp_path):
+    """task 023 前的旧库文件：打开时自动补 group_name/variant 列，已有行保留。"""
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.execute(
+        "CREATE TABLE experiments ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,"
+        " definition_yaml TEXT NOT NULL, code_version TEXT NOT NULL,"
+        " data_version TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running',"
+        " created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+    conn.execute(
+        "INSERT INTO experiments (name, definition_yaml, code_version, data_version)"
+        " VALUES ('old-exp', 'y', 'c', 'd')")
+    conn.commit()
+    conn.close()
+
+    db = ResultsDB(path)
+    try:
+        row = db.experiment(1)
+        assert row["name"] == "old-exp"
+        assert row["group_name"] == "" and row["variant"] == ""
+    finally:
+        db.close()

@@ -1,0 +1,17 @@
+# 示例实验：换卡敏感性分组（M4，task 023）——baseline 与变体仅差声明的换卡
+# 用法：bfsim run experiments/gardevoir-swap.example.yml --workers 4
+#       bfsim sensitivity <base_id> <variant_id>...   （run 输出末尾会提示具体 id）
+name: gardevoir-swap-example
+games: 20
+seed_start: 2000
+decks:
+  a: {source: db, deck_id: "mik_moe:644634"}
+  b: {source: db, deck_id: "mik_moe:644634"}
+agents:
+  a: {type: heuristic}
+  b: {type: random}
+variants:
+  # 对照组：A 方 2 反击捕捉器 → 2 巢穴球（卡组保持 60 张，同种子区间配对可比）
+  - name: swap-catcher-to-nestball
+    swaps:
+      - {side: a, out: 反击捕捉器, out_count: 2, in: 巢穴球, in_count: 2}

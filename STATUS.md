@@ -4,19 +4,49 @@
 
 ## 当前
 
-**M3 达成**：task 018 ✅（通用启发式 Agent）+ task 019 ✅（实验定义 YAML + 正式 Runner + 结果库三层表 + `bfsim run`）+ task 020 ✅（copy_attack 嵌套 chooser 二级挂起帧，task 017/019 已知引擎缺口修复）。M3 验收复跑：100 局 0 失败、并行 vs 串行逐局一致、copy_attack 真实对局实际触发 10 次正常结算。M2 已全部完成（task 005–017 ✅，定义库 23 卡）。下一步：M4 报告层（胜率报告 + 决策聚合 + 换卡敏感性）。
+**M4 已达成**：task 021 ✅（胜率报告 `bfsim report`）+ task 022 ✅（决策聚合 `bfsim report --decisions`）+ task 023 ✅（换卡敏感性：variants 分组实验 + `bfsim sensitivity` 并排 ΔWR + 两比例 z 检验）。报告 meta 全要素回显可复算。M3 已达成（task 018–020 ✅）。下一步：M5 覆盖扩展 + LLM 辅助编写试验。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
 
 - ✅ M1 引擎骨架（白板对局 + 同种子复现）——task 001–004 全 ✅（2026-08-25）
-- ⬜ M2 DSL + 解释器 + 首批原语（第一套目标卡组）
-- ⬜ M3 启发式 Agent + Runner + 结果库（百局端到端）
-- ⬜ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）
+- ✅ M2 DSL + 解释器 + 首批原语（第一套目标卡组）——task 005–008、010–017 全 ✅
+- ✅ M3 启发式 Agent + Runner + 结果库（百局端到端）——task 018–020 全 ✅（2026-08-29）
+- ✅ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）——task 021–023 全 ✅（2026-08-30）
 - ⬜ M5 覆盖扩展 + LLM 辅助编写试验
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-30 task 023 换卡敏感性 ✅（M4 达成）
+
+- 实验定义扩展 `variants`（PRD §9 一次提交多组实验）：`SwapCfg{side,out,out_count,in,in_count}`（`in` 走 pydantic alias）+ `VariantCfg{name,swaps}`；校验不猜——Σout≠Σin / 重名 / 未知 side / swaps 空 / out 存量不足 / in 卡名未命中 db 全显式报错
+- `apply_swaps` 纯函数（60 张守恒）+ `prepare_variant`（换入卡经 db 解析、DSL 文档补入 card_effects、deck id 标注 `[variant:名]`）+ `execute_group`/`run_group`（baseline + variants 同种子区间依次跑，配对可比）
+- 结果库 experiments 加 `group_name`/`variant` 两列；旧库文件打开自动 ALTER TABLE 迁移（FR-10 三层表骨架不变，仅加列）
+- `report/sensitivity.py`：ΔWR 95% CI（非合并 SE）+ 两比例 z 检验（合并 SE 双侧，Φ 用 math.erf 手写不引 scipy）；参考值手算对拍（65/100 vs 35/100 → z≈4.24264、p≈2.21e-5）；n=0 记 None 标「不可用」不除零
+- CLI：`bfsim run` 遇 variants 定义自动跑整组并逐个打印实验 id + sensitivity 用法提示；新增 `bfsim sensitivity <base> <variant...>` 并排报告
+- 真机冒烟（gardevoir-swap 20 局 ×2 组）：baseline 1 局失败为已知 DslError（copy_attack 套娃，task 020 显式不猜项），失败局正常落库不拖垮分组；并排报告数字合理
+- TDD 22 新测试（参考值对拍 / 定义校验分支 / apply_swaps / 分组确定性 / 旧库迁移 / CLI）；全量 322 绿 + ruff 零告警；示例 `experiments/gardevoir-swap.example.yml` 入库
+- 遗留：M5 覆盖扩展 + LLM 辅助编写试验（M4 已收口）
+
+### 2026-08-29 task 022 choose 决策事件 + observe 锚点 + 决策聚合报告 ✅
+
+- 引擎：`_do_choose` 恢复前落 `choose` 事件（effect_id/card/pool/chosen iids+chosen_names）；`_resolve_choose_names` 扫描双方全区域建 iid→名映射，opponent_active_attack 池解析为招式名；嵌套帧（task 020）effect_id 含 `copy>` 标注
+- cards/ 七卡补 `observe: [key_search]` 锚点（高级球/巢穴球/大地容器/厉害钓竿/夜间担架/秘密箱/派帕；observe 为开放字符串，loader 不校验）
+- `report/decisions.py`：按（侧, 卡, 池, 选择标签）聚合——occurrences 次数 / games 覆盖决定局（同局重复只计一次）/ 胜率+Wilson CI（复用 winrate.wilson_ci）；effect_observe 锚点经 effect_id 同局关联；空选 = 「（放弃）」；只统计完成局
+- CLI `bfsim report --decisions` 追加分节；render.py 补 choose 模板
+- TDD 14 新测试（合成库逐项对账 + 嵌套 copy 双事件 + 锚点关联 + CLI）；全量 300 绿 + ruff 零告警（F821 补 PendingChoice 导入——`from __future__ import annotations` 下运行时不炸、仅 lint 捕获，记一笔）
+- **M3 基线重记**（choose 入流改变 events_hash，预期变更）：100 局 0 失败、并行 vs 串行逐局一致、胜负 65/35 不变；真实库决策聚合首跑可用（如厉害钓竿 60 次决策分布 × 胜率）
+- 遗留：换卡敏感性（variants 配对实验 + ΔWR 显著性）归 task 023，M4 收口
+
+### 2026-08-29 task 021 胜率报告 + bfsim report ✅（M4 启动）
+
+- `report/winrate.py`：`wilson_ci` 手写（z=1.959964，不引 scipy——依赖纪律，正确性靠 4 组参考值对拍 ±1e-3 锁定）；`winrate_report`（完成/决定/平局/失败分层口径，先后手拆分，avg_turns 含平局）；`format_report` 文本（meta 全要素：实验 id/名称/种子区间/代码+数据版本/局数）
+- `ResultsDB.experiment()` 访问器；`bfsim report <id> [--results]`（未知 id 明确报错 rc=1）；argparse help 的 `%` 需 `%%` 转义（坑记一笔）
+- 口径定稿：胜率分母=决定局（平局单列）；决定局为 0 → 胜率/CI 记 0 不除零
+- TDD 13 新测试（11 局合成库逐项对账 + 边界 + CLI）；全量 286 绿 + ruff 零告警
+- 真实报告首跑（M3 百局库）：A(启发式) 65.0% CI 55.3..73.6，先攻 70.7% / 后攻 61.0%，平均 10.4 回合
+- 遗留：决策事件 + observe 锚点聚合归 task 022；换卡敏感性（variants 配对实验）归 task 023
 
 ### 2026-08-29 task 020 copy_attack 嵌套 chooser（二级挂起帧）✅
 

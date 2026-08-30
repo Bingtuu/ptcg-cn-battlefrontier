@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS experiments (
   code_version TEXT NOT NULL,
   data_version TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'running',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  group_name TEXT NOT NULL DEFAULT '',
+  variant TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS games (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +49,13 @@ CREATE TABLE IF NOT EXISTS game_events (
 CREATE INDEX IF NOT EXISTS idx_games_experiment ON games(experiment_id);
 """
 
+# task 023：experiments 加 group_name/variant 两列（换卡敏感性分组）；
+# CREATE TABLE IF NOT EXISTS 不会改旧库，故对已有文件做轻量迁移。
+_MIGRATIONS = (
+    ("experiments", "group_name", "TEXT NOT NULL DEFAULT ''"),
+    ("experiments", "variant", "TEXT NOT NULL DEFAULT ''"),
+)
+
 
 class ResultsDB:
     """结果库连接（WAL；每局增量落库）。"""
@@ -57,13 +66,19 @@ class ResultsDB:
         self._conn = sqlite3.connect(str(path))
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(SCHEMA)
+        for table, column, ddl in _MIGRATIONS:
+            cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+            if column not in cols:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+        self._conn.commit()
 
     def start_experiment(self, *, name: str, definition_yaml: str,
-                         code_version: str, data_version: str) -> int:
+                         code_version: str, data_version: str,
+                         group_name: str = "", variant: str = "") -> int:
         cur = self._conn.execute(
-            "INSERT INTO experiments (name, definition_yaml, code_version, data_version)"
-            " VALUES (?, ?, ?, ?)",
-            (name, definition_yaml, code_version, data_version))
+            "INSERT INTO experiments (name, definition_yaml, code_version, data_version,"
+            " group_name, variant) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, definition_yaml, code_version, data_version, group_name, variant))
         self._conn.commit()
         return int(cur.lastrowid)
 
@@ -99,6 +114,15 @@ class ResultsDB:
         self._conn.execute(
             "UPDATE experiments SET status=? WHERE id=?", (status, experiment_id))
         self._conn.commit()
+
+    def experiment(self, experiment_id: int) -> dict:
+        cur = self._conn.execute(
+            "SELECT * FROM experiments WHERE id=?", (experiment_id,))
+        row = cur.fetchone()
+        if row is None:
+            raise ValueError(f"实验 #{experiment_id} 不存在")
+        cols = [d[0] for d in cur.description]
+        return dict(zip(cols, row, strict=True))
 
     def games(self, experiment_id: int) -> list[dict]:
         cur = self._conn.execute(

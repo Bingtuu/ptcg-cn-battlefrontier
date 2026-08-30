@@ -16,11 +16,44 @@ from battlefrontier.runner.experiment import (
 from battlefrontier.runner.results_db import ResultsDB
 
 
+def _summarize(db: ResultsDB, exp_id: int, label: str, defn) -> str:
+    games = db.games(exp_id)
+    wins_a = sum(1 for g in games if g["winner"] == 0)
+    wins_b = sum(1 for g in games if g["winner"] == 1)
+    draws = sum(1 for g in games if g["is_draw"])
+    failed = sum(1 for g in games if g["error"])
+    return (f"实验 #{exp_id}「{label}」完成：{len(games)} 局 "
+            f"A胜 {wins_a} / B胜 {wins_b} / 平 {draws} / 失败 {failed}")
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
+    from battlefrontier.runner.experiment import run_group
+
     exp_path = Path(args.experiment)
     defn = load_experiment(exp_path)
     definition_yaml = exp_path.read_text(encoding="utf-8")
     db_path = args.db or load_db_path()
+    if defn.variants:
+        # 换卡敏感性分组（task 023）：baseline + variants 同种子区间依次跑
+        ids, warnings = run_group(defn, db_path, args.results, workers=args.workers,
+                                  cards_dir=args.cards_dir,
+                                  definition_yaml=definition_yaml)
+        for w in warnings:
+            print(f"[装载告警] {w}")
+        db = ResultsDB(args.results)
+        try:
+            labels = ["baseline"] + [v.name for v in defn.variants]
+            for exp_id, label in zip(ids, labels, strict=True):
+                print(_summarize(db, exp_id, f"{defn.name}/{label}", defn))
+        finally:
+            db.close()
+        print(f"分组完成（结果库 {args.results}）："
+              f"敏感性报告用 bfsim sensitivity {ids[0]} "
+              + " ".join(str(i) for i in ids[1:]))
+        print(f"数据版本锁定见各实验行；种子区间 {defn.seed_start}.."
+              f"{defn.seed_start + defn.games - 1}（各组相同，配对可比）")
+        return 0
+
     prep = prepare_experiment(defn, db_path, cards_dir=args.cards_dir)
     for w in prep.warnings:
         print(f"[装载告警] {w}")
@@ -29,18 +62,53 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     db = ResultsDB(args.results)
     try:
-        games = db.games(exp_id)
+        print(_summarize(db, exp_id, defn.name, defn) + f"（结果库 {args.results}）")
     finally:
         db.close()
-    wins_a = sum(1 for g in games if g["winner"] == 0)
-    wins_b = sum(1 for g in games if g["winner"] == 1)
-    draws = sum(1 for g in games if g["is_draw"])
-    failed = sum(1 for g in games if g["error"])
-    print(f"实验 #{exp_id}「{defn.name}」完成：{len(games)} 局 "
-          f"A胜 {wins_a} / B胜 {wins_b} / 平 {draws} / 失败 {failed}"
-          f"（结果库 {args.results}）")
     print(f"数据版本 {prep.data_version}；种子区间 {defn.seed_start}.."
           f"{defn.seed_start + defn.games - 1}")
+    return 0
+
+
+def _cmd_sensitivity(args: argparse.Namespace) -> int:
+    from battlefrontier.report.sensitivity import (
+        format_sensitivity,
+        sensitivity_report,
+    )
+
+    db = ResultsDB(args.results)
+    try:
+        try:
+            rep = sensitivity_report(db, args.base_id, args.variant_ids)
+        except ValueError as e:
+            print(f"错误：{e}")
+            return 1
+        print(format_sensitivity(rep))
+    finally:
+        db.close()
+    return 0
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    from battlefrontier.report.winrate import format_report, winrate_report
+
+    db = ResultsDB(args.results)
+    try:
+        try:
+            report = winrate_report(db, args.experiment_id)
+        except ValueError as e:
+            print(f"错误：{e}")
+            return 1
+        print(format_report(report))
+        if args.decisions:
+            from battlefrontier.report.decisions import (
+                decision_report,
+                format_decisions,
+            )
+
+            print(format_decisions(decision_report(db, args.experiment_id)))
+    finally:
+        db.close()
     return 0
 
 
@@ -54,10 +122,23 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--db", default=None,
                        help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     run_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    rep_p = sub.add_parser("report", help="胜率报告（Wilson 95%% CI + 先后手拆分）")
+    rep_p.add_argument("experiment_id", type=int, help="实验 id")
+    rep_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    rep_p.add_argument("--decisions", action="store_true", help="追加决策聚合分节")
+    sen_p = sub.add_parser("sensitivity",
+                           help="换卡敏感性：baseline vs variants 并排 ΔWR + 显著性检验")
+    sen_p.add_argument("base_id", type=int, help="baseline 实验 id")
+    sen_p.add_argument("variant_ids", type=int, nargs="+", help="variant 实验 id 列表")
+    sen_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
         return _cmd_run(args)
+    if args.cmd == "report":
+        return _cmd_report(args)
+    if args.cmd == "sensitivity":
+        return _cmd_sensitivity(args)
     print(f"battlefrontier {__import__('battlefrontier').__version__}："
           f"子命令 run 可用（实验定义见 experiments/），其余随里程碑添加")
     return 0

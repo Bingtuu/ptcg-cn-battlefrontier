@@ -35,6 +35,10 @@ class ActionNode(FrozenModel):
     choose: Annotated[int, Field(ge=1)] | None = None
     filters: tuple[str, ...] = ()
     destination: str | None = None
+    # 节点级运行时门控（task 025）：掷币分支等「若…则」语义；注册词与求值归解释器
+    # （run_effect 执行节点前求值，不满足跳过并落 skipped 事件；chooser 挂起恢复时
+    # 掷币结果经 PendingChoice.flip_result 穿透，跳过的节点不占选择游标）
+    condition: str | None = None
     args: dict[str, Any] = {}
 
 

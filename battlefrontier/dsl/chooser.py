@@ -35,6 +35,7 @@ class NeedChoice:
     carry：同节点两段式选择的中间结果（task 011，如 attach_energy 第一段选定的
     能量 iids），随挂起冻结进 PendingChoice.payload，恢复时经 ctx.carry 传回。
     exclude_iids：池冻结时剔除的栈顶/卡 iid（task 014，如能量转移目标排除来源）。
+    flip：挂起瞬间的掷币结果（task 025 节点门控穿透），冻结进 PendingChoice.flip_result。
     """
 
     def __init__(
@@ -55,6 +56,7 @@ class NeedChoice:
         self.carry = carry
         self.exclude_iids = exclude_iids
         self.cursor: int = -1
+        self.flip: bool | None = None  # 解释器挂起时标注（ctx.last_flip 快照）
         # 嵌套传播（task 020 copy_attack）：内层效果挂起时标注效果定位与内层游标
         # （外层 run_effect 会覆盖 self.cursor 为外层节点游标，内层游标需另行转存）
         self.inner: tuple[str, str] | None = None
@@ -91,6 +93,9 @@ def _match_one(card: CardInstance, filter_word: str) -> bool:
         )
     if filter_word == "stage2_pokemon":
         return c.supertype == Supertype.POKEMON and c.stage == 2
+    if filter_word == "evolved_pokemon":
+        # 「进化宝可梦」（task 025 捕获香氛正面检索目标）：1 阶及以上
+        return c.supertype == Supertype.POKEMON and c.stage >= 1
     if filter_word == "basic_pokemon_no_rule":
         # 「基础宝可梦（除拥有规则的宝可梦外）」（深钵镇：规则盒 = ex/V/光辉等）
         return (
@@ -238,6 +243,7 @@ def build_pending(
         inner=inner,
         outer_cursor=outer_cursor,
         outer_choice=outer_choice,
+        flip_result=need.flip,
     )
 
 
@@ -276,6 +282,8 @@ def playable_feasible(
             and (opponent is None or not opponent.bench)
         ):
             return False
+        if node.action == "switch" and node.selector == "own_bench" and not p.bench:
+            return False  # 交替推车等 own 侧互换：无备战宝可梦不可用（task 025）
         if node.action == "move_energy":
             if not resolve_pool(p, "own_attached_energy", node.filters):
                 return False
@@ -322,6 +330,13 @@ _CONDITIONS = {
     # 化危为吉：「在上一个对手的回合，自己的宝可梦【昏厥】」（跨回合 KO 标记，task 017）
     "own_ko_during_opponent_turn": (
         lambda engine, player, mon: engine.state.players[player].own_ko_during_opponent_turn
+    ),
+    # 交替推车：「将自己战斗场上的【基础】宝可梦与备战宝可梦互换」（战斗场须为基础，task 025）
+    "own_active_is_basic": (
+        lambda engine, player, mon: (
+            engine.state.players[player].active is not None
+            and engine.state.players[player].active.current.card.stage == 0
+        )
     ),
 }
 

@@ -1,0 +1,14 @@
+# 皮宝宝（CSV4C-044，宝可梦）
+# text_raw 原文：「【0】 握握抽取
+# 从牌库上方抽取卡牌，直到自己的手牌变为7张为止。」
+# 实现注记：card_ids 仅收同文本印刷——同名另有特性「活力抽取」与 GX 版等不同文本，
+# 不在本文件（同名多文本印刷的装载口径待主会话统一）。until_hand 抽至 7 张：
+# 手牌已 ≥7 时空结算合法；效果抽空牌库不判负（rules-manual·胜负判定，draw 原语注记）。
+card:
+  name_group: 皮宝宝
+  card_ids: [CSV4C-044, CSVE2C-062, CSVL2C-030, CSVL2C-073, SVP-026, SVP-211]
+effects:
+  - trigger: on_attack
+    attack: 握握抽取
+    actions:
+      - {action: draw, args: {until_hand: 7}}

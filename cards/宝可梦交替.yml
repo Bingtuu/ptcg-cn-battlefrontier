@@ -1,0 +1,12 @@
+# 宝可梦交替（CSV1C-113，物品）
+# text_raw 原文：「将自己的战斗宝可梦与备战宝可梦互换。」
+# 实现注记：无备战宝可梦时不可使用（可行性门拦截枚举，task 025 switch own 侧）；
+# 换入备战区的宝可梦特殊状态清除、伤害指示物与附着能量保留
+# （rules-manual §7.1 恢复途径 / §5 撤退条目）。
+card:
+  name_group: 宝可梦交替
+  card_ids: [CBB3C-1903, CS1DC-179, CS2DaC-043, CS3DC-140, CS4DaC-377, CS5DC-130, CSM1DC-257, CSM1bC-200, CSM2DC-263, CSMPaC-014, CSMPbC-014, CSMPdC-011, CSMPeC-011, CSMPfC-011, CSMPgC-012, CSMPhC-013, CSNC-016, CSV1C-113, CSV1C-167, CSVE1C-123, CSVE2C-160, CSVH1C-046, CSVH2C-046, CSVH3C-046, CSVH4C-039, CSVH5C-044, CSVM1aC-017, CSVM2aC-022, CSVM2bC-017, CSVM2cC-020, CSVSC-054, CSZC-038, SVP-294]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: switch, selector: own_bench, choose: 1}

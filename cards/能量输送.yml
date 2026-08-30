@@ -1,0 +1,12 @@
+# 能量输送（CS1DC-166，物品）
+# text_raw 原文：「选择自己牌库中的1张基本能量，在给对手看过之后，加入手牌。并重洗牌库。」
+card:
+  name_group: 能量输送
+  card_ids: [CS1DC-166, CS4DaC-367, CSVE1C-105, CSVE2C-139, CSVH1C-035, CSVH3C-038, CSVH4C-031, CSVH5C-036]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_energy], choose: 1, destination: hand}
+      - {action: shuffle_deck}

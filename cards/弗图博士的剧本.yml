@@ -1,0 +1,12 @@
+# 弗图博士的剧本（CSV6C-125，支援者）
+# text_raw 原文：「选择自己场上的1只宝可梦，放回手牌。（除宝可梦以外的卡牌，全部放于弃牌区。）」
+# bounce：整叠（含进化链）回手牌，附着能量/道具进弃牌区；战斗场目标被放回须换上
+# （主阶段内换上后继续当前回合）；无宝可梦可换上判负。规则决议见 rules-reference
+# 附录 A（2026-08-30 bounce 三条）。
+card:
+  name_group: 弗图博士的剧本
+  card_ids: [CSV6C-125, CSV6C-150, CSV6C-158, CSV9.5C-196, CSVH4C-057, CSVM1aC-027, CSVM1bC-028, CSVM2bC-028, CSVM2cC-027, SVP-240]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: bounce, selector: own_pokemon_in_play, choose: 1}

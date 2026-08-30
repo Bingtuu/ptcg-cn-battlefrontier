@@ -82,3 +82,12 @@ condition → 解释器 `_CONDITIONS` 注册表。自造过滤器词能过闸 1�
 - 词表缺词就在 YAML 里自造
 - 跳过闸 1 直接跑 pytest
 - 未报用户就降级改写效果语义
+
+## 批量编写约定（swarm 并行时）
+
+- **测试分片**：每个执行者一个独立文件 `tests/test_dsl_cards_<批次>_<执行者>.py`
+  （如 `test_dsl_cards_b1_w1.py`），不与他人共写 `test_dsl_cards.py`——避免并行编辑冲突。
+- **日志集中**：执行者不直接改 `cards/authoring-log.jsonl` 与 `docs/m5-coverage-plan.md`，
+  在最终报告里逐卡给出 JSONL 日志行与状态（done/blocked:原因），由主会话集中落账。
+- **词表集中**：需要 vocabularies.yml 新词 / chooser 新 filters / 新 condition 词时，
+  **不改代码**，把卡标 blocked 并在报告里写明所需新词，主会话统一注册后解锁重写。

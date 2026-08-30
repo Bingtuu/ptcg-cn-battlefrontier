@@ -1,0 +1,14 @@
+# 不服输头带（CSV1C-117，宝可梦道具）
+# text_raw 原文：「如果自己的剩余奖赏卡张数，比对手的剩余奖赏卡张数多的话，则身上放有
+# 这张卡牌的宝可梦所使用的招式，给对手的战斗宝可梦造成的伤害「+30」。」
+# 声明式常驻修正：引擎读 passive_static 的 modify_damage 声明，在招式伤害结算
+# （rules-manual §6 顺序 2：基准后、弱点抗性前）求和；condition 判定时机 = 伤害结算点，
+# 道具离场/条件翻转即失效；仅作用于「给对手的战斗宝可梦造成的伤害」（备战落点不加）。
+card:
+  name_group: 不服输头带
+  card_ids: [CSV1C-117, CSV5C-164, CSVE2C-169, CSVH1aC-016, CSVH2aC-016, CSVH3C-048, CSVH3aC-015, CSVH4C-045, CSVM1aC-021, CSVM2bC-021]
+effects:
+  - trigger: passive_static
+    condition: own_prizes_more_than_opponent
+    actions:
+      - {action: modify_damage, args: {amount: 30}}

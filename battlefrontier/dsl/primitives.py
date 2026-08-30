@@ -16,7 +16,7 @@ from battlefrontier.dsl.chooser import (
 from battlefrontier.dsl.interpreter import ExecutionContext, register, run_effect
 from battlefrontier.dsl.loader import DslError
 from battlefrontier.dsl.schema import ActionNode
-from battlefrontier.engine.state import InPlayPokemon, SpecialCondition
+from battlefrontier.engine.state import InPlayPokemon, PlayerState, SpecialCondition
 
 
 def _require_no_choose(node: ActionNode, name: str) -> None:
@@ -296,7 +296,9 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     """造成伤害：selector=opponent_active（自动目标）/ opponent_pokemon_any（choose=1 挂起选目标）。
 
     弱点 ×2 / 抗性 -30 由引擎规则骨架结算、仅对战斗场目标生效（rules-manual §6；
-    备战区不计算是贯穿规则）。伤害后统一 check_knockouts（rules-manual §8）。
+    备战区不计算是贯穿规则）。on_attack 触发的招式伤害落点为对手战斗场时，
+    先加攻方持有者的声明式伤害修正（task 025 modify_damage，§6 顺序 2，
+    在弱点抗性前）。伤害后统一 check_knockouts（rules-manual §8）。
     """
     from battlefrontier.engine.core import _weakness_resistance
 
@@ -319,9 +321,15 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
         slot, idx, target = "active", -1, d.active
 
     amount = _resolve_damage_amount(ctx, node, target)
+    # 攻方持有者伤害修正（task 025）：仅招式伤害（on_attack）+ 落点对手战斗场
+    mod = 0
+    if slot == "active" and ctx.trigger == "on_attack":
+        attacker = _find_source_mon(ctx)
+        if attacker is not None:
+            mod = engine._effective_damage_modifier(attacker, ctx.player)
     # 弱点/抗性仅对战斗场目标（rules-manual §6）
     final = (
-        _weakness_resistance(ctx.source.card, target, amount,
+        _weakness_resistance(ctx.source.card, target, amount + mod,
                              weakness=ctx.engine._effective_weakness(ctx.player, target))
         if slot == "active" else amount
     )
@@ -330,9 +338,21 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     ))
     engine.check_knockouts()
     return {
-        "amount": amount, "final": final, "target_iid": target.current.iid,
+        "amount": amount, "damage_mod": mod, "final": final,
+        "target_iid": target.current.iid,
         "target": target.current.card.name, "to_bench": slot == "bench",
     }
+
+
+def _find_source_mon(ctx: ExecutionContext) -> InPlayPokemon | None:
+    """按效果来源定位攻方持有宝可梦（来源可为宝可梦栈顶或其道具——授予招式路径）。"""
+    p = ctx.engine.state.players[ctx.player]
+    for m in ([p.active] if p.active else []) + list(p.bench):
+        if m.current.iid == ctx.source.iid:
+            return m
+        if m.attached_tool is not None and m.attached_tool.iid == ctx.source.iid:
+            return m
+    return None
 
 
 @register("clear_status")
@@ -386,27 +406,32 @@ def _apply_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
 
 @register("switch")
 def _switch(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
-    """强制对手换位（gust）：选对手 1 只备战宝可梦与其战斗场互换（反击捕捉器）。
+    """换位：opponent_bench = gust 强制对手（反击捕捉器）；own_bench = own 侧互换
+    （task 025 交替推车：自己战斗场 ↔ 所选备战）。
 
-    被换下回备战区的宝可梦特殊状态清除（rules-manual §4：回备战区恢复）。
-    对手无备战时不挂起、no-op（可行性门已提前拦截枚举）。
+    回备战区的宝可梦特殊状态清除（rules-manual §7.1「恢复途径：回到备战区
+    （撤退或效果）」），伤害指示物与附着能量保留（§5 撤退条目同理）；
+    效果互换不占每回合撤退次数（非撤退行动）。无备战时不挂起、no-op
+    （可行性门已提前拦截枚举）。
     """
-    if node.selector != "opponent_bench":
-        raise DslError(f"switch 暂仅支持 selector=opponent_bench（收到 {node.selector!r}）")
+    if node.selector not in ("opponent_bench", "own_bench"):
+        raise DslError(f"switch 暂仅支持 selector=opponent_bench/own_bench（收到 {node.selector!r}）")
     if node.choose != 1:
         raise DslError(f"switch 需要 choose=1（收到 choose={node.choose}）")
     engine = ctx.engine
-    opp_idx = 1 - ctx.player
-    o = engine.state.players[opp_idx]
+    side_idx = ctx.player if node.selector == "own_bench" else 1 - ctx.player
+    o = engine.state.players[side_idx]
     if choice is None:
         if not o.bench:
             return {"switched": False}
-        return NeedChoice(pool="opponent_bench", min_choose=1, max_choose=1)
+        return NeedChoice(pool=node.selector, min_choose=1, max_choose=1)
+    if o.active is None:
+        raise DslError("switch：战斗场为空，无法互换")
     idx = next(i for i, b in enumerate(o.bench) if b.current.iid == choice[0])
     promoted = o.bench[idx]
     retreated = o.active.model_copy(update={"conditions": frozenset()})
     bench = o.bench[:idx] + (retreated,) + o.bench[idx + 1:]
-    engine._set_player(opp_idx, o.model_copy(update={"active": promoted, "bench": bench}))
+    engine._set_player(side_idx, o.model_copy(update={"active": promoted, "bench": bench}))
     return {"switched": True, "into": promoted.current.card.name,
             "out": retreated.current.card.name}
 
@@ -704,12 +729,18 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
             sub.inner_cursor = sub.cursor
             return sub
         return {"copied": attack.name, "via": "dsl"}
-    # 白板伤害：按我方来源卡属性结算弱点抗性（有效弱点，task 017）
+    # 白板伤害：按我方来源卡属性结算弱点抗性（有效弱点，task 017）；
+    # 攻方持有者伤害修正同样接入（task 025：复制招式也是我方宝可梦「所使用的招式」）
     from battlefrontier.engine.core import _attack_damage
 
     d = engine.state.players[opp_idx]
+    attacker = _find_source_mon(ctx)
     dmg = _attack_damage(attack, ctx.source.card, d.active,
-                         weakness=engine._effective_weakness(ctx.player, d.active))
+                         weakness=engine._effective_weakness(ctx.player, d.active),
+                         damage_mod=(
+                             engine._effective_damage_modifier(attacker, ctx.player)
+                             if attacker is not None else 0
+                         ))
     engine._set_player(opp_idx, d.model_copy(update={
         "active": d.active.model_copy(update={"damage": d.active.damage + dmg}),
     }))
@@ -740,3 +771,118 @@ def _hand_to_deck_bottom(ctx: ExecutionContext, node: ActionNode, choice: tuple[
         "hand": (), "deck": p.deck + shuffled,
     }))
     return {"returned": len(shuffled), "owner": owner_idx}
+
+
+# ── task 025：小原语批（掷币 / 恢复 / 放回手牌 / own 侧换位）───────────────
+
+
+@register("heal")
+def _heal(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
+    """恢复 HP = 去伤害指示物（task 025）：卡面「恢复 N」= 去 N 点伤害（N/10 个指示物）。
+
+    不超过已有伤害（floor 0；恢复类效果无过回复，rules-manual §7.1 恢复途径
+    「使用恢复类效果」+ §6 伤害以伤害指示物累计）。昏厥检查无必要（恢复只减伤）。
+    selector=own_active 自动目标；own_pokemon_in_play + choose=1 经 chooser 选目标
+    （filters 如 has_damage_counters；池空不挂起，尽力而为空结算）。
+    """
+    amount = node.args.get("amount")
+    if not isinstance(amount, int) or isinstance(amount, bool) or amount < 0:
+        raise DslError(f"heal 需要 args.amount 非负 int（收到 {amount!r}）")
+
+    def apply_heal(p: PlayerState, target_iid: int) -> dict[str, object]:
+        slot, idx, mon = ctx.engine._find_in_play(p, target_iid)
+        healed = min(amount, mon.damage)
+        ctx.set_player_state(ctx.engine._replace_in_play(
+            p, slot, idx, mon.model_copy(update={"damage": mon.damage - healed}),
+        ))
+        return {"healed": healed, "target_iid": target_iid,
+                "target": mon.current.card.name}
+
+    if node.selector == "own_active":
+        _require_no_choose(node, "heal")
+        p = ctx.player_state
+        if p.active is None:
+            raise DslError("heal own_active：自己战斗场为空")
+        return apply_heal(p, p.active.current.iid)
+    if node.selector == "own_pokemon_in_play":
+        if node.choose != 1:
+            raise DslError(f"heal 选目标暂仅支持 choose=1（收到 choose={node.choose}）")
+        if choice is None:
+            if not resolve_in_play_pool(ctx.player_state, node.filters):
+                return {"healed": 0, "reason": "no_eligible_target"}
+            return NeedChoice(pool="own_pokemon_in_play", filters=node.filters,
+                              min_choose=1, max_choose=1)
+        return apply_heal(ctx.player_state, choice[0])
+    raise DslError(f"heal 暂仅支持 selector=own_active/own_pokemon_in_play（收到 {node.selector!r}）")
+
+
+@register("coin_flip")
+def _coin_flip(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """掷币（task 025）：args.times 次（默认 1），走引擎单一随机源（RandomSource.flip_coin，
+    与混乱判定同款，rules-manual §2 所需物品/§7 特殊状态掷币）。
+
+    逐次结果存 ExecutionContext.last_flip（= 最后一次），节点级门控
+    if_flip_heads / if_flip_tails 据此求值（interpreter）；明细落 effect_primitive 事件。
+    多掷计数（正面数×N 计伤/计奖）本期不做——遇卡按不猜纪律标 blocked（task 025 设计表）。
+    """
+    _require_no_choose(node, "coin_flip")
+    times = node.args.get("times", 1)
+    if not isinstance(times, int) or isinstance(times, bool) or times < 1:
+        raise DslError(f"coin_flip 的 times 须为正 int（收到 {times!r}）")
+    flips = [ctx.engine.rng.flip_coin() for _ in range(times)]
+    ctx.last_flip = flips[-1]
+    return {
+        "flips": ["heads" if f else "tails" for f in flips],
+        "heads": sum(flips),
+    }
+
+
+@register("bounce")
+def _bounce(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
+    """放回手牌（task 025 弗图博士的剧本）：自己场上 1 只宝可梦整叠（含进化链）回手牌，
+    附着能量/道具进弃牌区（卡面 rule_reference 句：「（除宝可梦以外的卡牌，全部放于弃牌区。）」；
+    规则决议见 rules-reference 附录 A·2026-08-30 bounce 条目）。
+
+    战斗场目标被放回（rules-reference 附录 A 决议）：
+    有备战 → 换上流程（promote_to_main：主阶段内换上后继续当前回合，不推进/不抽牌）；
+    无备战 → 场上无宝可梦判负（reason=no_pokemon，🔲 待核）。
+    回手牌不触发昏厥/奖赏；特殊状态随离场消失（rules-manual §7.1 恢复途径）。
+    """
+    if node.selector != "own_pokemon_in_play":
+        raise DslError(f"bounce 暂仅支持 selector=own_pokemon_in_play（收到 {node.selector!r}）")
+    if node.choose != 1:
+        raise DslError(f"bounce 需要 choose=1（收到 choose={node.choose}）")
+    engine = ctx.engine
+    if choice is None:
+        return NeedChoice(pool="own_pokemon_in_play", min_choose=1, max_choose=1)
+    p = ctx.player_state
+    slot, idx, mon = engine._find_in_play(p, choice[0])
+    returned = mon.stack  # 整叠宝可梦卡（底→顶）回手牌
+    attachments = mon.attached_energy + (
+        (mon.attached_tool,) if mon.attached_tool is not None else ()
+    )
+    if slot == "active":
+        p = p.model_copy(update={"active": None})
+    else:
+        p = p.model_copy(update={"bench": p.bench[:idx] + p.bench[idx + 1:]})
+    p = p.model_copy(update={
+        "hand": p.hand + returned,
+        "discard": p.discard + attachments,
+    })
+    ctx.set_player_state(p)
+    if slot == "active":
+        if ctx.player_state.bench:
+            # 战斗场空置：换上后继续当前主阶段（附录 A 决议）
+            engine.state = engine.state.model_copy(update={
+                "phase": "promote", "current_player": ctx.player,
+                "promote_to_main": True,
+            })
+        else:
+            # 场上无宝可梦判负（附录 A 决议，🔲 待核）
+            engine._game_over(winner=1 - ctx.player, reason="no_pokemon")
+    return {
+        "returned": [c.iid for c in returned],
+        "discarded": [c.iid for c in attachments],
+        "from": slot,
+        "name": mon.current.card.name,
+    }

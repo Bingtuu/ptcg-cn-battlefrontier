@@ -72,17 +72,19 @@ def _weakness_resistance(
 
 def _attack_damage(
     attack: AttackDef, atk_card: CardDef, defender: InPlayPokemon, *, to_bench: bool = False,
-    weakness: str | None = None,
+    weakness: str | None = None, damage_mod: int = 0,
 ) -> int:
-    """伤害计算顺序（rules-manual §6）：基准（≤0 终止）→ 弱点 ×2 → 抗性 -30 → 下限 0。
+    """伤害计算顺序（rules-manual §6）：基准（≤0 终止）→ 攻方修饰 → 弱点 ×2 → 抗性 -30 → 下限 0。
 
-    白板期无攻/防修饰，修饰插入点见注释；备战区伤害不计算弱点抗性（贯穿规则，
-    铺伤原语落地时走 to_bench=True）。weakness = 有效弱点覆盖（task 017）。
+    damage_mod：攻击方持有者身上的声明式伤害修正（task 025 modify_damage，
+    引擎 _effective_damage_modifier 求和传入；§6 顺序 2，在弱点抗性前）。
+    备战区伤害不计算弱点抗性（贯穿规则，铺伤原语落地时走 to_bench=True）。
+    weakness = 有效弱点覆盖（task 017）。
     """
     dmg = attack.damage or 0
     if dmg <= 0:
         return 0
-    # 插入点：攻击方身上附加的增伤效果（task 009+ 修饰原语）
+    dmg += damage_mod
     if not to_bench:
         dmg = _weakness_resistance(atk_card, defender, dmg, weakness=weakness)
     # 插入点：防御方身上附加的减伤效果（task 009+）
@@ -641,7 +643,8 @@ class GameEngine:
         defender = 1 - player
         d = s.players[defender]
         dmg = _attack_damage(attack, atk.current.card, d.active,
-                             weakness=self._effective_weakness(player, d.active))
+                             weakness=self._effective_weakness(player, d.active),
+                             damage_mod=self._effective_damage_modifier(atk, player))
         target = d.active.model_copy(update={"damage": d.active.damage + dmg})
         self._set_player(defender, d.model_copy(update={"active": target}))
         self._emit("attack", player, name=atk.current.card.name, attack=attack.name,
@@ -676,6 +679,33 @@ class GameEngine:
                 if node.action == "modify_hp":
                     hp += node.args["amount"]
         return hp
+
+    def _effective_damage_modifier(self, mon: InPlayPokemon, player: int) -> int:
+        """攻方招式伤害修正求和（task 025 不服输头带；仿 _effective_hp 声明式模式）。
+
+        引擎对卡牌内容零硬编码：修正值读持有者道具 DSL 文档 passive_static 的
+        modify_damage 声明（condition 如 own_prizes_more_than_opponent 在求值点判定；
+        道具离场即无声明可读、进化换栈顶即按新持有者判定——失效由求值点语义保证）。
+        仅由调用方在「给对手的战斗宝可梦造成的伤害」落点接入（卡面口径）。
+        """
+        tool = mon.attached_tool
+        if tool is None:
+            return 0
+        doc = self.card_effects.get(tool.card.name)
+        if doc is None:
+            return 0
+        from battlefrontier.dsl.chooser import condition_met
+
+        mod = 0
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            if not condition_met(effect.condition, self, player, mon):
+                continue
+            for node in effect.actions:
+                if node.action == "modify_damage":
+                    mod += node.args["amount"]
+        return mod
 
     def _effective_weakness(self, attacker: int, defender: InPlayPokemon) -> str | None:
         """防守方有效弱点（task 017 妖精领域）：攻方场上有 passive_static 的
@@ -783,6 +813,13 @@ class GameEngine:
         bench = p.bench[: action.bench_index] + p.bench[action.bench_index + 1 :]  # type: ignore[index]
         self._set_player(player, p.model_copy(update={"active": new_active, "bench": bench}))
         self._emit("promote", player, name=new_active.current.card.name)
+        # 主阶段内换上（task 025 bounce：效果致战斗场空置）：换上后继续当前主阶段，
+        # 不推进回合、不抽牌（与昏厥换上不同——回合未被攻击消耗）
+        if self.state.promote_to_main:
+            self.state = self.state.model_copy(update={
+                "promote_to_main": False, "phase": "main",
+            })
+            return
         # 换上后回合权：默认换上方回合（普通昏厥）；turn_after_promote 置位时给指定方
         # （混乱反面自我昏厥：攻击已消耗，回合权给对手——D1 决议 task 013）
         nxt = self.state.turn_after_promote
@@ -844,12 +881,16 @@ class GameEngine:
         carry: tuple[int, ...] = (), completion: str = "trainer",
         *, inner: tuple[str, str] | None = None, outer_cursor: int = -1,
         outer_choice: tuple[int, ...] = (), inner_done: bool = False,
+        flip: bool | None = None,
     ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
         嵌套帧（task 020 copy_attack）：inner 非空时按 inner 定位内层效果续跑；
         内层完成 → 带 inner_done 恢复外层 copy 节点（不重复执行内层）；
         内层再传播 inner → 嵌套层级 >1，显式 DslError（不猜）。
+        flip（task 025）：挂起冻结的掷币结果，恢复时穿透进 ctx.last_flip；
+        嵌套帧内层完成恢复外层时不穿透（外层 copy 节点后接掷币门控节点的组合
+        会在解释器显式 DslError——不猜，需要时再扩展多级冻结）。
         """
         from battlefrontier.dsl.chooser import build_pending
 
@@ -867,7 +908,7 @@ class GameEngine:
             effect_id=effect_id, trigger=effect.trigger,
         )
         ctx.inner_done = inner_done
-        need = run_effect(ctx, effect, start=start, choice=choice, carry=carry)
+        need = run_effect(ctx, effect, start=start, choice=choice, carry=carry, flip=flip)
         if need is not None:
             if need.inner is not None:
                 if inner is not None:
@@ -958,7 +999,7 @@ class GameEngine:
                              start=pc.cursor, choice=action.choices,
                              carry=pc.payload, completion=pc.completion,
                              inner=pc.inner, outer_cursor=pc.outer_cursor,
-                             outer_choice=pc.outer_choice)
+                             outer_choice=pc.outer_choice, flip=pc.flip_result)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。

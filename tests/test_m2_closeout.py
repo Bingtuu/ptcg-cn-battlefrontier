@@ -404,7 +404,9 @@ def test_card_library_m2_closeout() -> None:
     docs = load_card_dir("cards")
     for name in ("深钵镇", "奇树", "派帕"):
         assert name in docs
-    assert len(docs) == 24  # M2 收口 23 + task 024 自验卡（友好宝芬）
+    # M2 收口 23 + task 024 自验卡 + task 025 代表卡 4 = 28；M5 批量入库持续增长，
+    # 精确计数改为下限断言（防误删文件），增量以 docs/m5-coverage-plan.md 为准
+    assert len(docs) >= 28
     assert any(e.condition == "own_ko_during_opponent_turn" for e in docs["吉雉鸡ex"].effects)
     assert any(e.trigger == "passive_static" for e in docs["莉莉艾的皮皮ex"].effects)
     assert any(e.trigger == "on_attack" and e.attack == "基因侵入"

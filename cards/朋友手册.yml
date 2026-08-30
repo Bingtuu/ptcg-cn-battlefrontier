@@ -1,0 +1,14 @@
+# 朋友手册（CS1DC-174，物品）
+# text_raw 原文：「选择自己弃牌区中最多2张支援者，在给对手看过之后，放回牌库并重洗牌库。」
+# recover_to_deck 为 up-to 语义（min_choose=0，对齐「最多2张」；旧印刷「2张」文本差异见报告）；
+# 「给对手看过」为公开性说明不建模（与高级球等既有卡一致）；洗牌由 shuffle_deck 节点表达。
+card:
+  name_group: 朋友手册
+  card_ids: [CS1DC-174, CS2.1C-003, CSV1C-111, CSV6C-163, CSVE1C-115, CSVE2C-151, CSVH2aC-012, SVP-349, SVP-NaN18, SVP-NaN19, SVP-NaN20, CSM1DC-246, CSM1bC-121, CSM2.1C-006, CSM2DC-255, CSMPkC-010, CSMPoC-007, SSP-NaN48, SSP-NaN49, SSP-NaN50]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：回收选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [trainer_supporter], choose: 2, destination: deck}
+      - {action: shuffle_deck}

@@ -116,6 +116,8 @@ class PendingChoice(FrozenModel):
     pool_iids: tuple[int, ...] = ()
     # 同节点两段式选择的中间结果（task 011，如 attach_energy 已选的能量 iids）
     payload: tuple[int, ...] = ()
+    # 挂起瞬间冻结的掷币结果（task 025 节点级门控穿透：恢复时重建 ctx.last_flip）
+    flip_result: bool | None = None
     # 完成模式：trainer = 效果完成后本体进弃牌区；ability = 特性不弃置
     completion: str = "trainer"
     # 嵌套帧（task 020 copy_attack）：inner = 内层效果定位（DSL 文档卡名, 招式名），
@@ -227,6 +229,9 @@ class GameState(FrozenModel):
     # 换上后回合权归属（默认 None = 换上方回合，普通昏厥语义）；
     # 混乱反面自我昏厥时置为对手（攻击已消耗，D1 决议 task 013），_do_promote 读后清零
     turn_after_promote: int | None = None
+    # 主阶段内换上标记（task 025 bounce：效果致战斗场空置时置位）——
+    # 换上后回 main 继续当前回合（不推进回合、不抽牌），_do_promote 读后清零
+    promote_to_main: bool = False
     # 竞技场放置方（task 017：旧竞技场被替换时进其放置方弃牌区，rules-manual §5）
     stadium_owner: int | None = None
 

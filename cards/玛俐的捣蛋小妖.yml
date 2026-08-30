@@ -1,0 +1,15 @@
+# 玛俐的捣蛋小妖（CSV10C-146，基础）
+# text_raw 原文：「【无】 骗取
+# 从自己牌库上方抽取1张卡牌。
+#
+# 【恶】 推打 10」
+# 骗取无伤害、仅抽 1 张（牌库空抽完即止不判负，rules-manual 胜负判定）；
+# 推打 10 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 玛俐的捣蛋小妖
+  card_ids: [CSV10C-146]
+effects:
+  - trigger: on_attack
+    attack: 骗取
+    actions:
+      - {action: draw, count: 1}

@@ -1,0 +1,12 @@
+# 吉尼亚（CSV1C-120，支援者）
+# text_raw 原文：「选择自己牌库中最多2张进化宝可梦，在给对手看过之后，加入手牌。并重洗牌库。」
+card:
+  name_group: 吉尼亚
+  card_ids: [CSV1C-120, CSV1C-147, CSV1C-160, CSVM2bC-024, SVP-296]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [evolved_pokemon], choose: 2, destination: hand}
+      - {action: shuffle_deck}

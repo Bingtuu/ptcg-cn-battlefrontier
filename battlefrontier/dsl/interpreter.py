@@ -60,6 +60,9 @@ class ExecutionContext:
         # 嵌套恢复标记（task 020）：内层效果已完成后恢复外层 copy 节点时置位，
         # copy_attack 据此只回结果、不重复执行内层
         self.inner_done: bool = False
+        # 最近一次 coin_flip 结果（task 025 节点级门控 if_flip_heads/if_flip_tails 读取）；
+        # 挂起恢复时经 PendingChoice.flip_result 穿透重建（choice 阶段不消耗随机源，值稳定）
+        self.last_flip: bool | None = None
 
     @property
     def player_state(self) -> PlayerState:
@@ -86,22 +89,44 @@ def flatten_steps(effect: Effect) -> list[tuple[str, ActionNode]]:
     return [("cost", n) for n in effect.cost] + [("actions", n) for n in effect.actions]
 
 
+# 节点级运行时门控词表（task 025）：注册在代码里（同 filters/condition 纪律），
+# 词表文件不含 condition 段。求值读 ctx.last_flip（最近一次 coin_flip 结果）。
+_NODE_CONDITIONS = ("if_flip_heads", "if_flip_tails")
+
+
+def _node_condition_met(ctx: ExecutionContext, condition: str) -> bool:
+    """节点 condition 求值：未知词 / 无前置掷币 = DslError（不猜）。"""
+    if condition not in _NODE_CONDITIONS:
+        raise DslError(
+            f"未知节点 condition 词 {condition!r}（不猜；扩展请在 dsl/interpreter.py 注册）"
+        )
+    if ctx.last_flip is None:
+        raise DslError(
+            f"节点 condition {condition!r} 需要本效果内前置 coin_flip"
+            f"（无掷币结果，不猜；请在该节点前放 coin_flip 原语）"
+        )
+    return ctx.last_flip if condition == "if_flip_heads" else not ctx.last_flip
+
+
 def run_effect(
     ctx: ExecutionContext,
     effect: Effect,
     start: int = 0,
     choice: tuple[int, ...] | None = None,
     carry: tuple[int, ...] = (),
+    flip: bool | None = None,
 ) -> NeedChoice | None:
     """执行效果块：成本 → 动作序列；逐节点发事件（PRD §5.4）。
 
     返回 NeedChoice = 挂起（游标指向未完成的节点）；返回 None = 执行完毕。
     start>0 或带 choice 为恢复执行：choice 是游标节点的选择结果，effect_start 不重复发；
-    carry 是同节点此前挂起的中间选择（chooser carry 协议，task 011）。
+    carry 是同节点此前挂起的中间选择（chooser carry 协议，task 011）；
+    flip 是挂起瞬间冻结的掷币结果（task 025，恢复时重建 ctx.last_flip）。
     condition / limit 在本期仅随 effect_start 事件记录，强制约束（特性限次等）
     由引擎在行动枚举/执行层完成（task 011）。
     """
     ctx.carry = carry
+    ctx.last_flip = flip
     card_name = ctx.source.card.name
     if start == 0 and choice is None:  # 恢复执行（带 choice）不重复发 effect_start
         ctx.emit(
@@ -115,6 +140,19 @@ def run_effect(
     steps = flatten_steps(effect)
     for cursor in range(start, len(steps)):
         phase, node = steps[cursor]
+        # 节点级门控（task 025）：condition 不满足 → 跳过该节点并落 skipped 事件；
+        # 跳过的节点不占选择游标（游标 = 扁平步骤序号，跳过即越过，恢复语义不变）
+        if node.condition is not None and not _node_condition_met(ctx, node.condition):
+            ctx.emit(
+                "effect_primitive",
+                effect_id=ctx.effect_id,
+                card=card_name,
+                phase=phase,
+                action=node.action,
+                params=_node_params(node),
+                result={"skipped": True, "condition": node.condition},
+            )
+            continue
         fn = PRIMITIVES.get(node.action)
         if fn is None:
             raise DslError(
@@ -123,6 +161,7 @@ def run_effect(
         result = fn(ctx, node, choice if cursor == start else None)
         if isinstance(result, NeedChoice):
             result.cursor = cursor
+            result.flip = ctx.last_flip  # 掷币结果随挂起冻结（恢复时穿透重建）
             return result
         ctx.emit(
             "effect_primitive",

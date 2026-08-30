@@ -25,10 +25,15 @@ actions:
   - modify_hp               # 声明式：常驻 HP 修正（道具 passive_static，引擎读声明，解释器不执行）
   - grant_attack            # 声明式：授予招式（道具 passive_static；discard_at_turn_end 等标记）
   - modify_weakness         # 声明式：弱点改写（特性 passive_static，如妖精领域；引擎读声明）
+  - coin_flip               # 掷币（结果存 ExecutionContext，节点级门控 if_flip_* 读取）
+  - heal                    # 恢复 HP（去伤害指示物，不超过已有伤害）
+  - bounce                  # 放回手牌（场上宝可梦整叠回手，附着能量/道具进弃牌区）
+  - modify_damage           # 声明式：招式伤害修正（道具 passive_static，如不服输头带；引擎读声明）
 
 # 选择器（作用对象）
 selectors:
   - self                    # 这只宝可梦
+  - own_active              # 自己的战斗宝可梦（heal 等指向战斗场的目标）
   - opponent_active         # 对手战斗宝可梦
   - opponent_active_attack  # 对手战斗宝可梦所拥有的招式（复制目标）
   - own_hand                # 自己的手牌

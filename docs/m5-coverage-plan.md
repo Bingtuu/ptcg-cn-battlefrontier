@@ -18,52 +18,52 @@ V-UNION 缺口 0（一期不做，无冲突）。
 | 卡名 | 卡种 | effect_tags | 所属卡组 | 级别 | 依赖 | 状态 |
 |------|------|-------------|----------|------|------|------|
 | 友好宝芬 | trainer | search | 喷火龙大比鸟/多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女/赛富豪/多龙巴鲁托 | A | 现有原语（hp_max 过滤器已随 task 024 注册） | done（task 024 自验卡，gate3 待核销） |
-| 吉尼亚 | trainer | search | 喷火龙大比鸟/多龙黑夜魔灵/多龙巴鲁托 | A | 现有原语 | pending |
-| 多龙奇 | pokemon | search | 多龙黑夜魔灵/多龙喷火龙/多龙巴鲁托 | A | 现有原语 | pending |
-| 多龙梅西亚 | pokemon | damage_boost | 多龙黑夜魔灵/多龙喷火龙/多龙巴鲁托 | A | vanilla（无需 DSL，装载即可） | pending |
-| 夜巡灵 | pokemon | bounce | 喷火龙大比鸟/多龙黑夜魔灵 | A | 现有原语 | pending |
-| 奥琳博士的气魄 | trainer | draw,energy_accel | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 宝可梦交替 | trainer | switch | 多龙黑夜魔灵/赛富豪/赫普的苍响 | A | 现有原语 | pending |
-| 宝可装置3.0 | trainer | search,bounce | 赫普的苍响 | A | 现有原语 | pending |
-| 小刚的发掘 | trainer | search | 赛富豪 | A | 现有原语 | pending |
-| 尖钉镇道馆 | trainer | search | 玛俐长毛巨魔雪妖女 | A | 现有原语 | pending |
-| 弗图博士的剧本 | trainer | bounce | 喷火龙大比鸟/猛雷鼓厄诡椪/赛富豪/多龙巴鲁托 | A | 现有原语 | pending |
-| 彷徨夜灵 | pokemon | status | 喷火龙大比鸟/多龙黑夜魔灵 | A | 现有原语 | pending |
-| 怒鹦哥ex | pokemon | draw,energy_accel | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 拉帝亚斯ex | pokemon | modifier,cooldown | 猛雷鼓厄诡椪/多龙巴鲁托/赫普的苍响 | A | 现有原语 | pending |
-| 拉鲁拉丝 | pokemon | status | 沙奈朵 | A | vanilla（无需 DSL，装载即可） | pending |
-| 招式学习器 退化 | trainer | bounce,evolution,special_behavior | 玛俐长毛巨魔雪妖女/赫普的苍响 | A | 现有原语 | pending |
-| 摔角鹰人 | pokemon | draw,bounce | 多龙黑夜魔灵/多龙巴鲁托 | A | 现有原语 | pending |
-| 暗码迷的解读 | trainer | search,bounce | 赛富豪 | A | 现有原语 | pending |
-| 月月熊 赫月ex | pokemon | modifier,cooldown | 猛雷鼓厄诡椪/多龙黑夜魔灵/多龙巴鲁托/赫普的苍响 | A | 现有原语 | pending |
-| 朋友手册 | trainer | discard_recover,bounce | 赫普的苍响 | A | 现有原语 | pending |
-| 比比鸟 | pokemon | - | 喷火龙大比鸟 | A | vanilla（无需 DSL，装载即可） | pending |
-| 水莲的照顾 | trainer | discard_recover | 赛富豪 | A | 现有原语 | pending |
-| 沙铃仙人掌 | pokemon | - | 多龙巴鲁托 | A | 现有原语 | pending |
-| 波波 | pokemon | search | 喷火龙大比鸟 | A | 现有原语 | pending |
-| 火恐龙 | pokemon | - | 喷火龙大比鸟/多龙喷火龙 | A | 现有原语 | pending |
-| 牡丹 | trainer | bounce | 赫普的苍响 | A | 现有原语 | pending |
-| 猛雷鼓 | pokemon | draw | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 猛雷鼓ex | pokemon | draw | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 猫头夜鹰 | pokemon | bounce | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 玛俐的捣蛋小妖 | pokemon | draw | 玛俐长毛巨魔雪妖女 | A | 现有原语 | pending |
-| 玛俐的诈唬魔 | pokemon | - | 玛俐长毛巨魔雪妖女 | A | 现有原语 | pending |
-| 白蕾雅 | trainer | modifier | 喷火龙大比鸟 | A | 现有原语 | pending |
-| 百变怪 | pokemon | search | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 皮宝宝 | pokemon | bounce | 喷火龙大比鸟 | A | 现有原语 | pending |
-| 米立龙 | pokemon | search,bounce | 赫普的苍响 | A | 现有原语 | pending |
-| 索财灵 | pokemon | - | 赛富豪 | A | 现有原语 | pending |
-| 紧急滑板 | trainer | modifier | 喷火龙大比鸟/多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女/赫普的苍响 | A | 现有原语 | pending |
-| 能量输送 | trainer | search | 玛俐长毛巨魔雪妖女 | A | 现有原语 | pending |
-| 赛富豪ex | pokemon | draw | 赛富豪 | A | 现有原语 | pending |
-| 赤松 | trainer | search,energy_accel | 猛雷鼓厄诡椪/多龙黑夜魔灵 | A | 现有原语 | pending |
-| 赫普的包包 | trainer | search | 赫普的苍响 | A | 现有原语 | pending |
-| 赫普的古月鸟 | pokemon | - | 赫普的苍响 | A | 现有原语 | pending |
-| 超级能量回收 | trainer | discard_recover | 赛富豪 | A | 现有原语 | pending |
-| 雪童子 | pokemon | - | 玛俐长毛巨魔雪妖女 | A | 现有原语 | pending |
-| 零之大空洞 | trainer | modifier | 猛雷鼓厄诡椪 | A | 现有原语 | pending |
-| 飞天螳螂 | pokemon | energy_accel | 赛富豪 | A | 现有原语 | pending |
-| 不服输头带 | trainer | damage_boost | 玛俐长毛巨魔雪妖女 | B | 小原语批（task 025/026） | pending |
+| 吉尼亚 | trainer | search | 喷火龙大比鸟/多龙黑夜魔灵/多龙巴鲁托 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 多龙奇 | pokemon | search | 多龙黑夜魔灵/多龙喷火龙/多龙巴鲁托 | A | 现有原语 | blocked:缺 name:<卡名> 过滤器 |
+| 多龙梅西亚 | pokemon | damage_boost | 多龙黑夜魔灵/多龙喷火龙/多龙巴鲁托 | A | vanilla（无需 DSL，装载即可） | done（vanilla 核验：目标印刷无效果句，无需 DSL） |
+| 夜巡灵 | pokemon | bounce | 喷火龙大比鸟/多龙黑夜魔灵 | A | 现有原语 | blocked:缺 recover_from_discard bench 去向 + name 过滤器 |
+| 奥琳博士的气魄 | trainer | draw,energy_accel | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺古代特质过滤（CardDef labels）+ attach 多目标各附1 |
+| 宝可梦交替 | trainer | switch | 多龙黑夜魔灵/赛富豪/赫普的苍响 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 宝可装置3.0 | trainer | search,bounce | 赫普的苍响 | A | 现有原语 | blocked:缺 search_deck top_n 限定池 |
+| 小刚的发掘 | trainer | search | 赛富豪 | A | 现有原语 | blocked:缺二选一组合约束选择 |
+| 尖钉镇道馆 | trainer | search | 玛俐长毛巨魔雪妖女 | A | 现有原语 | blocked:缺 owner_pokemon:<名> 过滤器 |
+| 弗图博士的剧本 | trainer | bounce | 喷火龙大比鸟/猛雷鼓厄诡椪/赛富豪/多龙巴鲁托 | A | bounce 原语（task 025 已注册） | done（task 025 代表卡，gate3 待核销） |
+| 彷徨夜灵 | pokemon | status | 喷火龙大比鸟/多龙黑夜魔灵 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 怒鹦哥ex | pokemon | draw,energy_accel | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺 first_own_turn + attach_energy up-to-N + bench-only 目标池 |
+| 拉帝亚斯ex | pokemon | modifier,cooldown | 猛雷鼓厄诡椪/多龙巴鲁托/赫普的苍响 | A | 现有原语 | blocked:缺 modify_retreat_cost（全体基础）+ 招式冷却机制 |
+| 拉鲁拉丝 | pokemon | status | 沙奈朵 | A | vanilla（无需 DSL，装载即可） | done（vanilla 核验：目标印刷无效果句，无需 DSL） |
+| 招式学习器 退化 | trainer | bounce,evolution,special_behavior | 玛俐长毛巨魔雪妖女/赫普的苍响 | A | 现有原语 | blocked:缺 devolve 原语（退化回对手手牌） |
+| 摔角鹰人 | pokemon | draw,bounce | 多龙黑夜魔灵/多龙巴鲁托 | A | 现有原语 | blocked:缺 trigger_on_event 分发 + place_damage_counters（task 026 域） |
+| 暗码迷的解读 | trainer | search,bounce | 赛富豪 | A | 现有原语 | blocked:缺 deck_top 去向 + 有序排列选择 |
+| 月月熊 赫月ex | pokemon | modifier,cooldown | 猛雷鼓厄诡椪/多龙黑夜魔灵/多龙巴鲁托/赫普的苍响 | A | 现有原语 | blocked:缺 modify_attack_cost + opponent_taken_prizes 计数词 + 冷却机制 |
+| 朋友手册 | trainer | discard_recover,bounce | 赫普的苍响 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 比比鸟 | pokemon | - | 喷火龙大比鸟 | A | vanilla（无需 DSL，装载即可） | done（vanilla 核验：目标印刷无效果句，无需 DSL） |
+| 水莲的照顾 | trainer | discard_recover | 赛富豪 | A | 现有原语 | blocked:缺 pokemon_no_rule_or_basic_energy 过滤器 |
+| 沙铃仙人掌 | pokemon | - | 多龙巴鲁托 | A | 现有原语 | blocked:缺 place_damage_counters + KO 事件触发 + 撤退锁（task 026/029 域） |
+| 波波 | pokemon | search | 喷火龙大比鸟 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 火恐龙 | pokemon | - | 喷火龙大比鸟/多龙喷火龙 | A | 现有原语 | blocked:缺 discard own_attached_energy + 招式效果免疫 passive（task 029 域） |
+| 牡丹 | trainer | bounce | 赫普的苍响 | A | 现有原语 | blocked:缺 bounce 附着物回手参数 + in-play 基础宝可梦过滤器 |
+| 猛雷鼓 | pokemon | draw | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺 counters 词 attached_energy_on_target |
+| 猛雷鼓ex | pokemon | draw | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺弃置场上附着能量原语 + 前节点选择数计数词 |
+| 猫头夜鹰 | pokemon | bounce | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺 trigger_on_event 引擎分发 + own_tera_in_play |
+| 玛俐的捣蛋小妖 | pokemon | draw | 玛俐长毛巨魔雪妖女 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 玛俐的诈唬魔 | pokemon | - | 玛俐长毛巨魔雪妖女 | A | 现有原语 | done（vanilla 核验：目标印刷无效果句，无需 DSL） |
+| 白蕾雅 | trainer | modifier | 喷火龙大比鸟 | A | 现有原语 | blocked:缺 opponent_prizes_eq:2 + CardDef.is_tera + 奖赏修正钩子 |
+| 百变怪 | pokemon | search | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺 first_own_turn/self_is_active + 变身替换原语 |
+| 皮宝宝 | pokemon | bounce | 喷火龙大比鸟 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 米立龙 | pokemon | search,bounce | 赫普的苍响 | A | 现有原语 | blocked:缺牌库顶N检视 + self_is_active |
+| 索财灵 | pokemon | - | 赛富豪 | A | 现有原语 | blocked:缺 coin_flip until_tails + 正面次数×N 伤害 |
+| 紧急滑板 | trainer | modifier | 喷火龙大比鸟/多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女/赫普的苍响 | A | 现有原语 | blocked:缺 modify_retreat_cost + holder_hp_le:N |
+| 能量输送 | trainer | search | 玛俐长毛巨魔雪妖女 | A | 现有原语 | done（task 025 闸1/2 过，gate3 待核销） |
+| 赛富豪ex | pokemon | draw | 赛富豪 | A | 现有原语 | blocked:缺 holder_is_active + discard 区间弃置 + 弃置张数计数词 |
+| 赤松 | trainer | search,energy_accel | 猛雷鼓厄诡椪/多龙黑夜魔灵 | A | 现有原语 | blocked:缺 distinct-type 约束 + 检索拆分去向(hand+attach) |
+| 赫普的包包 | trainer | search | 赫普的苍响 | A | 现有原语 | blocked:缺 owner_pokemon:<名> 过滤器 |
+| 赫普的古月鸟 | pokemon | - | 赫普的苍响 | A | 现有原语 | blocked:缺 condition opponent_prizes_in:[4,3] |
+| 超级能量回收 | trainer | discard_recover | 赛富豪 | A | 现有原语 | blocked:缺 recover_from_discard hand up-to(min_choose=0) |
+| 雪童子 | pokemon | - | 玛俐长毛巨魔雪妖女 | A | 现有原语 | blocked:缺对手手牌随机单张回牌库原语（hand_disrupt） |
+| 零之大空洞 | trainer | modifier | 猛雷鼓厄诡椪 | A | 现有原语 | blocked:缺 bench_size 覆写 + CardDef.is_tera + 失效缩减结算 |
+| 飞天螳螂 | pokemon | energy_accel | 赛富豪 | A | 现有原语 | blocked:缺 energy_type:<属性> 过滤器 + bench-only attach 目标池 |
+| 不服输头带 | trainer | damage_boost | 玛俐长毛巨魔雪妖女 | B | modify_damage 结算（task 025 已接入） | done（task 025 代表卡，gate3 待核销） |
 | 化朗镇 | trainer | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | pending |
 | 古玉鱼 | pokemon | mill,energy_accel | 喷火龙大比鸟 | B | 小原语批（task 025/026） | pending |
 | 咕咕 | pokemon | gust | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | pending |

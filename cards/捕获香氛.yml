@@ -1,0 +1,17 @@
+# 捕获香氛（CS6aC-120，物品）
+# text_raw 原文：「抛掷1次硬币。如果为正面则从自己牌库中选择1张进化宝可梦，如果为反面
+# 则从自己牌库中选择1张【基础】宝可梦，在给对手看过之后，加入手牌。并重洗牌库。」
+# 掷币分支：coin_flip 置结果，两个检索节点各带节点级门控（if_flip_heads/if_flip_tails，
+# 不满足者跳过并落 skipped 事件）；「给对手看过」按库内惯例不单独建模（高级球先例）。
+card:
+  name_group: 捕获香氛
+  card_ids: [CS6aC-120, CSVH1aC-009, CSVH2aC-008, CSZC-032]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: coin_flip}
+      - {action: search_deck, selector: own_deck, filters: [evolved_pokemon], choose: 1, destination: hand, condition: if_flip_heads}
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon], choose: 1, destination: hand, condition: if_flip_tails}
+      - {action: shuffle_deck}

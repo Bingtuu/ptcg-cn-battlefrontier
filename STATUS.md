@@ -4,8 +4,8 @@
 
 ## 当前
 
-**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**——关键数据断点：db 仅一个合法性快照（07-16 退赛），原 top-9 中放逐Box/雷吉铎拉戈/洛奇亚/密勒顿无任何合法 full 卡组，经用户决议以退赛后窗口 WUR 前列替补（玛俐长毛巨魔雪妖女/赛富豪/多龙巴鲁托/赫普的苍响）。缺口 81 张（A46/B17/C18，`docs/m5-coverage-plan.md`）。LLM harness 就绪：`.kimi-code/skills/dsl-authoring` + 闸 1 `bfsim dsl-check` + `cards/authoring-log.jsonl` 质量日志；自验卡友好宝芬过闸 1/2（gate3 待核销）。
-M1–M4 已达成。下一步：task 025（批 1 A 级 46 张 + 小原语批）。
+**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：done 15（DSL 11 + vanilla 4）/ blocked 32 / pending 34（B/C 级）。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）——task 026 需按批 1 归并的解锁清单 re-scope。LLM harness 质量数据：批 1 新写 DSL 12 张，first_pass 10/12；**13 张 gate3 待用户核销**（友好宝芬已核销）。
+M1–M4 已达成。下一步：task 026（B 级批，先 re-scope：filters/conditions 高频解锁项 + trigger_on_event 分发 + place_damage_counters）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -18,6 +18,16 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-30 task 025 批 1：小原语批 + A 级 46 张 ✅
+
+- **小原语批 5 项（子代理 TDD）**：`coin_flip` + 节点级 condition 门控（if_flip_heads/tails，掷币结果经 PendingChoice.flip_result 穿透恢复、不占选择游标）/ `heal` / `switch` own_bench / `bounce`（整叠回手+附着物弃置，附录 A 三条决议含 🔲 待核）/ `modify_damage` 声明式结算（`_effective_damage_modifier` 仿 `_effective_hp`，三路径接入 §6 顺序 2）。代码注册 filters `evolved_pokemon`、condition `own_active_is_basic`；词表 actions +4、selectors +1
+- 代表卡 4 张（捕获香氛/交替推车/弗图博士的剧本/不服输头带）闸 1/2 一次通过 4/4，gate3 待核销；交替推车 heal 前置取舍已记决议
+- **A 级 swarm 7 波**：done 8（吉尼亚/波波/能量输送/宝可梦交替/皮宝宝/朋友手册/彷徨夜灵/玛俐的捣蛋小妖）+ vanilla 4 + blocked 32；批 1 新写 DSL 12 张 **first_pass 10/12**（2 例 false 均为测试侧笔误、DSL 零修改）；分片测试 `tests/test_dsl_cards_b1_w*.py`
+- **关键发现：A 级初判失真严重**——effect_tags 归判 vs text_raw 实测，46 张初判「现有原语可写」仅 10 张可直接写（约 22%）；blocked 32 张的解锁需求已归并（filters/conditions/原语扩展/数据管道四类，详见 task 025.md 批 1 质量小结）→ **task 026 需 re-scope**
+- 落账：coverage-plan 81 行状态全量更新（done 15 / blocked 32 / pending 34）；authoring-log 批 1 计 49 条；m2_closeout 计数断言改下限口径（≥28，M5 持续增长）
+- 全量 388 绿 + ruff 零告警（含沙奈朵镜像同种子 hash 回归）
+- 遗留/待用户：①13 张 gate3 待核销（代表卡 4 + done 8 + 友好宝芬已核销）；②同名组多文本印刷归组口径（彷徨夜灵/波波/皮宝宝目前只覆盖池内实际印刷）；③task 026 re-scope 确认
 
 ### 2026-08-30 task 024 卡组池锁定 + LLM harness ✅（M5 启动）
 

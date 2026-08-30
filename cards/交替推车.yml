@@ -1,0 +1,16 @@
+# 交替推车（CS5DC-116，物品）
+# text_raw 原文：「将自己战斗场上的【基础】宝可梦与备战宝可梦互换。
+# 然后，回复被换入备战区的宝可梦「30」点HP。」
+# 实现注记：战斗场须为【基础】走条件门（own_active_is_basic，不满足不枚举）；
+# 「回复被换入备战区的宝可梦」= 回复互换前的战斗宝可梦——伤害指示物随宝可梦移动
+# （rules-manual §5 撤退条目「伤害指示物保留」），先 heal 战斗场再互换与原文顺序
+# 结算等价（终态同一），故 heal 节点前置；互换回备战清特殊状态（§7.1 恢复途径）。
+card:
+  name_group: 交替推车
+  card_ids: [CS5DC-116, CS5bC-116, CSOC-005, CSVE1C-101, CSVE2C-135, CSVE2pC-008, CSVH3aC-007, CSVM1cC-008, CSXC-006, CSZC-030]
+effects:
+  - trigger: on_play
+    condition: own_active_is_basic
+    actions:
+      - {action: heal, selector: own_active, args: {amount: 30}}
+      - {action: switch, selector: own_bench, choose: 1}

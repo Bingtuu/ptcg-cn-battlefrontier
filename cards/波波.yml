@@ -1,0 +1,17 @@
+# 波波（151C-016，基础）
+# text_raw 原文：「【无】 呼朋引伴
+# 选择自己牌库中最多2张【基础】宝可梦，放于备战区。并重洗牌库。
+#
+# 【无】【无】 撞击 20」
+# 「撞击」为白板固定伤害招式，无需 DSL。
+card:
+  name_group: 波波
+  card_ids: [151C-016, 151C-153, CSVM1aC-008]
+effects:
+  - trigger: on_attack
+    attack: 呼朋引伴
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon], choose: 2, destination: bench}
+      - {action: shuffle_deck}

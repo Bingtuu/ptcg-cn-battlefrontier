@@ -1,0 +1,15 @@
+# 彷徨夜灵（CS2.5C-018，1阶）
+# text_raw 原文：「【无】 奇异之光
+# 使对手的战斗宝可梦陷入【混乱】状态。
+#
+# 【超】【无】【无】 精神拳 60」
+# 奇异之光无伤害、仅施加混乱（混乱判定见 rules-reference 附录 A D1 决议）；
+# 精神拳 60 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 彷徨夜灵
+  card_ids: [CS2.5C-018]
+effects:
+  - trigger: on_attack
+    attack: 奇异之光
+    actions:
+      - {action: apply_status, selector: opponent_active, args: {status: confused}}

@@ -8,6 +8,8 @@ card:
   card_ids: [CSV1C-123]
 effects:
   - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
     actions:
       - {action: search_deck, selector: own_deck, filters: [trainer_item], choose: 1, destination: hand}
       - {action: search_deck, selector: own_deck, filters: [trainer_tool], choose: 1, destination: hand}

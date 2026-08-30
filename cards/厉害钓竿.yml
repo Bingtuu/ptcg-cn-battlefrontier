@@ -6,6 +6,8 @@ card:
   card_ids: [CSV1C-109]
 effects:
   - trigger: on_play
+    # 决策聚合锚点（task 022）：回收选牌为关键决策点
+    observe: [key_search]
     actions:
       - {action: recover_from_discard, selector: own_discard, filters: [pokemon_or_basic_energy], choose: 3, destination: deck}
       - {action: shuffle_deck}

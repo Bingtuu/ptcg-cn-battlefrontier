@@ -8,6 +8,8 @@ card:
   card_ids: [CSV8C-176]
 effects:
   - trigger: on_play
+    # 决策聚合锚点（task 022）：四类检索选牌为关键决策点
+    observe: [key_search]
     cost:
       - {action: discard, selector: own_hand, choose: 3}
     actions:

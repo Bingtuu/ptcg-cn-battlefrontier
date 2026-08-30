@@ -21,6 +21,7 @@ from battlefrontier.engine.state import (
     CardInstance,
     GameState,
     InPlayPokemon,
+    PendingChoice,
     PlayerState,
     SpecialCondition,
     Supertype,
@@ -914,10 +915,44 @@ class GameEngine:
         else:
             self.state = self.state.model_copy(update={"pending_choice": None})
 
+    def _resolve_choose_names(self, pc: PendingChoice, choices: tuple[int, ...]) -> list[str]:
+        """choose 事件的选中项名称解析（task 022 决策聚合数据源）。
+
+        卡 iid 扫描双方全区域；opponent_active_attack 池的元素是招式索引，
+        解析为对手战斗场招式名（rules：复制招式选择公开信息）。
+        """
+        if pc.pool == "opponent_active_attack":
+            opp_active = self.state.players[1 - pc.player].active
+            attacks = opp_active.current.card.attacks if opp_active else ()
+            return [attacks[i].name for i in choices if i < len(attacks)]
+        names: dict[int, str] = {}
+        for p in self.state.players:
+            for c in (*p.deck, *p.hand, *p.discard, *p.prizes):
+                names[c.iid] = c.card.name
+            for mon in ([p.active] if p.active else []) + list(p.bench):
+                for c in (*mon.stack, *mon.attached_energy):
+                    names[c.iid] = c.card.name
+                if mon.attached_tool is not None:
+                    names[mon.attached_tool.iid] = mon.attached_tool.card.name
+        return [names.get(i, f"#{i}") for i in choices]
+
     def _do_choose(self, player: int, action: Action) -> None:
-        """chooser 恢复：带选择结果从挂起游标续跑效果（PRD §5.2；嵌套帧 task 020）。"""
+        """chooser 恢复：带选择结果从挂起游标续跑效果（PRD §5.2；嵌套帧 task 020）。
+
+        恢复前落 choose 决策事件（task 022，PRD §5.4/§9 决策聚合数据源）：
+        effect_id / 来源卡 / 池 / 选中 iids + 名称；嵌套帧 effect_id 含 copy> 标注。
+        """
         pc = self.state.pending_choice
         assert pc is not None  # legal_actions 已保证 phase="choice" 才有 choose
+        if pc.inner is not None:
+            effect_id = f"{pc.source.card.name}[{pc.source.iid}]:copy>{pc.inner[0]}.{pc.inner[1]}"
+        else:
+            doc = self.card_effects[pc.source.card.name]
+            trigger = doc.effects[pc.effect_index].trigger
+            effect_id = f"{pc.source.card.name}[{pc.source.iid}]:{trigger}"
+        self._emit("choose", player, effect_id=effect_id, card=pc.source.card.name,
+                   pool=pc.pool, chosen=list(action.choices),
+                   chosen_names=self._resolve_choose_names(pc, action.choices))
         self.state = self.state.model_copy(update={"pending_choice": None})
         self._run_or_suspend(player, pc.source, pc.effect_index,
                              start=pc.cursor, choice=action.choices,

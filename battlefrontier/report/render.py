@@ -29,6 +29,7 @@ _TEMPLATES = {
     "effect_primitive": "· {action} → {result}",
     "effect_observe": "· 观测锚点：{anchor}",
     "effect_end": "· 效果结束",
+    "choose": "· 选择：{chosen_names}（{card} / {pool}）",
     "deck_out": "玩家{player} 牌库抽空",
     "turn_cap": "达到回合上限，强制判平",
     "no_legal_actions": "无合法行动，强制判平",

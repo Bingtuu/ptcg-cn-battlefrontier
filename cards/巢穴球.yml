@@ -5,6 +5,8 @@ card:
   card_ids: [CSVH1C-043]
 effects:
   - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
     actions:
       - {action: search_deck, selector: own_deck, filters: [basic_pokemon], choose: 1, destination: bench}
       - {action: shuffle_deck}

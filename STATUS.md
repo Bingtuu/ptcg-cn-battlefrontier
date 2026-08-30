@@ -4,7 +4,7 @@
 
 ## 当前
 
-**M3 达成**：task 018 ✅（通用启发式 Agent）+ task 019 ✅（实验定义 YAML + 正式 Runner + 结果库三层表 + `bfsim run`）。M3 验收实跑：沙奈朵镜像 heuristic vs random 100 局落库（A胜 63/B胜 37/失败 0，4 workers 约 4.4s），并行 vs 串行重跑 games 层逐局一致（§8.4 硬验收过）。M2 已全部完成（task 005–017 ✅，定义库 23 卡）。下一步：M4 报告层（胜率报告 + 决策聚合 + 换卡敏感性）。
+**M3 达成**：task 018 ✅（通用启发式 Agent）+ task 019 ✅（实验定义 YAML + 正式 Runner + 结果库三层表 + `bfsim run`）+ task 020 ✅（copy_attack 嵌套 chooser 二级挂起帧，task 017/019 已知引擎缺口修复）。M3 验收复跑：100 局 0 失败、并行 vs 串行逐局一致、copy_attack 真实对局实际触发 10 次正常结算。M2 已全部完成（task 005–017 ✅，定义库 23 卡）。下一步：M4 报告层（胜率报告 + 决策聚合 + 换卡敏感性）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -17,6 +17,15 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-29 task 020 copy_attack 嵌套 chooser（二级挂起帧）✅
+
+- `PendingChoice` 增嵌套帧字段：`inner`（内层效果定位：DSL 文档卡名+招式名）/ `outer_cursor` / `outer_choice`；`NeedChoice` 增 `inner`/`inner_cursor` 传播字段（外层 run_effect 覆盖 cursor 前转存内层游标）
+- copy_attack：内层 run_effect 挂起从 DslError 改为标注传播；`ctx.inner_done` 标记外层恢复时只回结果（不重复执行内层、不重复发 copy_attack 事件）；内层 effect_id 标注 `>copy:招式名`（事件流可观测）
+- `_run_or_suspend` 嵌套恢复路径：inner 定位内层效果续跑 / 同层再挂起沿用帧 / 内层完成带 inner_done 恢复外层 copy 节点续跑后续节点 / 层级 >1（套娃复制）显式 DslError 不猜
+- HeuristicAgent `_pick_choose` 池映射补对手场上宝可梦（opponent_pokemon_any 类选择评分可见，确定性不变）
+- TDD 7 新测试全红→绿（真实卡回归：梦幻ex 复制吉雉鸡ex 残忍箭矢 / 内层双选择 / 外层续跑 / 套娃 guard / 重放 hash / Agent 驱动）；全量 273 绿 + ruff 零告警
+- M3 百局复验：0 失败、并行 vs 串行逐局一致、copy_attack 实际触发 10 次正常结算（A胜 65/B胜 35——Agent 决策口径变化属预期）
 
 ### 2026-08-29 task 019 实验定义 + 正式 Runner + 结果库 + bfsim run ✅（M3 达成）
 

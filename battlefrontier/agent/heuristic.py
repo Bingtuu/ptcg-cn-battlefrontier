@@ -141,6 +141,9 @@ class HeuristicAgent:
         for p in _in_play(view.own.active, view.own.bench):
             for c in (*p.stack, *p.attached_energy):
                 pool.setdefault(c.iid, c)
+        # 对手场上宝可梦（opponent_pokemon_any 类池，如复制招式的目标选择）
+        for p in _in_play(view.opponent.active, view.opponent.bench):
+            pool.setdefault(p.current.iid, p.current)
 
         def score(a: Action) -> float:
             total = 0.0

@@ -678,22 +678,31 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
 
     idx = choice[0]
     attack = opp_attacks[idx]
-    ctx.emit("copy_attack", attack=attack.name, source=opp_active.current.card.name)
     effect = next(
         (e for e in (opp_doc.effects if opp_doc else ())
          if e.trigger == "on_attack" and e.attack == attack.name),
         None,
     )
+    if ctx.inner_done:
+        # 嵌套恢复（task 020）：内层效果已完成，本节点只回结果——不重复执行内层、
+        # 不重复发 copy_attack 事件（内层首次执行时已发）
+        return {"copied": attack.name, "via": "dsl" if effect is not None else "whiteboard",
+                "resumed": True}
+    ctx.emit("copy_attack", attack=attack.name, source=opp_active.current.card.name)
     if effect is not None:
         # DSL 绑定招式：以我方视角结算对方效果块（selector 相对使用者）。
-        # 嵌套挂起（被复制招式自身含运行时选择）超出 chooser 单游标协议——
-        # 显式报错不猜（rules-reference 附录 A 决议；镜像对局主流复制目标为白板伤害）
-        sub = run_effect(ctx, effect, start=0)
+        # 嵌套挂起（task 020）：被复制招式自身含运行时选择时，标注内层效果定位
+        # （inner）与内层游标（inner_cursor）向上传播，由引擎建立嵌套帧挂起；
+        # 嵌套层级 >1（套娃复制）在引擎恢复路径显式 DslError（不猜）。
+        sub_ctx = ExecutionContext(
+            engine=engine, player=ctx.player, source=ctx.source,
+            effect_id=f"{ctx.effect_id}>copy:{attack.name}", trigger=effect.trigger,
+        )
+        sub = run_effect(sub_ctx, effect, start=0)
         if isinstance(sub, NeedChoice):
-            raise DslError(
-                f"copy_attack 复制的招式 {attack.name!r} 的效果含运行时选择，"
-                f"嵌套挂起未支持（不猜；需要时扩展 chooser 嵌套游标）"
-            )
+            sub.inner = (opp_active.current.card.name, attack.name)
+            sub.inner_cursor = sub.cursor
+            return sub
         return {"copied": attack.name, "via": "dsl"}
     # 白板伤害：按我方来源卡属性结算弱点抗性（有效弱点，task 017）
     from battlefrontier.engine.core import _attack_damage

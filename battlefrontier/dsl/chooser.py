@@ -55,6 +55,10 @@ class NeedChoice:
         self.carry = carry
         self.exclude_iids = exclude_iids
         self.cursor: int = -1
+        # 嵌套传播（task 020 copy_attack）：内层效果挂起时标注效果定位与内层游标
+        # （外层 run_effect 会覆盖 self.cursor 为外层节点游标，内层游标需另行转存）
+        self.inner: tuple[str, str] | None = None
+        self.inner_cursor: int = -1
 
 
 def _match_one(card: CardInstance, filter_word: str) -> bool:
@@ -203,6 +207,8 @@ def enumerate_choices(pending: PendingChoice) -> list[Action]:
 def build_pending(
     engine: GameEngine, player: int, source: CardInstance, effect_index: int,
     cursor: int, need: NeedChoice, completion: str = "trainer",
+    inner: tuple[str, str] | None = None, outer_cursor: int = -1,
+    outer_choice: tuple[int, ...] = (),
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
@@ -226,6 +232,9 @@ def build_pending(
         pool_iids=iids,
         payload=need.carry,
         completion=completion,
+        inner=inner,
+        outer_cursor=outer_cursor,
+        outer_choice=outer_choice,
     )
 
 

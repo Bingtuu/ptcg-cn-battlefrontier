@@ -118,6 +118,12 @@ class PendingChoice(FrozenModel):
     payload: tuple[int, ...] = ()
     # 完成模式：trainer = 效果完成后本体进弃牌区；ability = 特性不弃置
     completion: str = "trainer"
+    # 嵌套帧（task 020 copy_attack）：inner = 内层效果定位（DSL 文档卡名, 招式名），
+    # 非空时 cursor/payload 属内层；outer_cursor/outer_choice = 外层 copy 节点游标
+    # 与已消费的招式选择（内层完成后带 inner_done 标记恢复外层，不重复执行内层）
+    inner: tuple[str, str] | None = None
+    outer_cursor: int = -1
+    outer_choice: tuple[int, ...] = ()
 
 
 class PlayerState(FrozenModel):

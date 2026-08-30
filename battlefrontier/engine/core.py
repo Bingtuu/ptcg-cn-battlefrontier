@@ -841,23 +841,60 @@ class GameEngine:
         self, player: int, card: CardInstance, effect_index: int,
         start: int, choice: tuple[int, ...] | None = None,
         carry: tuple[int, ...] = (), completion: str = "trainer",
+        *, inner: tuple[str, str] | None = None, outer_cursor: int = -1,
+        outer_choice: tuple[int, ...] = (), inner_done: bool = False,
     ) -> None:
-        """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。"""
+        """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
+
+        嵌套帧（task 020 copy_attack）：inner 非空时按 inner 定位内层效果续跑；
+        内层完成 → 带 inner_done 恢复外层 copy 节点（不重复执行内层）；
+        内层再传播 inner → 嵌套层级 >1，显式 DslError（不猜）。
+        """
         from battlefrontier.dsl.chooser import build_pending
 
-        doc = self.card_effects[card.card.name]
-        effect = doc.effects[effect_index]
+        if inner is not None and not inner_done:
+            doc = self.card_effects[inner[0]]
+            effect = next(e for e in doc.effects
+                          if e.trigger == "on_attack" and e.attack == inner[1])
+            effect_id = f"{card.card.name}[{card.iid}]:copy>{inner[0]}.{inner[1]}"
+        else:
+            doc = self.card_effects[card.card.name]
+            effect = doc.effects[effect_index]
+            effect_id = f"{card.card.name}[{card.iid}]:{effect.trigger}"
         ctx = ExecutionContext(
             engine=self, player=player, source=card,
-            effect_id=f"{card.card.name}[{card.iid}]:{effect.trigger}", trigger=effect.trigger,
+            effect_id=effect_id, trigger=effect.trigger,
         )
+        ctx.inner_done = inner_done
         need = run_effect(ctx, effect, start=start, choice=choice, carry=carry)
         if need is not None:
-            pending = build_pending(self, player, card, effect_index, need.cursor, need,
-                                    completion=completion)
+            if need.inner is not None:
+                if inner is not None:
+                    raise DslError(
+                        f"copy_attack 嵌套层级 >1 未支持（不猜）：内层 {inner} "
+                        f"又传播 {need.inner}（需要时扩展 chooser 多级帧）"
+                    )
+                # 外层 copy 节点首次传播：建立嵌套帧（cursor/outer_cursor 分层记录）
+                pending = build_pending(
+                    self, player, card, effect_index, need.inner_cursor, need,
+                    completion=completion, inner=need.inner,
+                    outer_cursor=need.cursor, outer_choice=choice or (),
+                )
+            else:
+                pending = build_pending(
+                    self, player, card, effect_index, need.cursor, need,
+                    completion=completion, inner=inner,
+                    outer_cursor=outer_cursor, outer_choice=outer_choice,
+                )
             self.state = self.state.model_copy(update={
                 "phase": "choice", "current_player": player, "pending_choice": pending,
             })
+            return
+        if inner is not None and not inner_done:
+            # 内层完成 → 带 inner_done 恢复外层 copy 节点（外层后续节点照常执行）
+            self._run_or_suspend(player, card, effect_index, start=outer_cursor,
+                                 choice=outer_choice, completion=completion,
+                                 inner_done=True)
             return
         # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置；
         # 攻击结算完毕推进对手回合（rules-manual §6：攻击后回合结束）。
@@ -878,13 +915,15 @@ class GameEngine:
             self.state = self.state.model_copy(update={"pending_choice": None})
 
     def _do_choose(self, player: int, action: Action) -> None:
-        """chooser 恢复：带选择结果从挂起游标续跑效果（PRD §5.2）。"""
+        """chooser 恢复：带选择结果从挂起游标续跑效果（PRD §5.2；嵌套帧 task 020）。"""
         pc = self.state.pending_choice
         assert pc is not None  # legal_actions 已保证 phase="choice" 才有 choose
         self.state = self.state.model_copy(update={"pending_choice": None})
         self._run_or_suspend(player, pc.source, pc.effect_index,
                              start=pc.cursor, choice=action.choices,
-                             carry=pc.payload, completion=pc.completion)
+                             carry=pc.payload, completion=pc.completion,
+                             inner=pc.inner, outer_cursor=pc.outer_cursor,
+                             outer_choice=pc.outer_choice)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。

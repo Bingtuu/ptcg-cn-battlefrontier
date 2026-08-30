@@ -57,6 +57,9 @@ class ExecutionContext:
         self.trigger = trigger
         # 同节点两段式选择的中间结果（task 011 chooser carry 协议，恢复时注入）
         self.carry: tuple[int, ...] = ()
+        # 嵌套恢复标记（task 020）：内层效果已完成后恢复外层 copy 节点时置位，
+        # copy_attack 据此只回结果、不重复执行内层
+        self.inner_done: bool = False
 
     @property
     def player_state(self) -> PlayerState:

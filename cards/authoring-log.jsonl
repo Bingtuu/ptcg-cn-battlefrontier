@@ -1,0 +1,1 @@
+{"date":"2026-08-30","card":"友好宝芬","card_id":"CSV7C-177","author":"llm","batch":1,"gate1":true,"gate2":true,"gate3":true,"first_pass":false,"human_edit_lines":0,"notes":"harness 自验卡（子代理执行）。装配阶段发现缺 HP 上限过滤器词，按不猜纪律 blocked 上报；hp_max:N 注册后解锁。DSL 草稿首交即过闸1/闸2；闸2 首跑 rc=5——测试函数拼音命名致 -k 卡名匹配失败，改中文名后过（skill 已补命名约定）。first_pass 严格记 false。2026-08-30 用户核销通过，零修改。"}

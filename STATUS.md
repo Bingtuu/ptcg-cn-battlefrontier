@@ -4,7 +4,8 @@
 
 ## 当前
 
-**M4 已达成**：task 021 ✅（胜率报告 `bfsim report`）+ task 022 ✅（决策聚合 `bfsim report --decisions`）+ task 023 ✅（换卡敏感性：variants 分组实验 + `bfsim sensitivity` 并排 ΔWR + 两比例 z 检验）。报告 meta 全要素回显可复算。M3 已达成（task 018–020 ✅）。下一步：M5 覆盖扩展 + LLM 辅助编写试验。
+**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**——关键数据断点：db 仅一个合法性快照（07-16 退赛），原 top-9 中放逐Box/雷吉铎拉戈/洛奇亚/密勒顿无任何合法 full 卡组，经用户决议以退赛后窗口 WUR 前列替补（玛俐长毛巨魔雪妖女/赛富豪/多龙巴鲁托/赫普的苍响）。缺口 81 张（A46/B17/C18，`docs/m5-coverage-plan.md`）。LLM harness 就绪：`.kimi-code/skills/dsl-authoring` + 闸 1 `bfsim dsl-check` + `cards/authoring-log.jsonl` 质量日志；自验卡友好宝芬过闸 1/2（gate3 待核销）。
+M1–M4 已达成。下一步：task 025（批 1 A 级 46 张 + 小原语批）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -17,6 +18,15 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-08-30 task 024 卡组池锁定 + LLM harness ✅（M5 启动）
+
+- **卡池 v1（9 套，`config/target-pool.v1.yml` + `data/pool.py` 强校验 loader）**：调研发现退赛断点——db 仅一个合法性快照（standard-2026-07-16），原 WUR top-9 中放逐Box/雷吉铎拉戈/洛奇亚/密勒顿 4 套无任何合法 full 卡组（数据止于 08-05）；用户决议替补补位（退赛后窗口 WUR 前列：玛俐长毛巨魔雪妖女/赛富豪/多龙巴鲁托/赫普的苍响）。代表卡组全过当前快照校验，全窗口覆盖 53.4%
+- **缺口全表 `docs/m5-coverage-plan.md`**：81 张（A46/B17/C18），级别=标签归并初判、逐卡以 text_raw 为准；V-UNION 缺口 0
+- **LLM harness**：`.kimi-code/skills/dsl-authoring`（输入装配/输出契约/三道闸/不猜纪律/词表扩展路径）；闸 1 工具化 `bfsim dsl-check`；质量日志 `cards/authoring-log.jsonl`（JSONL，不落卡文本，合规）
+- **自验（子代理执行友好宝芬）**：流程完整走通且暴露真问题——缺 HP 上限过滤器词（按不猜纪律 blocked 上报）→ 注册 `hp_max:N` 参数化过滤器（chooser）解锁；skill REFACTOR 五处（闸 1 盲点 filters 不校验需闸 2 兜底 / 词表扩展路径 / 注释格式约定 / 样例映射 / 测试函数中文命名）；自验卡过闸 1+2，日志首条 first_pass=false（测试命名返工，严格口径）
+- TDD 12 新测试（pool loader / dsl-check 三分支 / 自验卡 4 项）；全量 334 绿 + ruff 零告警
+- 遗留：批 1 A 级 46 张归 task 025；友好宝芬 gate3 待用户核销
 
 ### 2026-08-30 task 023 换卡敏感性 ✅（M4 达成）
 

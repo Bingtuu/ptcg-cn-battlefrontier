@@ -89,6 +89,22 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_dsl_check(args: argparse.Namespace) -> int:
+    """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验。"""
+    from battlefrontier.dsl.loader import DslError, load_card_doc
+
+    failed = 0
+    for file in args.files:
+        try:
+            doc = load_card_doc(file)
+        except (DslError, OSError) as e:
+            failed += 1
+            print(f"[FAIL] {file}: {e}")
+        else:
+            print(f"[OK] {file}（{doc.card.name_group}，{len(doc.effects)} 个效果）")
+    return 1 if failed else 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     from battlefrontier.report.winrate import format_report, winrate_report
 
@@ -131,6 +147,8 @@ def main(argv: list[str] | None = None) -> int:
     sen_p.add_argument("base_id", type=int, help="baseline 实验 id")
     sen_p.add_argument("variant_ids", type=int, nargs="+", help="variant 实验 id 列表")
     sen_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    chk_p = sub.add_parser("dsl-check", help="DSL 文件校验（schema + 词表；LLM harness 闸 1）")
+    chk_p.add_argument("files", nargs="+", help="DSL YAML 路径（可多个）")
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
@@ -139,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(args)
     if args.cmd == "sensitivity":
         return _cmd_sensitivity(args)
+    if args.cmd == "dsl-check":
+        return _cmd_dsl_check(args)
     print(f"battlefrontier {__import__('battlefrontier').__version__}："
           f"子命令 run 可用（实验定义见 experiments/），其余随里程碑添加")
     return 0

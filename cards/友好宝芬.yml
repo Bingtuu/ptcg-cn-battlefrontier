@@ -1,0 +1,14 @@
+# 友好宝芬（CSV7C-177 等 8 印刷，物品）
+# text_raw 原文：「选择自己牌库中，最多2张HP在「70」及以下的【基础】宝可梦，放于备战区。并重洗牌库。」
+card:
+  name_group: 友好宝芬
+  card_ids: [CSV7C-177, CSV7C-258, CSV9.5C-167, CSVM1aC-013, CSVM1bC-018, CSVM2bC-013, CSVM2cC-014, SVP-196]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      # 选择自己牌库中，最多2张HP在「70」及以下的【基础】宝可梦，放于备战区。
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon, hp_max:70], choose: 2, destination: bench}
+      # 并重洗牌库。
+      - {action: shuffle_deck}

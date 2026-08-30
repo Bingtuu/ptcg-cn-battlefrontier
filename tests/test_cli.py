@@ -87,3 +87,54 @@ def test_cli_sensitivity_bad_id(tmp_path, capsys):
     rc = main(["sensitivity", "999", "1", "--results", str(results)])
     assert rc == 1
     assert "错误" in capsys.readouterr().out
+
+
+# ── task 024：dsl-check（LLM harness 闸 1：schema + 词表校验）──
+
+VALID_CARD_YAML = """\
+card:
+  name_group: 测试球
+  card_ids: [TEST-001]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: shuffle_deck}
+"""
+
+INVALID_CARD_YAML = """\
+card:
+  name_group: 测试球
+  card_ids: [TEST-001]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: 不存在的动作}
+"""
+
+
+def test_cli_dsl_check_valid(tmp_path, capsys):
+    p = tmp_path / "ok.yml"
+    p.write_text(VALID_CARD_YAML, encoding="utf-8")
+    rc = main(["dsl-check", str(p)])
+    assert rc == 0
+    assert "OK" in capsys.readouterr().out
+
+
+def test_cli_dsl_check_invalid_vocab(tmp_path, capsys):
+    p = tmp_path / "bad.yml"
+    p.write_text(INVALID_CARD_YAML, encoding="utf-8")
+    rc = main(["dsl-check", str(p)])
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "bad.yml" in out and "未知" in out
+
+
+def test_cli_dsl_check_mixed_files(tmp_path, capsys):
+    ok = tmp_path / "ok.yml"
+    ok.write_text(VALID_CARD_YAML, encoding="utf-8")
+    bad = tmp_path / "bad.yml"
+    bad.write_text("card: {name_group: x, card_ids: notalist}\n", encoding="utf-8")  # schema 类型错
+    rc = main(["dsl-check", str(ok), str(bad)])
+    assert rc == 1  # 任一失败即 rc=1，合法文件也照常报告
+    out = capsys.readouterr().out
+    assert "OK" in out and "bad.yml" in out

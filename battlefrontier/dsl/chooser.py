@@ -99,6 +99,9 @@ def _match_one(card: CardInstance, filter_word: str) -> bool:
     if filter_word.startswith("evolves_from:"):
         # 参数化过滤器（task 016）：「从该宝可梦进化而来的卡牌」（学习器 进化 逐只检索）
         return c.evolves_from == filter_word.split(":", 1)[1]
+    if filter_word.startswith("hp_max:"):
+        # 参数化过滤器（task 024）：「HP 在 N 及以下」（友好宝芬等检索条件）
+        return c.hp is not None and c.hp <= int(filter_word.split(":", 1)[1])
     raise DslError(f"未知 filter 词 '{filter_word}'（chooser 求值点；扩展请在 dsl/chooser.py 注册）")
 
 

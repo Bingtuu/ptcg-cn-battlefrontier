@@ -1,0 +1,33 @@
+# M5 目标卡组池 v1（2026-08-30 锁定，task 024）
+# 选取规则：WUR 排名（下述 6 场窗口）驱动 + **代表卡组须通过当前快照
+# （standard-2026-07-16）合法性校验**——db 仅此一个快照，07-16 退赛后
+# 放逐Box/雷吉铎拉戈/洛奇亚始祖大鸟/密勒顿 4 个 archetype 没有任何合法
+# full 卡组（数据止于 08-05），按用户决议（2026-08-30）以退赛后窗口
+# （07-16~08-28，n_tournaments=2）WUR 前列且有合法卡组的 archetype 替补：
+# 玛俐的长毛巨魔雪妖女 / 赛富豪 / 多龙巴鲁托 / 赫普的苍响。
+# 代表卡组 = 合法 full 卡组中最高名次（并列取日期近/出战多者；limit=500 防截断）。
+# 全窗口 WUR 合计覆盖 53.4%。本文件是 M5 覆盖验收与 M6 校准的卡池事实源。
+version: 1
+locked_at: "2026-08-30"
+query:
+  granularity: archetype
+  window: "2026-05-30..2026-08-28"
+  division: master
+  basis: cn
+  min_n: 5
+  n_tournaments: 6
+  mapping_status: full
+  snapshot: standard-2026-07-16
+  name_group_rules_hash: c47538c37ca8
+  legality_constraint: "代表卡组须通过 standard-2026-07-16 校验（当前环境口径）"
+  substitution: "放逐Box/雷吉铎拉戈/洛奇亚始祖大鸟/密勒顿 无合法卡组，以退赛后窗口（07-16~08-28，2 场）WUR 前列替补"
+decks:
+  - {archetype: 沙奈朵, wur: 0.129, n: 56, deck_id: "mik_moe:644634", note: "rank 1，2026-08-01，5 次出战；M2 已覆盖（23 卡 DSL 入库）"}
+  - {archetype: 喷火龙 大比鸟, wur: 0.116, n: 42, deck_id: "mik_moe:650353", note: "rank 4，2026-08-01（合法候选最高名次）"}
+  - {archetype: 猛雷鼓 厄诡椪, wur: 0.115, n: 29, deck_id: "mik_moe:652967", note: "rank 1，2026-08-01，4 次出战"}
+  - {archetype: 多龙巴鲁托 黑夜魔灵, wur: 0.056, n: 14, deck_id: "mik_moe:655545", note: "rank 11，2026-08-01（合法候选最高名次）"}
+  - {archetype: 多龙巴鲁托 喷火龙, wur: 0.049, n: 15, deck_id: "mik_moe:655776", note: "rank 1，2026-08-01"}
+  - {archetype: 玛俐的长毛巨魔 雪妖女, wur: 0.027, n: 11, deck_id: "mik_moe:643572", note: "替补（退赛后 WUR 0.120）；rank 2，2026-08-01"}
+  - {archetype: 赛富豪, wur: 0.027, n: 17, deck_id: "mik_moe:655513", note: "替补（退赛后 WUR 0.031）；rank 1，2026-08-01"}
+  - {archetype: 多龙巴鲁托, wur: 0.011, n: 14, deck_id: "mik_moe:648346", note: "替补（退赛后 WUR 0.041）；rank 7，2026-08-01"}
+  - {archetype: 赫普的苍响, wur: 0.004, n: 4, deck_id: "mik_moe:655512", note: "替补（退赛后 WUR 0.019）；rank 1，2026-08-01"}

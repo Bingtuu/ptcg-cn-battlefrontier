@@ -8,6 +8,7 @@ from battlefrontier.dsl import (
 )
 from battlefrontier.dsl.interpreter import PRIMITIVES, ExecutionContext, run_effect
 from battlefrontier.dsl.loader import (
+    CardLibrary,
     DslError,
     Vocabulary,
     load_card_dir,
@@ -21,6 +22,7 @@ __all__ = [
     "PRIMITIVES",
     "ActionNode",
     "CardEffectDoc",
+    "CardLibrary",
     "CardRef",
     "DslError",
     "Effect",

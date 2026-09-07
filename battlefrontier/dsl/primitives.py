@@ -684,7 +684,10 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     if opp_active is None:
         return {"copied": None, "reason": "no_opponent_active"}
     opp_attacks = opp_active.current.card.attacks
-    opp_doc = engine.card_effects.get(opp_active.current.card.name)
+    # 局部 import 防循环（engine.core ← dsl ← primitives）
+    from battlefrontier.engine.core import effect_doc
+
+    opp_doc = effect_doc(engine.card_effects, opp_active.current.card)
 
     def copyable(idx: int) -> bool:
         a = opp_attacks[idx]
@@ -725,7 +728,8 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
         )
         sub = run_effect(sub_ctx, effect, start=0)
         if isinstance(sub, NeedChoice):
-            sub.inner = (opp_active.current.card.name, attack.name)
+            sub.inner = (opp_active.current.card.card_id, opp_active.current.card.name,
+                         attack.name)
             sub.inner_cursor = sub.cursor
             return sub
         return {"copied": attack.name, "via": "dsl"}

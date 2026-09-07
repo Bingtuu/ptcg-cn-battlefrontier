@@ -7,7 +7,16 @@
 """
 
 import pytest
-from helpers import basic, energy, engine_at, in_play, inst, main_state
+from helpers import (
+    basic,
+    doc_of,
+    effects_by_name,
+    energy,
+    engine_at,
+    in_play,
+    inst,
+    main_state,
+)
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
 from battlefrontier.dsl.loader import DslError
@@ -226,11 +235,12 @@ def test_ability_gate_unknown_primitive_dsl_error() -> None:
 
 def test_card_library_covers_ability_cards() -> None:
     docs = load_card_dir("cards")
-    assert {"博士的研究", "高级球", "巢穴球", "夜间担架", "沙奈朵ex", "梦幻ex"} <= set(docs)
-    g = docs["沙奈朵ex"].effects[0]
+    for name in ("博士的研究", "高级球", "巢穴球", "夜间担架", "沙奈朵ex", "梦幻ex"):
+        assert docs.by_name(name), f"{name} 不在定义库"
+    g = doc_of(docs, "沙奈朵ex").effects[0]
     assert g.trigger == "ability_manual" and g.limit == "unlimited"
     assert g.actions[0].action == "attach_energy" and g.actions[0].args["damage_counters"] == 2
-    m = docs["梦幻ex"].effects[0]
+    m = doc_of(docs, "梦幻ex").effects[0]
     assert m.limit == "once_per_turn" and m.actions[0].args["until_hand"] == 3
 
 
@@ -239,7 +249,7 @@ def test_play_game_with_abilities_deterministic() -> None:
     from battlefrontier.runner.play import play_game
 
     deck = [mew()] * 4 + [basic("小火龙")] * 20 + [psy_energy()] * 20 + [energy()] * 16
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=5, card_effects=effects)
     r2 = play_game(deck, deck, seed=5, card_effects=effects)
     assert r1.events_hash == r2.events_hash

@@ -1,0 +1,15 @@
+# 赫普的古月鸟（CSV10C-188，基础）
+# text_raw 原文：「【无】 随性喷吐 120
+# 如果对手的剩余奖赏卡张数不为4张、3张的话，则这个招式失败。」
+# 「不为4张、3张则招式失败」= effect 级 condition opponent_prizes_in:[4,3]
+# （task 026 WP1 参数化条件）；不满足时整个招式失败——不结算伤害/效果、回合照常结束
+# （on_attack condition 引擎钩子，task 026 WP1）。
+card:
+  name_group: 赫普的古月鸟
+  card_ids: [CSV10C-188]
+effects:
+  - trigger: on_attack
+    attack: 随性喷吐
+    condition: "opponent_prizes_in:[4,3]"
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 120}}

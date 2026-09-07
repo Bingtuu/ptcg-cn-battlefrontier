@@ -1,7 +1,7 @@
 """task 022：choose 决策事件 + observe 锚点 + 决策聚合报告（PRD §5.4/§9）。"""
 
 import pytest
-from helpers import basic, engine_at, in_play, inst, main_state
+from helpers import basic, doc_of, engine_at, in_play, inst, main_state
 
 from battlefrontier.cli import main as cli_main
 from battlefrontier.dsl import load_card_dir, parse_card_doc
@@ -192,7 +192,7 @@ def test_format_decisions_renders(synth_db):
                                   "夜间担架", "秘密箱", "派帕"])
 def test_cards_observe_anchors(name):
     docs = load_card_dir("cards")
-    assert any(e.observe for e in docs[name].effects), f"{name} 缺 observe 锚点"
+    assert any(e.observe for e in doc_of(docs, name).effects), f"{name} 缺 observe 锚点"
 
 
 # ── CLI ──────────────────────────────────────────────────

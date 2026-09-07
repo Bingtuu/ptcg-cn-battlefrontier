@@ -4,8 +4,8 @@
 
 ## 当前
 
-**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：done 15（DSL 11 + vanilla 4）/ blocked 32 / pending 34（B/C 级）。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）——task 026 需按批 1 归并的解锁清单 re-scope。LLM harness 质量数据：批 1 新写 DSL 12 张，first_pass 10/12；**13 张 gate3 待用户核销**（友好宝芬已核销）。
-M1–M4 已达成。下一步：task 026（B 级批，先 re-scope：filters/conditions 高频解锁项 + trigger_on_event 分发 + place_damage_counters）。
+**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：done 14（DSL 10 + vanilla 4）/ blocked 33 / pending 34（B/C 级）。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张，first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，详见工作记录）。
+M1–M4 已达成。**task 026 进行中（`tasks/task 026.md`）**：WP0 前置 ✅（CardLibrary card_id 挂载 + dsl-check --db + 审计拆分，定义库 25 文件）、WP1 ✅（filters/conditions 高频项 + CardDef 数据管道 is_tera/owner/labels + 招式失败钩子；新写 3 卡：老大的指令/尖钉镇道馆/赫普的古月鸟，gate3 待核销，定义库 28 文件）；下一步 WP2 = trigger_on_event 分发 + place_damage_counters（彷徨夜灵 H 标/摔角鹰人/沙铃仙人掌等在等）→ 其余原语按解锁卡数排序。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -18,6 +18,33 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-09-06 task 026 WP1：filters/conditions 高频项 + 数据管道 ✅
+
+- **CardDef 数据管道**：`is_tera` / `owner` ← db cards 列；`labels` ← db `effect_tags.labels`（古代/未来特质有现成来源，未按文本硬推）
+- **filters 注册**：`name:<卡名>` / `owner_pokemon:<名>` / `energy_<属性>`（参数化，原字面词 `energy_超` 泛化并入）/ `pokemon_no_rule_or_basic_energy` / `trait:<特质>`（卡维度+场上维度）；未知词仍 DslError
+- **conditions 注册**：`self_is_active`/`holder_is_active` / `first_own_turn` / `own_tera_in_play` / `opponent_prizes_eq:N` / `opponent_prizes_in:[...]` / `holder_hp_le:N`（有效 HP 口径，畸形参数 DslError）
+- **引擎钩子**：on_attack 效果级 condition 不满足 → 招式失败（不结算、回合照常结束、attack 事件落 failed 标记）——古月鸟「则这个招式失败」语义
+- **新写卡 3 张（闸 1/2 全过，first_pass 3/3，gate3 待用户核销）**：老大的指令（gust 无门控，38 印刷同文本全挂载，池内最高频缺口卡）/ 尖钉镇道馆（owner_pokemon：玛俐）/ 赫普的古月鸟（opponent_prizes_in:[4,3] + 招式失败三分支）；词表零变更（filters/conditions 按既定架构注册在代码求值点）
+- **blocked 原因复核更新 13 行**：多龙奇原 blocked 失真（实测缺 top_n 检视 + deck_bottom 去向，归 WP2+）；**赫普的包包 = db 数据缺口**（cards.owner 实测仅玛俐/竹兰/莉莉艾/N/火箭队，赫普组无数据——上游 Pokearena 补数项，不猜不硬推）；水莲的照顾等 11 张标注「WP1 已备项」待 WP2/3 原语
+- 测试：新 23 条（filters/conditions 14 + 卡分片 9）；**全量 427 绿 + ruff 零告警 + dsl-check --db 全库 36 文件全 OK + 镜像 hash 回归绿**（主会话独立复验一致）
+- 遗留：3 张新卡 gate3 待核销；db 侧 owner 补数（赫普组）为上游立项项；WP2 = trigger_on_event 分发 + place_damage_counters
+
+### 2026-09-06 gate3 核销批 + task 026 WP0 ✅
+
+- **task 026 WP0 前置完成（子代理 TDD，主会话独立复验）**：CardLibrary（dict 子类，键 = card_id，card_ids 必填 + 跨文件查重 + by_name 索引）；引擎 17 处查询点改走 `effect_doc()` 助手（CardLibrary 仅 card_id 精确命中无名字兜底，朴素 dict 兼容存量测试）；`assemble_card_effects` 装配层（card_id 过滤 + 覆盖告警：印刷未覆盖且同名有文档 → warning）；dsl-check 新增 `--db`（card_id 存在性 / 文件内归一化 text_raw 一致 / 赛制标合法性——SDK legal_at，含再录合法口径）
+- **审计拆分**：不服输头带 10→9、朋友手册 20→11 收窄至单文本类；其余候选（厉害钓竿/反击捕捉器/巢穴球/高级球/神奇糖果/能量转移/夜光能量/波波/皮宝宝）实测单文本类无需收窄
+- **退环境出库 3 张**：彷徨夜灵 D 标（任务内）+ **捕获香氛/交替推车（子代理实测发现：全部 14 个印刷 F 标退环境、standard-2026-07-16 仅 G/H/I+白名单且两卡未入白名单、池内零使用——主会话 SQL 复核属实，按同口径确认出库）**；两卡 DSL gate3 本已通过，移除原因是赛制合法性非文本保真；coin_flip / heal+switch / own_active_is_basic 失去真实卡测试载体（原语单测仍在），WP1+ 同机制新卡落地时回补。定义库 28→25 文件
+- 测试：新 21 条（test_loader_cardid 15 + cli dsl-check --db 6），迁移 10 个存量测试文件，删出库卡测试 7 条；**全量 404 绿 + ruff 零告警 + dsl-check --db 全库 33 文件全 OK + 镜像 hash 回归绿**（主会话独立复验一致）
+- 遗留：池内唯一「同名有文档但印刷未覆盖」= 波波 CSV4C-099（起风白板，告警豁免已断言）；彷徨夜灵 H 标归 WP2
+- **彷徨夜灵 核销不过 → 转 blocked 归 task 026**：装配阶段按 name_group 取 text_raw 取错印刷——池内两套卡组（喷火龙大比鸟 mik_moe:650353 / 多龙黑夜魔灵 mik_moe:655545）实际均为 H 标 CSV8C-082「咒怨炸弹」（自我昏厥 + 给对手 1 只宝可梦放置 5 伤害指示物，自爆多龙轴组件），现 DSL 覆盖的 D 标 CS2.5C-018（奇异之光）池内零使用。H 标版需 place_damage_counters + 自我昏厥原语，正属 task 026 re-scope 域
+- 落账：coverage-plan 行改 blocked（含原因）、authoring-log 补 gate3=false 条、cards/彷徨夜灵.yml 头部加印刷口径警示；计数 done 15→14 / blocked 32→33
+- **用户决议：根因是「版本检查/赛制标签」缺失**——harness 装配环节需增加 card_id/赛制标对齐卡池实际印刷的校验，列为 task 026 前置任务
+- **A 组其余 11 张 gate3 全部核销通过**（含交替推车 heal 前置取舍确认）：coverage-plan 9 行状态更新、authoring-log 补 11 条 gate3=true；批 1 最终质量数据定格 first_pass 10/12、gate3 11/12
+- **B1/B2 规则决议用户确认无误**：rules-reference 附录 A bounce 换上/无宝可梦判负两条 🔲 → ✅ 已核（2026-09-06）
+- **C1 task 026 re-scope 用户拍板（四点全确认）**：a) 组织方式改解锁项驱动（不按已证伪的字母批）；b) 优先级 = filters/conditions 先行 → trigger_on_event + place_damage_counters → 其余按解锁卡数排序；c) harness 装配校验列为第一步；d) 老大的指令（gust 无门控版）顺带批 2 落地。已立项 `tasks/task 026.md`
+- **D1 同名组归组口径用户拍板**：按（卡名 + 文本）等价类归组、**严格拆分**（同语义异措辞不合并）；装载键 name_group → card_id 精确挂载；闸 1 校验文件内 card_ids 归一化 text_raw 一致。池内实测支撑：112 卡名中 40 个全库多文本，火恐龙（特性版 vs 白板）/索财灵池内同名异效。现有 DSL 需审计拆分（朋友手册/巢穴球/高级球/神奇糖果等着异文本混挂），归 task 026 前置
+- 待用户核对事项全部清零；task 026 可启动
 
 ### 2026-08-30 task 025 批 1：小原语批 + A 级 46 张 ✅
 
@@ -279,3 +306,6 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 | 日期 | 决策 | 出处 |
 |------|------|------|
 | 2026-08-25 | D1–D12 | PRD §2 |
+| 2026-08-30 | 退赛 4 archetype 以退赛后窗口 WUR 前列替补（玛俐长毛巨魔雪妖女/赛富豪/多龙巴鲁托/赫普的苍响） | config/target-pool.v1.yml 头注；task 024 |
+| 2026-09-06 | DSL 归组口径 =（卡名 + 文本）等价类，**严格拆分**：同语义异措辞也拆（朋友手册「最多2张」/「2张」级别差异不合并）；装载键 name_group → card_id 精确挂载；闸 1 校验文件内 card_ids 归一化 text_raw 一致 | 用户决议（池内实测：112 卡名中 40 个全库多文本、火恐龙/索财灵池内同名异效）；归 task 026 前置 |
+| 2026-09-06 | task 026 re-scope：解锁项驱动替代字母批；顺序 = 装配校验前置 → filters/conditions → trigger_on_event + place_damage_counters → 其余按解锁卡数；老大的指令顺带 | 用户决议；tasks/task 026.md |

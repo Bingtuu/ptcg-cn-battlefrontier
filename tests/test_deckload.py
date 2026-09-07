@@ -136,22 +136,85 @@ def test_unknown_stage_raises() -> None:
         carddef_from_db(FakeCard())
 
 
+# ── task 026 WP1：CardDef 数据管道扩展（is_tera / owner / labels）────────
+
+def _fake_card(**over):
+    """FakeCard 基座（对齐既有 FakeCard 字段集），按键覆写。"""
+
+    class FakeCard:
+        card_id = "FAKE-100"
+        name_full = "桩兽"
+        card_type = "pokemon"
+        hp = 100
+        stage = "基础"
+        types = ("超",)
+        weakness = None
+        resistance = None
+        retreat_cost = 0
+        attacks = ()
+        rule_box_type = None
+        prize_cards = 1
+        trainer_subtype = None
+        is_ace_spec = False
+        provides = None
+        evolves_from_text = None
+        evolution_chain_id = None
+        is_tera = False
+        owner = None
+        effect_tags = None
+
+    for k, v in over.items():
+        setattr(FakeCard, k, v)
+    return FakeCard()
+
+
+def test_is_tera_owner_labels_mapping() -> None:
+    """is_tera←db is_tera；owner←db owner；labels←effect_tags.labels（db PRD v1.23 契约键）。"""
+    from types import SimpleNamespace
+
+    from battlefrontier.data.cards import carddef_from_db
+
+    card, _ = carddef_from_db(_fake_card(
+        is_tera=True, owner="玛俐",
+        effect_tags=SimpleNamespace(labels=["古代"]),
+    ))
+    assert card.is_tera is True
+    assert card.owner == "玛俐"
+    assert card.labels == ("古代",)
+
+
+def test_is_tera_owner_labels_defaults() -> None:
+    """缺 effect_tags / 字段缺省 → 空值（False / None / 空组），不猜。"""
+    from battlefrontier.data.cards import carddef_from_db
+
+    card, _ = carddef_from_db(_fake_card())
+    assert card.is_tera is False
+    assert card.owner is None
+    assert card.labels == ()
+
+
+
 # ── DSL 定义库（cards/）─────────────────────────────────────────────────
 
 def test_card_library_loads_and_covers_four_cards() -> None:
-    docs = load_card_dir("cards")
-    assert {"博士的研究", "高级球", "巢穴球", "夜间担架"} <= set(docs)
-    for name, doc in docs.items():
-        assert doc.card.name_group == name  # 文件名/键 = name_group
+    lib = load_card_dir("cards")
+    for name in ("博士的研究", "高级球", "巢穴球", "夜间担架"):
+        assert lib.by_name(name), f"{name} 不在定义库"
+    # 键 = card_id 精确挂载（task 026 WP0）：文档的每个 card_id 都是库键
+    for doc in {id(d): d for d in lib.values()}.values():
+        for cid in doc.card.card_ids:
+            assert lib[cid] is doc
 
 
 def test_library_docs_semantics() -> None:
     """定义库四卡与任务验收语义一致（抽查结构）。"""
+    from helpers import doc_of
+
     docs = load_card_dir("cards")
-    ub = docs["高级球"].effects[0]
+    ub = doc_of(docs, "高级球").effects[0]
     assert ub.cost[0].action == "discard" and ub.cost[0].choose == 2
     assert ub.actions[0].action == "search_deck" and ub.actions[0].destination == "hand"
     assert ub.actions[1].action == "shuffle_deck"
-    nb = docs["巢穴球"].effects[0]
+    nb = doc_of(docs, "巢穴球").effects[0]
     assert nb.actions[0].destination == "bench"
     assert "basic_pokemon" in nb.actions[0].filters

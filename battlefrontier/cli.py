@@ -89,19 +89,81 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _check_doc_against_db(doc, db, legal_ids: frozenset, snapshot_id: str) -> None:
+    """闸 1 装配校验（task 026 WP0，--db 时启用）；失败抛 DslError 列明原因。
+
+    ① card_ids 非空（挂载键必填）且全部存在于 db；② 文件内所有 card_ids 的
+    归一化 text_raw（去全部空白）完全一致（不一致列出分歧 card_id 分组）；
+    ③ 每个 card_id 在最新 standard 合法性快照（LegalityPool，含再录合法）内。
+    """
+    from battlefrontier.dsl.loader import DslError
+
+    if not doc.card.card_ids:
+        raise DslError("card_ids 为空——挂载键必填（装载键 = card_id 精确挂载）")
+    texts: dict[str, str] = {}
+    marks: dict[str, str] = {}
+    for cid in doc.card.card_ids:
+        card = db.get_card(cid)
+        if card is None:
+            raise DslError(f"未知 card_id '{cid}'（db 无此印刷）")
+        texts[cid] = "".join(card.text_raw.split())
+        marks[cid] = card.regulation_mark
+    distinct = set(texts.values())
+    if len(distinct) > 1:
+        groups: dict[str, list[str]] = {}
+        for cid, t in texts.items():
+            groups.setdefault(t, []).append(cid)
+        detail = " / ".join(str(sorted(g)) for g in groups.values())
+        raise DslError(
+            f"文件内 card_ids 归一化 text_raw 不一致（{len(distinct)} 个文本等价类："
+            f"{detail}）——（卡名+文本）等价类须严格拆分")
+    illegal = [f"{cid}（{marks[cid]} 标）" for cid in doc.card.card_ids
+               if cid not in legal_ids]
+    if illegal:
+        raise DslError(
+            f"印刷不在最新 standard 合法性快照 {snapshot_id}（退环境/未收录）："
+            + "、".join(illegal))
+
+
 def _cmd_dsl_check(args: argparse.Namespace) -> int:
-    """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验。"""
+    """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验；
+    --db 追加装配校验（task 026：card_id 存在 / 文本等价类一致 / 赛制合法）。"""
     from battlefrontier.dsl.loader import DslError, load_card_doc
 
-    failed = 0
-    for file in args.files:
+    db = None
+    legal_ids: frozenset = frozenset()
+    snapshot_id = ""
+    if args.db:
+        from ptcgdb.sdk import open_db
+
+        db = open_db(args.db)
         try:
-            doc = load_card_doc(file)
-        except (DslError, OSError) as e:
-            failed += 1
-            print(f"[FAIL] {file}: {e}")
-        else:
-            print(f"[OK] {file}（{doc.card.name_group}，{len(doc.effects)} 个效果）")
+            snapshots = db.snapshots("standard")
+            if not snapshots:
+                print(f"错误：{args.db} 无 standard 合法性快照")
+                return 1
+            latest = snapshots[-1]
+            snapshot_id = latest.snapshot_id
+            legal_ids = db.legal_at(latest.effective_from, "standard").card_ids
+        except Exception:
+            db.close()
+            raise
+
+    failed = 0
+    try:
+        for file in args.files:
+            try:
+                doc = load_card_doc(file)
+                if db is not None:
+                    _check_doc_against_db(doc, db, legal_ids, snapshot_id)
+            except (DslError, OSError) as e:
+                failed += 1
+                print(f"[FAIL] {file}: {e}")
+            else:
+                print(f"[OK] {file}（{doc.card.name_group}，{len(doc.effects)} 个效果）")
+    finally:
+        if db is not None:
+            db.close()
     return 1 if failed else 0
 
 
@@ -149,6 +211,9 @@ def main(argv: list[str] | None = None) -> int:
     sen_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
     chk_p = sub.add_parser("dsl-check", help="DSL 文件校验（schema + 词表；LLM harness 闸 1）")
     chk_p.add_argument("files", nargs="+", help="DSL YAML 路径（可多个）")
+    chk_p.add_argument("--db", default=None,
+                       help="ptcg-cn.db 路径：追加装配校验（card_id 存在性 / "
+                            "文本等价类一致 / 最新 standard 赛制合法，task 026）")
     args = parser.parse_args(argv)
 
     if args.cmd == "run":

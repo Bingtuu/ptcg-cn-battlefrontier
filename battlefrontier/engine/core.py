@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from battlefrontier.dsl import ExecutionContext, run_effect
-from battlefrontier.dsl.loader import DslError
+from battlefrontier.dsl.loader import CardLibrary, DslError
 from battlefrontier.engine.actions import Action, IllegalActionError
 from battlefrontier.engine.events import GameEvent
 from battlefrontier.engine.rng import RandomSource
@@ -33,6 +33,27 @@ if TYPE_CHECKING:
 
 class DeckConfigError(Exception):
     """卡组不满足开局条件（无基础宝可梦 / 张数不足），明确报错而非死循环。"""
+
+
+def effect_doc_by_ref(
+    effects: Mapping[str, CardEffectDoc], card_id: str, name: str
+) -> CardEffectDoc | None:
+    """按卡身份解析 DSL 文档。
+
+    CardLibrary（装载键 = card_id 精确挂载，2026-09-06 决议）：仅按 card_id 取，
+    无名字兜底——card_id 未覆盖但同名有文档时返回 None（防同名异文本静默错挂，
+    彷徨夜灵 D 标顶替 H 标事故回归）。朴素 dict = 存量测试兼容路径，按卡名取。
+    """
+    if isinstance(effects, CardLibrary):
+        return effects.get(card_id)
+    return effects.get(name)
+
+
+def effect_doc(
+    effects: Mapping[str, CardEffectDoc], card: CardDef
+) -> CardEffectDoc | None:
+    """effect_doc_by_ref 的 CardDef 便捷封装（引擎全部 card_effects 查询点走此助手）。"""
+    return effect_doc_by_ref(effects, card.card_id, card.name)
 
 
 # 规则盒宝可梦昏厥时对手拿取的奖赏张数（rules-manual §1.4/§8；开放词表，
@@ -94,15 +115,19 @@ def _attack_damage(
 class GameEngine:
     """持有随机源与事件流；状态本身不可变，apply/new_game 产出新 GameState。
 
-    card_effects：name_group（本期 = 卡名）→ DSL 文档；引擎对卡牌内容零硬编码，
-    无文档的训练家卡不可使用。
+    card_effects：CardLibrary（键 = card_id 精确挂载）或卡名键朴素 dict（存量测试
+    兼容路径）；引擎对卡牌内容零硬编码，无文档的训练家卡不可使用。
     """
 
     def __init__(
         self, rng: RandomSource, card_effects: Mapping[str, CardEffectDoc] | None = None
     ) -> None:
         self.rng = rng
-        self.card_effects = dict(card_effects or {})
+        # CardLibrary 保类型（dict() 会退化为朴素 dict，解析口径从 card_id 滑回卡名）
+        self.card_effects = (
+            card_effects if isinstance(card_effects, CardLibrary)
+            else dict(card_effects or {})
+        )
         self.events: list[GameEvent] = []
         self.state: GameState
 
@@ -283,11 +308,11 @@ class GameEngine:
         first_turn_ban = s.turn == 1 and player == s.first_player
         if p.active and not first_turn_ban:
             own_attacks = p.active.current.card.attacks
-            own_doc = self.card_effects.get(p.active.current.card.name)
+            own_doc = effect_doc(self.card_effects, p.active.current.card)
             tool = p.active.attached_tool
             combined = [(a, own_doc) for a in own_attacks]
             if tool is not None:
-                tool_doc = self.card_effects.get(tool.card.name)
+                tool_doc = effect_doc(self.card_effects, tool.card)
                 combined += [(a, tool_doc) for a in tool.card.attacks]
             for i, (attack, doc) in enumerate(combined):
                 if not _energy_satisfied(p.active.attached_energy, attack.cost):
@@ -306,7 +331,7 @@ class GameEngine:
                 continue
             if c.card.trainer_subtype not in ("物品", "支援者"):
                 continue  # 宝可梦道具 / 竞技场的使用骨架随机制落地（task 008+）
-            doc = self.card_effects.get(c.card.name)
+            doc = effect_doc(self.card_effects, c.card)
             if doc is None or not any(e.trigger == "on_play" for e in doc.effects):
                 continue
             if c.card.trainer_subtype == "支援者" and (
@@ -337,7 +362,7 @@ class GameEngine:
         # stadium_grant：场上竞技场赋予的每方每回合 1 次行动（无 DSL 文档不可发动）；
         # 落点可行性门（search_deck destination=bench 备战满不枚举——无效果不可使用）
         if s.stadium is not None and not p.stadium_used_this_turn:
-            sdoc = self.card_effects.get(s.stadium.card.name)
+            sdoc = effect_doc(self.card_effects, s.stadium.card)
             seffect = next(
                 (e for e in sdoc.effects if e.trigger == "stadium_grant"), None,
             ) if sdoc else None
@@ -352,7 +377,7 @@ class GameEngine:
         # 门未覆盖的形式 DslError 不猜）
         for t in in_play:
             top = t.current
-            doc = self.card_effects.get(top.card.name)
+            doc = effect_doc(self.card_effects, top.card)
             if doc is None:
                 continue
             effect = next((e for e in doc.effects if e.trigger == "ability_manual"), None)
@@ -507,7 +532,8 @@ class GameEngine:
         p = self.state.players[player]
         self._set_player(player, p.model_copy(update={"stadium_used_this_turn": True}))
         self._emit("use_stadium", player, name=stadium.card.name)
-        doc = self.card_effects[stadium.card.name]
+        doc = effect_doc(self.card_effects, stadium.card)
+        assert doc is not None  # legal_actions 已保证竞技场有 DSL 文档
         effect_index = next(
             i for i, e in enumerate(doc.effects) if e.trigger == "stadium_grant"
         )
@@ -523,7 +549,7 @@ class GameEngine:
             tool = mon.attached_tool
             if tool is None:
                 return mon, None
-            doc = self.card_effects.get(tool.card.name)
+            doc = effect_doc(self.card_effects, tool.card)
             flagged = doc is not None and any(
                 node.action == "grant_attack" and node.args.get("discard_at_turn_end")
                 for e in doc.effects for node in e.actions
@@ -598,12 +624,12 @@ class GameEngine:
         tool = atk.attached_tool
         if action.attack_index < len(own_attacks):
             attack = own_attacks[action.attack_index]
-            doc = self.card_effects.get(atk.current.card.name)
+            doc = effect_doc(self.card_effects, atk.current.card)
             source = atk.current
         else:
             assert tool is not None  # legal_actions 已保证索引合法
             attack = tool.card.attacks[action.attack_index - len(own_attacks)]
-            doc = self.card_effects.get(tool.card.name)
+            doc = effect_doc(self.card_effects, tool.card)
             source = tool
         # 混乱（D1 决议，rules-reference 附录 A）：战斗宝可梦决定使用招式时掷 1 次硬币——
         # 正面招式正常发动（混乱不解除）；反面招式完全失败 + 自身 3 个伤害指示物。
@@ -636,6 +662,19 @@ class GameEngine:
             None,
         ) if doc else None
         if effect_index is not None:
+            effect = doc.effects[effect_index]
+            # on_attack 效果级 condition（task 026 WP1，赫普的古月鸟「则这个招式失败」）：
+            # 条件不满足 → 招式失败，不结算伤害/效果，回合照常结束（攻击已消耗）
+            if effect.condition is not None:
+                from battlefrontier.dsl.chooser import condition_met
+
+                if not condition_met(effect.condition, self, player, atk):
+                    self._emit("attack", player, name=atk.current.card.name,
+                               attack=attack.name, failed=True,
+                               condition=effect.condition)
+                    self._on_turn_end(player)
+                    self._begin_turn(1 - player)
+                    return
             self._emit("attack", player, name=atk.current.card.name, attack=attack.name)
             self._run_or_suspend(player, source, effect_index, start=0,
                                  completion="attack")
@@ -665,7 +704,7 @@ class GameEngine:
         tool = mon.attached_tool
         if tool is None:
             return hp
-        doc = self.card_effects.get(tool.card.name)
+        doc = effect_doc(self.card_effects, tool.card)
         if doc is None:
             return hp
         from battlefrontier.dsl.chooser import condition_met
@@ -691,7 +730,7 @@ class GameEngine:
         tool = mon.attached_tool
         if tool is None:
             return 0
-        doc = self.card_effects.get(tool.card.name)
+        doc = effect_doc(self.card_effects, tool.card)
         if doc is None:
             return 0
         from battlefrontier.dsl.chooser import condition_met
@@ -717,7 +756,7 @@ class GameEngine:
         atk_p = self.state.players[attacker]
         mons = ([atk_p.active] if atk_p.active else []) + list(atk_p.bench)
         for m in mons:
-            doc = self.card_effects.get(m.current.card.name)
+            doc = effect_doc(self.card_effects, m.current.card)
             if doc is None:
                 continue
             for effect in doc.effects:
@@ -846,7 +885,8 @@ class GameEngine:
         }))
         self._emit("play_trainer", player, iid=card.iid, name=card.card.name,
                    subtype=card.card.trainer_subtype)
-        doc = self.card_effects[card.card.name]
+        doc = effect_doc(self.card_effects, card.card)
+        assert doc is not None  # legal_actions 已保证训练家卡有 DSL 文档
         effect_index = next(i for i, e in enumerate(doc.effects) if e.trigger == "on_play")
         self._run_or_suspend(player, card, effect_index, start=0)
 
@@ -860,7 +900,8 @@ class GameEngine:
         iid = action.iid  # type: ignore[attr-defined]
         in_play: list[InPlayPokemon] = ([p.active] if p.active else []) + list(p.bench)
         mon = next(m for m in in_play if m.current.iid == iid)
-        doc = self.card_effects[mon.current.card.name]
+        doc = effect_doc(self.card_effects, mon.current.card)
+        assert doc is not None  # legal_actions 已保证特性卡有 DSL 文档
         effect_index = next(i for i, e in enumerate(doc.effects) if e.trigger == "ability_manual")
         effect = doc.effects[effect_index]
         update: dict[str, object] = {}
@@ -879,7 +920,7 @@ class GameEngine:
         self, player: int, card: CardInstance, effect_index: int,
         start: int, choice: tuple[int, ...] | None = None,
         carry: tuple[int, ...] = (), completion: str = "trainer",
-        *, inner: tuple[str, str] | None = None, outer_cursor: int = -1,
+        *, inner: tuple[str, str, str] | None = None, outer_cursor: int = -1,
         outer_choice: tuple[int, ...] = (), inner_done: bool = False,
         flip: bool | None = None,
     ) -> None:
@@ -895,12 +936,16 @@ class GameEngine:
         from battlefrontier.dsl.chooser import build_pending
 
         if inner is not None and not inner_done:
-            doc = self.card_effects[inner[0]]
+            # inner = (card_id, 卡名, 招式名)：CardLibrary 按 card_id 取，朴素 dict 按名取
+            doc = effect_doc_by_ref(self.card_effects, inner[0], inner[1])
+            if doc is None:
+                raise DslError(f"copy_attack 内层文档缺失：{inner[1]}（{inner[0]}）未挂载（不猜）")
             effect = next(e for e in doc.effects
-                          if e.trigger == "on_attack" and e.attack == inner[1])
-            effect_id = f"{card.card.name}[{card.iid}]:copy>{inner[0]}.{inner[1]}"
+                          if e.trigger == "on_attack" and e.attack == inner[2])
+            effect_id = f"{card.card.name}[{card.iid}]:copy>{inner[1]}.{inner[2]}"
         else:
-            doc = self.card_effects[card.card.name]
+            doc = effect_doc(self.card_effects, card.card)
+            assert doc is not None  # 调用方（trainer/ability/attack）已保证文档存在
             effect = doc.effects[effect_index]
             effect_id = f"{card.card.name}[{card.iid}]:{effect.trigger}"
         ctx = ExecutionContext(
@@ -986,9 +1031,10 @@ class GameEngine:
         pc = self.state.pending_choice
         assert pc is not None  # legal_actions 已保证 phase="choice" 才有 choose
         if pc.inner is not None:
-            effect_id = f"{pc.source.card.name}[{pc.source.iid}]:copy>{pc.inner[0]}.{pc.inner[1]}"
+            effect_id = f"{pc.source.card.name}[{pc.source.iid}]:copy>{pc.inner[1]}.{pc.inner[2]}"
         else:
-            doc = self.card_effects[pc.source.card.name]
+            doc = effect_doc(self.card_effects, pc.source.card)
+            assert doc is not None  # 挂起时文档存在（同一对局内库不变）
             trigger = doc.effects[pc.effect_index].trigger
             effect_id = f"{pc.source.card.name}[{pc.source.iid}]:{trigger}"
         self._emit("choose", player, effect_id=effect_id, card=pc.source.card.name,

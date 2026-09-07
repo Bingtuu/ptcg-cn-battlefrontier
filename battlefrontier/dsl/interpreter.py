@@ -6,7 +6,8 @@ effect_start → effect_primitive（每原语节点一条）→ effect_observe�
 
 chooser 挂起/恢复（task 009）：原语返回 NeedChoice 即中断，引擎存 PendingChoice
 （扁平步骤游标）；Agent 选择后带 choices 从游标恢复续跑。Effect 树不入状态，
-恢复时按 (来源卡名, effect_index) 从 card_effects 重取（单一事实源 = DSL 文档）。
+恢复时按来源卡身份（card_id；朴素 dict 兼容路径按卡名）+ effect_index 从
+card_effects 重取（单一事实源 = DSL 文档，task 026 精确挂载口径）。
 """
 
 from __future__ import annotations

@@ -59,7 +59,8 @@ class NeedChoice:
         self.flip: bool | None = None  # 解释器挂起时标注（ctx.last_flip 快照）
         # 嵌套传播（task 020 copy_attack）：内层效果挂起时标注效果定位与内层游标
         # （外层 run_effect 会覆盖 self.cursor 为外层节点游标，内层游标需另行转存）
-        self.inner: tuple[str, str] | None = None
+        # inner = (card_id, 卡名, 招式名)：card_id 供 CardLibrary 精确解析（task 026）
+        self.inner: tuple[str, str, str] | None = None
         self.inner_cursor: int = -1
 
 
@@ -78,8 +79,34 @@ def _match_one(card: CardInstance, filter_word: str) -> bool:
         return c.supertype == Supertype.TRAINER
     if filter_word == "pokemon_or_basic_energy":
         return _match_one(card, "pokemon") or _match_one(card, "basic_energy")
-    if filter_word == "energy_超":
-        return c.supertype == Supertype.ENERGY and c.energy_type == "超"
+    if filter_word == "pokemon_no_rule_or_basic_energy":
+        # 「宝可梦（除拥有规则的宝可梦外）和基本能量」（水莲的照顾 合计回收目标）
+        return (
+            (c.supertype == Supertype.POKEMON and c.rule_box is None)
+            or _match_one(card, "basic_energy")
+        )
+    if filter_word.startswith("name:"):
+        # 参数化过滤器（task 026 WP1）：「夜巡灵」式按卡名指定（同名回收/检索）
+        return c.name == filter_word.split(":", 1)[1]
+    if filter_word.startswith("owner_pokemon:"):
+        # 参数化过滤器（task 026 WP1）：「玛俐的宝可梦」（db cards.owner 供数；
+        # db 未覆盖的主人组恒不匹配——不回落卡名硬推）
+        return (
+            c.supertype == Supertype.POKEMON
+            and c.owner is not None
+            and c.owner == filter_word.split(":", 1)[1]
+        )
+    if filter_word.startswith("energy_"):
+        # 参数化过滤器（task 026 WP1 泛化，原字面词 energy_超 并入）：
+        # 能量卡属性（「基本【草】能量」等的基本约束用 basic_energy 组合）
+        return (
+            c.supertype == Supertype.ENERGY
+            and c.energy_type == filter_word.split("_", 1)[1]
+        )
+    if filter_word.startswith("trait:"):
+        # 参数化过滤器（task 026 WP1）：机制特质（trait：古代/trait：未来；
+        # CardDef.labels ← db effect_tags.labels）
+        return filter_word.split(":", 1)[1] in c.labels
     _TRAINER_SUBTYPE_FILTERS = {
         "trainer_item": "物品",
         "trainer_tool": "宝可梦道具",
@@ -119,6 +146,12 @@ def _match_in_play(
     hp_of：有效 HP 提供者（task 015，含勇气护符等 modify_hp 修正）；缺省退回卡面 HP。
     """
     top = mon.current.card
+    if filter_word == "basic_pokemon":
+        # 场上维度的基础宝可梦（task 026 WP1，与卡维度同词同义复用：栈顶 stage==0）
+        return top.supertype == Supertype.POKEMON and top.stage == 0
+    if filter_word.startswith("trait:"):
+        # 场上维度的机制特质（task 026 WP1，如奥琳博士的气魄的 attach 目标过滤）
+        return filter_word.split(":", 1)[1] in top.labels
     if filter_word == "pokemon_超":
         return top.supertype == Supertype.POKEMON and top.energy_type == "超"
     if filter_word == "would_survive_20":
@@ -215,7 +248,7 @@ def enumerate_choices(pending: PendingChoice) -> list[Action]:
 def build_pending(
     engine: GameEngine, player: int, source: CardInstance, effect_index: int,
     cursor: int, need: NeedChoice, completion: str = "trainer",
-    inner: tuple[str, str] | None = None, outer_cursor: int = -1,
+    inner: tuple[str, str, str] | None = None, outer_cursor: int = -1,
     outer_choice: tuple[int, ...] = (),
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
@@ -317,6 +350,11 @@ def playable_feasible(
 # condition 求值注册表（开放字符串；「只有…时才可使用」类前提，task 014）。
 # 签名统一 (engine, player, mon)：mon 为道具/特性持有者（task 015 道具 passive_static
 # 求值用），与持有者无关的 condition 忽略该参数。
+def _is_active_holder(engine: GameEngine, player: int, mon: InPlayPokemon | None) -> bool:
+    active = engine.state.players[player].active
+    return mon is not None and active is not None and active.current.iid == mon.current.iid
+
+
 _CONDITIONS = {
     # 反击捕捉器：自己的剩余奖赏卡张数比对手多
     "own_prizes_more_than_opponent": (
@@ -338,6 +376,22 @@ _CONDITIONS = {
             and engine.state.players[player].active.current.card.stage == 0
         )
     ),
+    # task 026 WP1：自身/持有者为战斗宝可梦（「如果这只宝可梦在战斗场上的话」，栈顶 iid 比对）
+    "self_is_active": _is_active_holder,
+    "holder_is_active": _is_active_holder,
+    # task 026 WP1：自己最初的回合（turn 仅在先攻方回合开始递增，双方首回合均为 turn==1）
+    "first_own_turn": (
+        lambda engine, player, mon: engine.state.turn == 1
+    ),
+    # task 026 WP1：自己场上有太晶宝可梦（依赖 CardDef.is_tera ← db cards.is_tera）
+    "own_tera_in_play": (
+        lambda engine, player, mon: any(
+            m.current.card.is_tera
+            for m in ([engine.state.players[player].active]
+                      if engine.state.players[player].active else [])
+            + list(engine.state.players[player].bench)
+        )
+    ),
 }
 
 
@@ -357,6 +411,34 @@ def condition_met(
         return mon is not None and any(
             e.card.energy_type == energy_type for e in mon.attached_energy
         )
+    if condition.startswith("opponent_prizes_eq:"):
+        # 参数化条件（task 026 WP1）：「对手的剩余奖赏卡张数为 N 张」（白蕾雅）
+        raw = condition.split(":", 1)[1]
+        try:
+            n = int(raw)
+        except ValueError:
+            raise DslError(f"condition 参数畸形 '{condition}'（opponent_prizes_eq 需 int）") from None
+        return len(engine.state.players[1 - player].prizes) == n
+    if condition.startswith("opponent_prizes_in:"):
+        # 参数化条件（task 026 WP1）：「对手的剩余奖赏卡张数不为4张、3张的话…失败」
+        # （赫普的古月鸟）——集合写法 [4,3]
+        raw = condition.split(":", 1)[1]
+        if not (raw.startswith("[") and raw.endswith("]")):
+            raise DslError(f"condition 参数畸形 '{condition}'（opponent_prizes_in 需 [a,b,…]）")
+        try:
+            allowed = {int(x) for x in raw[1:-1].split(",")}
+        except ValueError:
+            raise DslError(f"condition 参数畸形 '{condition}'（opponent_prizes_in 元素需 int）") from None
+        return len(engine.state.players[1 - player].prizes) in allowed
+    if condition.startswith("holder_hp_le:"):
+        # 参数化条件（task 026 WP1）：「剩余 HP 在 N 及以下」（紧急滑板）；
+        # 剩余 HP = 有效 HP（含 modify_hp 常驻修正）− 已受伤害
+        raw = condition.split(":", 1)[1]
+        try:
+            n = int(raw)
+        except ValueError:
+            raise DslError(f"condition 参数畸形 '{condition}'（holder_hp_le 需 int）") from None
+        return mon is not None and engine._effective_hp(mon, player) - mon.damage <= n
     fn = _CONDITIONS.get(condition)
     if fn is None:
         raise DslError(f"未知 condition 词 '{condition}'（chooser 求值点；扩展请在 dsl/chooser.py 注册）")

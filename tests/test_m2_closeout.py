@@ -6,7 +6,16 @@ text_raw 原文见各 cards/*.yml 注释引用。降级决策：亢奋脑力「�
 """
 
 import pytest
-from helpers import basic, energy, engine_at, in_play, inst, main_state
+from helpers import (
+    basic,
+    doc_of,
+    effects_by_name,
+    energy,
+    engine_at,
+    in_play,
+    inst,
+    main_state,
+)
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
 from battlefrontier.dsl.loader import DslError
@@ -403,15 +412,16 @@ effects:
 def test_card_library_m2_closeout() -> None:
     docs = load_card_dir("cards")
     for name in ("深钵镇", "奇树", "派帕"):
-        assert name in docs
+        assert docs.by_name(name), f"{name} 不在定义库"
     # M2 收口 23 + task 024 自验卡 + task 025 代表卡 4 = 28；M5 批量入库持续增长，
-    # 精确计数改为下限断言（防误删文件），增量以 docs/m5-coverage-plan.md 为准
-    assert len(docs) >= 28
-    assert any(e.condition == "own_ko_during_opponent_turn" for e in docs["吉雉鸡ex"].effects)
-    assert any(e.trigger == "passive_static" for e in docs["莉莉艾的皮皮ex"].effects)
+    # 精确计数改为下限断言（防误删文件），增量以 docs/m5-coverage-plan.md 为准。
+    # task 026 WP0：库键 = card_id（同一文档多键挂载），文档数按 name_group 去重统计
+    assert len({d.card.name_group for d in docs.values()}) >= 28
+    assert any(e.condition == "own_ko_during_opponent_turn" for e in doc_of(docs, "吉雉鸡ex").effects)
+    assert any(e.trigger == "passive_static" for e in doc_of(docs, "莉莉艾的皮皮ex").effects)
     assert any(e.trigger == "on_attack" and e.attack == "基因侵入"
-               for e in docs["梦幻ex"].effects)
-    assert any(e.trigger == "stadium_grant" for e in docs["深钵镇"].effects)
+               for e in doc_of(docs, "梦幻ex").effects)
+    assert any(e.trigger == "stadium_grant" for e in doc_of(docs, "深钵镇").effects)
 
 
 def test_play_game_m2_full_coverage_deterministic() -> None:
@@ -433,7 +443,7 @@ def test_play_game_m2_full_coverage_deterministic() -> None:
             + [supporter("奇树")] * 2 + [supporter("派帕")] * 2
             + [energy("基本超能量", "超")] * 18 + [energy("基本恶能量", "恶")] * 18)
     assert len(deck) == 60
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=31, card_effects=effects)
     r2 = play_game(deck, deck, seed=31, card_effects=effects)
     assert r1.events_hash == r2.events_hash

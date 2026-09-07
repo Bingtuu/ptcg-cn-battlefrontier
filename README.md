@@ -18,7 +18,9 @@
 
 ## 状态
 
-🚧 设计阶段完成，实现未开始。权威设计文档见 [PRD v1.0](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md)（含 12 条决策记录、一期里程碑 M1–M6）。
+🚧 一期开发中：M1–M4 已达成（引擎骨架 / DSL + 解释器 / 启发式 Agent + Runner + 结果库 / 报告层），当前 M5（覆盖扩展 + LLM 辅助编写试验）进行中。详细进展见 [STATUS.md](STATUS.md)；权威设计文档见 [PRD v1.0](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md)（含 12 条决策记录、一期里程碑 M1–M6）。
+
+CLI 入口 `bfsim`：`run`（跑实验定义 YAML）/ `report`（胜率 + 决策聚合）/ `sensitivity`（换卡敏感性并排报告）/ `dsl-check`（DSL 闸 1 校验）。示例实验见 `experiments/`。
 
 ## 数据依赖
 

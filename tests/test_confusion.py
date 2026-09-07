@@ -6,7 +6,7 @@ D1 决议（rules-reference 附录 A，2026-08-28 核定）：混乱只对战斗
 """
 
 import pytest
-from helpers import basic, energy, inst
+from helpers import basic, doc_of, effects_by_name, energy, inst
 from test_attack import battle, energies, mon
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
@@ -173,8 +173,7 @@ def test_retreat_clears_confusion() -> None:
 
 def test_card_library_munkidori() -> None:
     docs = load_card_dir("cards")
-    assert "愿增猿" in docs
-    eff = next(e for e in docs["愿增猿"].effects if e.trigger == "on_attack")
+    eff = next(e for e in doc_of(docs, "愿增猿").effects if e.trigger == "on_attack")
     assert eff.attack == "精神幻觉"
     assert [a.action for a in eff.actions] == ["damage", "apply_status"]
 
@@ -187,7 +186,7 @@ def test_play_game_with_confusion_deterministic() -> None:
                hp=110, energy_type="恶")
     deck = ([munk] * 4 + [basic("小火龙")] * 20
             + [energy("基本超能量", "超")] * 20 + [energy()] * 16)
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=13, card_effects=effects)
     r2 = play_game(deck, deck, seed=13, card_effects=effects)
     assert r1.events_hash == r2.events_hash

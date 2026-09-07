@@ -22,7 +22,7 @@ from battlefrontier.agent.heuristic import HeuristicAgent, HeuristicParams
 from battlefrontier.agent.random_agent import RandomAgent
 from battlefrontier.data.cards import carddef_from_db
 from battlefrontier.data.deck import load_deck
-from battlefrontier.dsl import load_card_dir
+from battlefrontier.dsl import CardLibrary, load_card_dir
 from battlefrontier.dsl.schema import CardEffectDoc
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import CardDef
@@ -209,11 +209,39 @@ def build_agents(defn: ExperimentDef, seed: int) -> list:
 class PreparedExperiment:
     deck_a: list[CardDef]
     deck_b: list[CardDef]
-    card_effects: dict[str, CardEffectDoc]
+    card_effects: CardLibrary  # 键 = card_id 精确挂载（task 026，2026-09-06 决议）
     deck_a_id: str
     deck_b_id: str
     data_version: str
     warnings: list[str] = field(default_factory=list)
+
+
+def _unique_docs(docs) -> list[CardEffectDoc]:
+    """同一文档按全部 card_ids 多点挂载，按对象去重。"""
+    return list({id(d): d for d in docs}.values())
+
+
+def assemble_card_effects(
+    decks: list[list[CardDef]], library: CardLibrary
+) -> tuple[CardLibrary, list[str]]:
+    """按卡组 card_id 精确过滤 DSL 文档 + 覆盖告警（task 026 WP0）。
+
+    同名多文本严格拆分后，挂载不再按卡名兜底：卡组印刷 card_id 在库 → 挂载；
+    未覆盖且同名存在效果文档 → warnings（不硬报错：波波式 vanilla 异文本印刷合法）；
+    同名无文档（纯 vanilla）→ 无告警。
+    """
+    used = sorted({(c.card_id, c.name) for d in decks for c in d})
+    used_ids = {cid for cid, _ in used}
+    kept = [doc for doc in _unique_docs(library.values())
+            if any(cid in used_ids for cid in doc.card.card_ids)]
+    effects = CardLibrary.from_docs((doc.card.name_group, doc) for doc in kept)
+    warnings = [
+        f"{name}（{cid}）：印刷未被 DSL 定义库覆盖，同名存在效果文档；"
+        f"按无效果结算（vanilla 异文本印刷合法则不视为错误）"
+        for cid, name in used
+        if cid not in effects and library.by_name(name)
+    ]
+    return effects, warnings
 
 
 def load_db_path(config_path: str | Path = DEFAULT_CONFIG_PATH) -> str:
@@ -293,9 +321,8 @@ def prepare_experiment(defn: ExperimentDef, db_path: str,
             warnings.extend(ws)
             ids.append(f"file:{side.path}")
 
-    names = {c.name for d in decks for c in d}
-    all_effects = load_card_dir(cards_dir)
-    card_effects = {n: doc for n, doc in all_effects.items() if n in names}
+    card_effects, ws = assemble_card_effects(decks, load_card_dir(cards_dir))
+    warnings.extend(ws)
     return PreparedExperiment(
         deck_a=decks[0], deck_b=decks[1], card_effects=card_effects,
         deck_a_id=ids[0], deck_b_id=ids[1],
@@ -334,16 +361,15 @@ def prepare_variant(prep: PreparedExperiment, variant: VariantCfg,
     for side in touched:
         ids[side] = f"{ids[side]} [variant:{variant.name}]"
 
-    card_effects = dict(prep.card_effects)
-    names = {c.name for d in sides.values() for c in d}
-    missing = names - set(card_effects)
-    if missing:
-        all_effects = load_card_dir(cards_dir)
-        card_effects.update({n: doc for n, doc in all_effects.items() if n in missing})
+    card_effects, ws = assemble_card_effects(
+        [sides["a"], sides["b"]], load_card_dir(cards_dir))
+    # 换入卡可能不在 baseline 卡组里，其 DSL 文档按 card_id 补入；
+    # 覆盖告警与 baseline 去重（未换的 side 会重现相同告警）
+    warnings = list(dict.fromkeys([*prep.warnings, *ws]))
     return PreparedExperiment(
         deck_a=sides["a"], deck_b=sides["b"], card_effects=card_effects,
         deck_a_id=ids["a"], deck_b_id=ids["b"], data_version=prep.data_version,
-        warnings=list(prep.warnings))
+        warnings=warnings)
 
 
 # ── 执行（§8.2/§8.4）────────────────────────────────────
@@ -372,8 +398,10 @@ def _run_one_experiment(payload: dict) -> tuple[int, GameResult | None, str | No
             deck_a=[CardDef.model_validate(c) for c in payload["deck_a"]],
             deck_b=[CardDef.model_validate(c) for c in payload["deck_b"]],
             seed=payload["seed"],
-            card_effects={n: CardEffectDoc.model_validate(d)
-                          for n, d in payload["card_effects"].items()},
+            # worker 内重建 CardLibrary（载荷为去重后的文档列表；挂载键 = card_id）
+            card_effects=CardLibrary.from_docs(
+                ("<worker>", CardEffectDoc.model_validate(d))
+                for d in payload["card_effects"]),
             agents=agents,
         )
         return payload["seed"], result, None
@@ -407,8 +435,9 @@ def execute_experiment(prep: PreparedExperiment, defn: ExperimentDef,
                 payloads = [{
                     "deck_a": [c.model_dump(mode="json") for c in prep.deck_a],
                     "deck_b": [c.model_dump(mode="json") for c in prep.deck_b],
-                    "card_effects": {n: d.model_dump(mode="json")
-                                     for n, d in prep.card_effects.items()},
+                    # 同一文档按全部 card_ids 多点挂载，序列化前去重（worker 重建库）
+                    "card_effects": [d.model_dump(mode="json")
+                                     for d in _unique_docs(prep.card_effects.values())],
                     "agents": defn.agents.model_dump(mode="json"),
                     "seed": s,
                 } for s in seeds]

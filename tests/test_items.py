@@ -6,7 +6,16 @@
 """
 
 import pytest
-from helpers import basic, energy, engine_at, in_play, inst, main_state
+from helpers import (
+    basic,
+    doc_of,
+    effects_by_name,
+    energy,
+    engine_at,
+    in_play,
+    inst,
+    main_state,
+)
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
 from battlefrontier.dsl.loader import DslError
@@ -241,11 +250,11 @@ def test_move_energy_gate_no_attached_energy() -> None:
 def test_card_library_seventeen() -> None:
     docs = load_card_dir("cards")
     for name in ("大地容器", "秘密箱", "厉害钓竿", "反击捕捉器", "能量转移"):
-        assert name in docs
+        assert docs.by_name(name), f"{name} 不在定义库"
     # 定义库总数断言由最新入库任务的测试持有（当前 test_tools::test_card_library_tools）
-    assert docs["秘密箱"].effects[0].cost[0].choose == 3
-    assert docs["反击捕捉器"].effects[0].condition == "own_prizes_more_than_opponent"
-    assert docs["能量转移"].effects[0].actions[0].action == "move_energy"
+    assert doc_of(docs, "秘密箱").effects[0].cost[0].choose == 3
+    assert doc_of(docs, "反击捕捉器").effects[0].condition == "own_prizes_more_than_opponent"
+    assert doc_of(docs, "能量转移").effects[0].actions[0].action == "move_energy"
 
 
 def test_play_game_with_items_deterministic() -> None:
@@ -256,7 +265,7 @@ def test_play_game_with_items_deterministic() -> None:
             + [trainer("大地容器", "物品")] * 4 + [trainer("厉害钓竿", "物品")] * 4
             + [trainer("能量转移", "物品")] * 4
             + [energy("基本超能量", "超")] * 20 + [energy()] * 8)
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=17, card_effects=effects)
     r2 = play_game(deck, deck, seed=17, card_effects=effects)
     assert r1.events_hash == r2.events_hash

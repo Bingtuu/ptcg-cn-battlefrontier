@@ -1,0 +1,17 @@
+# 老大的指令（CSVH1aC-023，支援者）
+# text_raw 原文：「选择对手的1只备战宝可梦，将其与战斗宝可梦互换。」
+# gust 无门控版（反击捕捉器同机制减 condition，task 026 WP1）；对手无备战宝可梦不可用
+# （可行性门：无合法落点不枚举）。38 个印刷归一化 text_raw 全一致（实测），全量挂载。
+card:
+  name_group: 老大的指令
+  card_ids: [CS1DC-200, CS1aC-131, CS1aC-191, CS1aC-210, CS2.5C-055, CS2.5C-070,
+             CS2DaC-051, CS3DC-160, CS4DaC-406, CS5DC-149, CS5DC-157, CSAC-021,
+             CSBC-015, CSCC-014, CSNC-022, CSOC-017, CSV4C-125, CSV4C-152,
+             CSV4C-161, CSVE1C-162, CSVE1C-163, CSVE1pC-022, CSVE2C-192,
+             CSVH1aC-023, CSVH2aC-023, CSVH3aC-022, CSVH4aC-022, CSVH5aC-022,
+             CSVM1aC-029, CSVM1bC-030, CSVM1cC-026, CSVM2aC-029, CSVM2bC-030,
+             CSVM2cC-029, CSVSC-066, CSXC-019, CSZC-053, SVP-219]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: switch, selector: opponent_bench, choose: 1}

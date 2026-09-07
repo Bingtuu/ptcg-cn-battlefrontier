@@ -7,7 +7,16 @@
 链拓扑数据驱动：CardDef.evolution_chain（db evolution_chain_id），引擎零硬编码。
 """
 
-from helpers import basic, energy, engine_at, in_play, inst, main_state
+from helpers import (
+    basic,
+    doc_of,
+    effects_by_name,
+    energy,
+    engine_at,
+    in_play,
+    inst,
+    main_state,
+)
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
 from battlefrontier.engine.actions import Action
@@ -254,11 +263,10 @@ def test_learner_choose_zero_still_shuffles() -> None:
 def test_card_library_twenty() -> None:
     docs = load_card_dir("cards")
     # 定义库总数断言由最新入库任务的测试持有（当前 test_m2_closeout::test_card_library_m2_closeout）
-    assert "神奇糖果" in docs
-    candy_eff = docs["神奇糖果"].effects[0]
+    candy_eff = doc_of(docs, "神奇糖果").effects[0]
     assert candy_eff.actions[0].action == "evolve"
     assert candy_eff.actions[0].args["mode"] == "skip_stage"
-    learner_doc = docs["招式学习器 进化"]
+    learner_doc = doc_of(docs, "招式学习器 进化")
     bound = [e for e in learner_doc.effects if e.trigger == "on_attack"]
     assert len(bound) == 1 and bound[0].attack == "进化"
 
@@ -270,7 +278,7 @@ def test_play_game_with_evolve_deterministic() -> None:
     deck = ([ralts()] * 16 + [kirlia()] * 4 + [gardevoir_s2()] * 4
             + [candy()] * 4 + [learner()] * 2
             + [energy("基本超能量", "超")] * 15 + [energy()] * 15)
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=23, card_effects=effects)
     r2 = play_game(deck, deck, seed=23, card_effects=effects)
     assert r1.events_hash == r2.events_hash

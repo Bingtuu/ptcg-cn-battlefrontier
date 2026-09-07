@@ -138,3 +138,77 @@ def test_cli_dsl_check_mixed_files(tmp_path, capsys):
     assert rc == 1  # 任一失败即 rc=1，合法文件也照常报告
     out = capsys.readouterr().out
     assert "OK" in out and "bad.yml" in out
+
+
+# ── task 026 WP0：dsl-check --db（闸 1 装配校验）──────────
+# 三项追加校验：① card_id 存在于 db；② 文件内 card_ids 归一化 text_raw 一致；
+# ③ 每个 card_id 在最新 standard 合法性快照内。无 --db 行为不变（上方用例覆盖）。
+
+DB_YAML = """\
+card:
+  name_group: 测试球
+  card_ids: [{ids}]
+effects:
+  - trigger: on_play
+    actions:
+      - {{action: shuffle_deck}}
+"""
+
+needs_db = pytest.mark.skipif(not DB_PATH.exists(), reason="本机无 ptcg-cn.db")
+
+
+def _check_db(tmp_path, ids: str, capsys):
+    p = tmp_path / "card.yml"
+    p.write_text(DB_YAML.format(ids=ids), encoding="utf-8")
+    rc = main(["dsl-check", str(p), "--db", str(DB_PATH)])
+    return rc, capsys.readouterr().out
+
+
+@needs_db
+def test_dsl_check_db_未知_card_id_FAIL(tmp_path, capsys):
+    rc, out = _check_db(tmp_path, "FAKE-999", capsys)
+    assert rc == 1 and "FAIL" in out and "FAKE-999" in out
+
+
+@needs_db
+def test_dsl_check_db_文本不等价_FAIL_列出分歧(tmp_path, capsys):
+    # 朋友手册：CSV1C-111「最多2张」 vs CSM1DC-246「2张」——异文本混挂必须拦下
+    rc, out = _check_db(tmp_path, "CSV1C-111, CSM1DC-246", capsys)
+    assert rc == 1 and "FAIL" in out
+    assert "CSV1C-111" in out and "CSM1DC-246" in out
+
+
+@needs_db
+def test_dsl_check_db_退环境印刷_FAIL(tmp_path, capsys):
+    # 彷徨夜灵 D 标 CS2.5C-018：不在最新 standard 快照（退环境）
+    rc, out = _check_db(tmp_path, "CS2.5C-018", capsys)
+    assert rc == 1 and "FAIL" in out and "CS2.5C-018" in out
+
+
+@needs_db
+def test_dsl_check_db_空_card_ids_FAIL(tmp_path, capsys):
+    p = tmp_path / "empty.yml"
+    p.write_text("card:\n  name_group: 测试球\n  card_ids: []\n"
+                 "effects:\n  - trigger: on_play\n"
+                 "    actions:\n      - {action: shuffle_deck}\n", encoding="utf-8")
+    rc = main(["dsl-check", str(p), "--db", str(DB_PATH)])
+    out = capsys.readouterr().out
+    assert rc == 1 and "FAIL" in out and "挂载键必填" in out
+
+
+@needs_db
+def test_dsl_check_db_全绿_OK_回显卡名效果数(tmp_path, capsys):
+    # 朋友手册 G 标同文本两印刷：存在 + 文本一致 + 快照内合法
+    rc, out = _check_db(tmp_path, "CSV1C-111, CSV6C-163", capsys)
+    assert rc == 0 and "OK" in out and "测试球" in out and "1 个效果" in out
+
+
+@needs_db
+def test_dsl_check_db_全库扫描全_OK(capsys):
+    """审计后定义库全库过闸 1（task 026 WP0 验收 18）。"""
+    import glob
+
+    rc = main(["dsl-check", *sorted(glob.glob("cards/*.yml")), "--db", str(DB_PATH)])
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert "FAIL" not in out

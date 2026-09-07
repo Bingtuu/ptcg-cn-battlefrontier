@@ -14,7 +14,8 @@ class FrozenModel(BaseModel):
 
 
 class CardRef(FrozenModel):
-    """卡身份：name_group 主键（对齐 db 归组），card_ids 列已知印刷。"""
+    """卡身份：装载键 = card_ids 精确挂载（task 026，2026-09-06 决议：同文本等价类
+    严格拆分，挂载键必填）；name_group 供按名检索（同名多文本文件共存）。"""
 
     name_group: str
     card_ids: tuple[str, ...] = ()

@@ -7,7 +7,7 @@ DSL 结算（AttackDef.damage 仅作装载/展示数据，不重复结算）。
 """
 
 import pytest
-from helpers import basic, energy, engine_at, inst
+from helpers import basic, doc_of, effects_by_name, energy, engine_at, inst
 from test_attack import battle, energies, mon
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
@@ -251,12 +251,10 @@ effects:
 
 def test_card_library_attack_docs() -> None:
     docs = load_card_dir("cards")
-    for name in ("吉雉鸡ex", "吼叫尾", "奇鲁莉安", "莉莉艾的皮皮ex", "飘飘球"):
-        assert name in docs
-    k = docs["奇鲁莉安"].effects[0]
+    k = doc_of(docs, "奇鲁莉安").effects[0]
     assert k.trigger == "on_attack" and k.attack == "精神强念"
     assert k.actions[0].args == {"base": 60, "per": 20, "op": "+"}
-    g = docs["沙奈朵ex"]
+    g = doc_of(docs, "沙奈朵ex")
     assert {e.trigger for e in g.effects} == {"ability_manual", "on_attack"}
 
 
@@ -270,7 +268,7 @@ def test_play_game_with_attack_effects_deterministic() -> None:
                                             damage=30, damage_modifier="×"))
     deck = ([kirlia] * 4 + [drifloon] * 4 + [basic("小火龙")] * 16
             + [energy("基本超能量", "超")] * 20 + [energy()] * 16)
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=9, card_effects=effects)
     r2 = play_game(deck, deck, seed=9, card_effects=effects)
     assert r1.events_hash == r2.events_hash

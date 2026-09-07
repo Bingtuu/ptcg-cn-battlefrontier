@@ -69,6 +69,25 @@ def inst(iid: int, card: CardDef) -> CardInstance:
     return CardInstance(iid=iid, card=card)
 
 
+def effects_by_name(library) -> dict:
+    """CardLibrary → 卡名键朴素 dict：stub 卡（card_id=stub-*）注入的兼容路径。
+
+    引擎对朴素 dict 按卡名解析（task 026 WP0）；同名多文档时按名注入有歧义，直接报错。
+    """
+    docs = list({id(d): d for d in library.values()}.values())
+    names = [d.card.name_group for d in docs]
+    dupes = {n for n in names if names.count(n) > 1}
+    assert not dupes, f"同名多文档无法按名注入（应改用 card_id 挂载）: {sorted(dupes)}"
+    return {d.card.name_group: d for d in docs}
+
+
+def doc_of(library, name: str):
+    """CardLibrary 中该卡名的唯一文档（0 或 >1 均为装配口径事故，直接报错）。"""
+    docs = library.by_name(name)
+    assert len(docs) == 1, f"{name} 文档数 {len(docs)}（应为 1）"
+    return docs[0]
+
+
 def in_play(iid: int, card: CardDef, energies: int = 0) -> InPlayPokemon:
     return InPlayPokemon(
         stack=(inst(iid, card),),

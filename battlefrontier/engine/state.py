@@ -71,6 +71,13 @@ class CardDef(FrozenModel):
     trainer_subtype: str | None = None
     # ACE SPEC 标记（对齐 db is_ace_spec；规则：每卡组限 1 张 ACE SPEC，rules-reference 附录 A）
     is_ace_spec: bool = False
+    # 太晶标记（对齐 db cards.is_tera，task 026 WP1；own_tera_in_play 等条件用）
+    is_tera: bool = False
+    # 主人字段（对齐 db cards.owner：「玛俐的」「N 的」等训练家宝可梦归属；
+    # db 未覆盖的主人组（如赫普）保持 None——不回落卡名硬推，不猜）
+    owner: str | None = None
+    # 机制特质标签（对齐 db effect_tags.labels：古代/未来/一击/连击等，db PRD v1.23 契约键）
+    labels: tuple[str, ...] = ()
 
 
 class CardInstance(FrozenModel):
@@ -98,8 +105,8 @@ class InPlayPokemon(FrozenModel):
 class PendingChoice(FrozenModel):
     """挂起的效果执行（chooser 机制，PRD §5.2）：等待 Agent 选择，恢复信息全在此。
 
-    Effect 树不入状态——恢复时按 (source.card.name, effect_index) 从 card_effects
-    重取，cursor 指向扁平步骤（cost 段在前，actions 段在后）。
+    Effect 树不入状态——恢复时按来源卡身份（card_id；朴素 dict 兼容路径按卡名）
+    + effect_index 从 card_effects 重取，cursor 指向扁平步骤（cost 段在前，actions 段在后）。
     pool/filters/min~max/destination 供合法选择枚举，无需重跑原语。
     """
 
@@ -120,10 +127,11 @@ class PendingChoice(FrozenModel):
     flip_result: bool | None = None
     # 完成模式：trainer = 效果完成后本体进弃牌区；ability = 特性不弃置
     completion: str = "trainer"
-    # 嵌套帧（task 020 copy_attack）：inner = 内层效果定位（DSL 文档卡名, 招式名），
+    # 嵌套帧（task 020 copy_attack）：inner = 内层效果定位（card_id, 卡名, 招式名）
+    # ——card_id 供 CardLibrary 精确解析、卡名供朴素 dict 兼容路径与事件展示；
     # 非空时 cursor/payload 属内层；outer_cursor/outer_choice = 外层 copy 节点游标
     # 与已消费的招式选择（内层完成后带 inner_done 标记恢复外层，不重复执行内层）
-    inner: tuple[str, str] | None = None
+    inner: tuple[str, str, str] | None = None
     outer_cursor: int = -1
     outer_choice: tuple[int, ...] = ()
 

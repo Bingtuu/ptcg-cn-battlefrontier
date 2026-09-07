@@ -9,7 +9,7 @@ import hashlib
 import json
 
 import pytest
-from helpers import basic, engine_at, in_play, main_state
+from helpers import basic, doc_of, engine_at, in_play, main_state
 
 from battlefrontier.agent.heuristic import HeuristicAgent
 from battlefrontier.dsl import load_card_dir, parse_card_doc
@@ -142,7 +142,7 @@ def test_real_cards_gene_hack_copies_cruel_arrow():
     jiji = CardDef(card_id="stub-吉雉鸡ex", name="吉雉鸡ex", supertype="pokemon",
                    hp=210, stage=0, rule_box="ex",
                    attacks=(AttackDef(name="残忍箭矢", cost=("无",), damage=None),))
-    e = _engine(jiji, docs["吉雉鸡ex"], mew_doc=docs["梦幻ex"])
+    e = _engine(jiji, doc_of(docs, "吉雉鸡ex"), mew_doc=doc_of(docs, "梦幻ex"))
     e.apply(0, Action(kind="attack", attack_index=0))
     e.apply(0, Action(kind="choose", choices=(0,)))   # 选 残忍箭矢
     assert e.state.phase == "choice"

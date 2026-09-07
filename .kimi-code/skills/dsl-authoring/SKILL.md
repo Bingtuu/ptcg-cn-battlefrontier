@@ -14,16 +14,29 @@ description: Use when 编写或修改 cards/ 下的卡牌 DSL 定义（YAML 效�
    `db.sqlite_path`）→ `search_cards(name=卡名)` → `get_card(card_id)`，
    取 `text_raw` 原文 + `effect_tags` + `sentences` 句级标签（**排除 `rule_reference` 句**，task 009 约定）。
    运行环境：Windows，Python 用 `.venv/Scripts/python.exe -X utf8`，`PYTHONIOENCODING=utf-8`。
+   **印刷对齐纪律（task 026，2026-09-06 决议）**：必须按池内代表卡组的 `card_id`
+   取 `text_raw`（池内印刷见 `config/target-pool.v1.yml` 卡组 `deck_cards`），
+   **不得按 name_group 任取印刷**（彷徨夜灵事故：D 标文本顶替池内 H 标）。
+   印刷须在当前 standard 合法性快照内（`db.legal_at(最新快照日期, "standard")`）。
 2. **读契约**：`battlefrontier/dsl/schema.py`（字段结构）+ `battlefrontier/dsl/vocabularies.yml`（开放词表）。
 3. **读规范**：本文件「编写规范」节。
 4. **找样例**：同机制既有卡作参考（检索类→`cards/高级球.yml`；特性→`cards/沙奈朵ex.yml`；招式效果→`cards/吉雉鸡ex.yml`）。
 
+### 归组与挂载口径（task 026，2026-09-06 决议）
+
+- 归组 = **（卡名 + 文本）等价类，严格拆分**：同语义异措辞不合并；文件内所有
+  `card_ids` 的归一化 `text_raw`（`"".join(t.split())`）必须一致（闸 1 --db 校验）。
+- 装载键 = **card_id 精确挂载**（引擎不再按卡名兜底）；`card_ids` 必填、仅收
+  同文本等价类且在最新 standard 快照内合法的印刷。
+- 同名多文本须拆多文件，命名约定 `<名>-<区分词>.yml`（区分词取自招式/特性名等
+  文本差异点，如 `朋友手册-2张.yml`）；同名文件共存合法（card_ids 不相交）。
+
 ## 输出契约（每卡两件，缺一不可）
 
-- `cards/<name_group>.yml`：文件名 = name_group；**注释格式约定**（与库内既有卡一致）：
+- `cards/<name_group>.yml`：文件名 = name_group（同名多文本拆分后 = `<名>-<区分词>.yml`）；**注释格式约定**（与库内既有卡一致）：
   文件头 `# 卡名（card_id，卡种）` + `# text_raw 原文：「…」`（整段引用，不改写、不做
-  术语规范化——原文保真红线）；effect 上方注释写实现注记（如 observe 锚点说明）。
-  `card_ids` 填 db 实际 id。
+  术语规范化——原文保真红线，`text_raw` 必须取自池内 card_id 的印刷）；effect 上方注释写实现注记（如 observe 锚点说明）。
+  `card_ids` 填 db 实际 id（仅同文本等价类 + 赛制合法印刷）。
 - 单卡单元测试：写入 `tests/test_dsl_cards.py`（按批次分节注释），测试**必须从 `cards/` 真实文件装载**（`load_card_doc`），用 `tests/helpers.py` 的 stub 引擎驱动效果全链路（含 chooser 选择）。**测试函数名含中文卡名**（`test_<卡名>_...`）——闸 2 用 `pytest -k <卡名>` 过滤，拼音命名会匹配不上（task 024 自验踩过）。
 
 ## 样例速查（同机制参考）
@@ -47,7 +60,9 @@ condition → 解释器 `_CONDITIONS` 注册表。自造过滤器词能过闸 1�
 
 ## 三道验收闸（全过才入库）
 
-1. `PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -X utf8 -m battlefrontier.cli dsl-check cards/<卡>.yml` → rc=0。
+1. `PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -X utf8 -m battlefrontier.cli dsl-check cards/<卡>.yml --db <ptcg-cn.db 路径>` → rc=0。
+   `--db` 追加装配校验（task 026）：card_id 存在性 / 文件内归一化 text_raw 一致 /
+   最新 standard 快照赛制合法。（无 --db 仅 schema+词表，不作为入库闸口径。）
 2. `pytest tests/test_dsl_cards.py -k <卡名>` 全绿。
 3. **人工核销**：提交用户确认。用户确认前日志 `gate3=false`，卡不算入库完成。
 
@@ -78,6 +93,8 @@ condition → 解释器 `_CONDITIONS` 注册表。自造过滤器词能过闸 1�
 ## Red Flags — 停止并重来
 
 - 凭记忆写效果，没从 db 取 `text_raw`
+- 按 name_group 任取印刷装配（没按池内 card_id 取 `text_raw` / 没核赛制标）
+- 同名异文本混挂在一个文件里（没按（卡名+文本）等价类拆分）
 - 测试里内联 YAML 副本而不是装载真实文件
 - 词表缺词就在 YAML 里自造
 - 跳过闸 1 直接跑 pytest

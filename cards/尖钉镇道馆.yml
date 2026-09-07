@@ -1,0 +1,14 @@
+# 尖钉镇道馆（CSV10C-216，竞技场）
+# text_raw 原文：「双方玩家每次在自己的回合有1次机会，可以选择自己牌库中的1张
+# 「玛俐的宝可梦」，在给对手看过之后加入手牌。并重洗牌库。」
+# 「玛俐的宝可梦」= owner_pokemon:玛俐 过滤器（db cards.owner 供数，task 026 WP1）；
+# 「每次在自己的回合有1次机会」= stadium_used_this_turn（引擎强制，DSL 不重复声明 limit）；
+# 「给对手看过」按库内惯例不建模（高级球先例）。
+card:
+  name_group: 尖钉镇道馆
+  card_ids: [CSV10C-216]
+effects:
+  - trigger: stadium_grant
+    actions:
+      - {action: search_deck, selector: own_deck, filters: ["owner_pokemon:玛俐"], choose: 1, destination: hand}
+      - {action: shuffle_deck}

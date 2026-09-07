@@ -6,7 +6,16 @@ HP 修饰影响判定）；§4（撤退/进化保留道具）；招式学习器�
 """
 
 import pytest
-from helpers import basic, energy, engine_at, in_play, inst, main_state
+from helpers import (
+    basic,
+    doc_of,
+    effects_by_name,
+    energy,
+    engine_at,
+    in_play,
+    inst,
+    main_state,
+)
 
 from battlefrontier.dsl import load_card_dir, parse_card_doc
 from battlefrontier.engine.actions import Action, IllegalActionError
@@ -206,11 +215,10 @@ def test_granted_attack_without_binding_not_enumerated() -> None:
 
 def test_card_library_tools() -> None:
     docs = load_card_dir("cards")
-    assert {"勇气护符", "招式学习器 进化"} <= set(docs)
     # 定义库总数断言由最新入库任务的测试持有（当前 test_evolve::test_card_library_twenty）
-    charm = docs["勇气护符"].effects[0]
+    charm = doc_of(docs, "勇气护符").effects[0]
     assert charm.trigger == "passive_static" and charm.condition == "holder_is_basic"
-    learner = docs["招式学习器 进化"].effects[0].actions[0]
+    learner = doc_of(docs, "招式学习器 进化").effects[0].actions[0]
     assert learner.action == "grant_attack" and learner.args["discard_at_turn_end"] is True
 
 
@@ -221,7 +229,7 @@ def test_play_game_with_tools_deterministic() -> None:
     deck = ([basic("妙蛙种子")] * 20 + [tool("勇气护符")] * 4
             + [tool("招式学习器 进化")] * 4
             + [energy("基本超能量", "超")] * 16 + [energy()] * 16)
-    effects = load_card_dir("cards")
+    effects = effects_by_name(load_card_dir("cards"))  # stub 卡按名注入兼容路径
     r1 = play_game(deck, deck, seed=19, card_effects=effects)
     r2 = play_game(deck, deck, seed=19, card_effects=effects)
     assert r1.events_hash == r2.events_hash

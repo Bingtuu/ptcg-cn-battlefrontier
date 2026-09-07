@@ -4,8 +4,8 @@
 
 ## 当前
 
-**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：done 14（DSL 10 + vanilla 4）/ blocked 33 / pending 34（B/C 级）。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张，first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，详见工作记录）。
-M1–M4 已达成。**task 026 进行中（`tasks/task 026.md`）**：WP0 前置 ✅（CardLibrary card_id 挂载 + dsl-check --db + 审计拆分，定义库 25 文件）、WP1 ✅（filters/conditions 高频项 + CardDef 数据管道 is_tera/owner/labels + 招式失败钩子；新写 3 卡：老大的指令/尖钉镇道馆/赫普的古月鸟，gate3 待核销，定义库 28 文件）；下一步 WP2 = trigger_on_event 分发 + place_damage_counters（彷徨夜灵 H 标/摔角鹰人/沙铃仙人掌等在等）→ 其余原语按解锁卡数排序。
+**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：done 15（DSL 11 + vanilla 4）/ blocked 32 / pending 34（B/C 级）。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张，first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，详见工作记录）。
+M1–M4 已达成。**task 026 进行中（`tasks/task 026.md`）**：WP0 前置 ✅（CardLibrary card_id 挂载 + dsl-check --db + 审计拆分）、WP1 ✅（filters/conditions 高频项 + CardDef 数据管道 is_tera/owner/labels + 招式失败钩子）；新写 4 卡（老大的指令/尖钉镇道馆/赫普的古月鸟/赫普的包包——db owner 赫普组 2026-09-07 补数后解锁），**gate3 待核销 ×4**，定义库 29 文件；下一步 WP2 = trigger_on_event 分发 + place_damage_counters（彷徨夜灵 H 标/摔角鹰人/沙铃仙人掌等在等）→ 其余原语按解锁卡数排序。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -18,6 +18,13 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-09-07 db owner 补数验收 + 赫普的包包 ✅
+
+- **上游补数验收**：db `cards.owner` 从 5 组扩到 12 组（新增赫普 14 / 奇树 9 / 派帕 9 / 阿响 15 / 小霞 11 / 大吾 11 / 阿渡 1），三组前缀逐张复核 owner≠前缀或 NULL 为零；池内赫普的卡 5 种抽查全对
+- **赫普的包包（CSV10C-195）解锁落地**（主会话直写，TDD）：检索 ≤2 基础「赫普的宝可梦」入备战（basic_pokemon + owner_pokemon：赫普 双过滤 + bench 去向 + up-to）；闸 1（dsl-check --db）✅ 闸 2 ✅ 3 用例（full flow / 双过滤负例 / 空选仍洗牌）；first_pass=false 严格口径（首跑 2 条失败 = 测试夹具默认备战区假设错误，DSL 零修改）；gate3 待核销
+- 落账：coverage-plan 赫普的包包 blocked→done（缺口 done 15 / blocked 32）；authoring-log 批 2 首条；全量 **430 绿** + ruff 零告警
+- 上游剩余缺口：跨源对账残留 38 张人工核销 / 合法性快照与赛事数据新鲜度（M6 前置）/ group_key 暴露（已非阻塞，可选）
 
 ### 2026-09-06 task 026 WP1：filters/conditions 高频项 + 数据管道 ✅
 

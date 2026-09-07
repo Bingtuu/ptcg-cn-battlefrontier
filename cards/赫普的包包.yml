@@ -1,0 +1,14 @@
+# 赫普的包包（CSV10C-195，物品）
+# text_raw 原文：「选择自己牌库中最多2张【基础】宝可梦的「赫普的宝可梦」，放于备战区。并重洗牌库。」
+# 双过滤器交集：basic_pokemon（【基础】）+ owner_pokemon:赫普（「赫普的宝可梦」，db cards.owner
+# 字段，2026-09-07 赫普组补数后解锁）；「最多2张」= up-to（可不找）；bench 去向联动登场锁定。
+card:
+  name_group: 赫普的包包
+  card_ids: [CSV10C-195]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon, owner_pokemon:赫普], choose: 2, destination: bench}
+      - {action: shuffle_deck}

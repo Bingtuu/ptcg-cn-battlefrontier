@@ -5,6 +5,8 @@
 - 尖钉镇道馆：stadium_grant 检索「玛俐的宝可梦」入手（owner_pokemon:<名> 过滤器）。
 - 赫普的古月鸟：随性喷吐 condition opponent_prizes_in:[4,3]——不满足则招式失败
   （不结算伤害/效果，回合照常结束；on_attack condition 引擎钩子，task 026 WP1）。
+- 赫普的包包：检索牌库 ≤2 张基础「赫普的宝可梦」直放备战区 + 洗牌
+  （basic_pokemon + owner_pokemon:赫普 双过滤器；db owner 赫普组补数后解锁）。
 """
 
 from pathlib import Path
@@ -20,6 +22,7 @@ CARDS_DIR = Path(__file__).parent.parent / "cards"
 BOSS_DOC = load_card_doc(CARDS_DIR / "老大的指令.yml")
 SPIKEMUTH_DOC = load_card_doc(CARDS_DIR / "尖钉镇道馆.yml")
 CRAMORANT_DOC = load_card_doc(CARDS_DIR / "赫普的古月鸟.yml")
+HOP_BAG_DOC = load_card_doc(CARDS_DIR / "赫普的包包.yml")
 
 
 def supporter(name: str) -> CardDef:
@@ -169,3 +172,74 @@ def test_赫普的古月鸟_奖赏5张_招式失败() -> None:
     assert e.state.current_player == 1  # 攻击已消耗，回合移交
     failed = [ev for ev in e.events if ev.kind == "attack" and ev.detail.get("failed")]
     assert len(failed) == 1 and failed[0].detail["attack"] == "随性喷吐"
+
+
+# ── 赫普的包包 ───────────────────────────────────────────────────────────
+
+
+def hop_pokemon(name: str, stage: int = 0) -> CardDef:
+    return CardDef(card_id=f"stub-{name}", name=name, supertype="pokemon",
+                   hp=70, stage=stage, owner="赫普")
+
+
+def hop_bag_engine(deck: tuple) -> object:
+    """main 阶段、p0 手牌含赫普的包包（iid 60）、牌库为指定构成。"""
+    state = main_state(p0_extra_hand=(inst(60, CardDef(
+        card_id="stub-赫普的包包", name="赫普的包包", supertype="trainer",
+        trainer_subtype="物品")),))
+    p0 = state.players[0].model_copy(update={"deck": deck})
+    engine = engine_at(state.model_copy(update={"players": (p0, state.players[1])}))
+    engine.card_effects = {"赫普的包包": HOP_BAG_DOC}
+    return engine
+
+
+def hop_bag_deck() -> tuple:
+    return (
+        inst(100, hop_pokemon("赫普的毛辫羊")),            # 基础+赫普：合法
+        inst(101, hop_pokemon("赫普的卡比兽")),            # 基础+赫普：合法
+        inst(102, hop_pokemon("赫普的沙螺蟒", stage=1)),   # 赫普但 1 阶：过滤
+        inst(103, basic("小拉达")),                        # 基础但非赫普：过滤
+        inst(104, energy()),                               # 能量：过滤
+        inst(105, supporter("老大的指令")),                # 训练家：过滤
+    )
+
+
+def test_赫普的包包_full_flow() -> None:
+    """全链路：使用物品 → 挂起检索 → 选 2 只基础赫普宝可梦直放备战区 → 洗牌 → 本体进弃牌区。"""
+    e = hop_bag_engine(hop_bag_deck())
+    e.apply(0, Action(kind="play_trainer", iid=60))
+    assert e.state.phase == "choice" and e.state.pending_choice is not None
+    choices = [a for a in e.legal_actions(0) if a.kind == "choose"]
+    assert sorted(a.choices for a in choices) == [(), (100,), (100, 101), (101,)]
+    e.apply(0, next(a for a in choices if a.choices == (100, 101)))
+    p0 = e.state.players[0]
+    assert e.state.phase == "main"
+    assert [m.current.iid for m in p0.bench] == [100, 101]
+    assert {100, 101} <= p0.entered_play_this_turn  # 当回合登场 → 不可进化联动
+    assert len(p0.deck) == 4  # 取走 2 张且已洗牌
+    shuffles = [ev for ev in e.events
+                if ev.kind == "effect_primitive" and ev.detail["action"] == "shuffle_deck"]
+    assert len(shuffles) == 1
+    assert [c.iid for c in p0.discard] == [60]  # 物品用后弃置
+
+
+def test_赫普的包包_filters() -> None:
+    """负例：赫普 1 阶 / 非赫普基础 / 能量 / 训练家均不进检索池。"""
+    e = hop_bag_engine(hop_bag_deck())
+    e.apply(0, Action(kind="play_trainer", iid=60))
+    pooled = {iid for a in e.legal_actions(0) if a.kind == "choose" for iid in a.choices}
+    assert pooled == {100, 101}
+
+
+def test_赫普的包包_decline_search_still_shuffles() -> None:
+    """选空集（最多 2 张可不找）：备战区不进宝可梦，洗牌仍执行，本体进弃牌区。"""
+    e = hop_bag_engine(hop_bag_deck())
+    e.apply(0, Action(kind="play_trainer", iid=60))
+    e.apply(0, next(a for a in e.legal_actions(0) if a.kind == "choose" and a.choices == ()))
+    p0 = e.state.players[0]
+    assert [m.current.iid for m in p0.bench] == []
+    assert len(p0.deck) == 6
+    shuffles = [ev for ev in e.events
+                if ev.kind == "effect_primitive" and ev.detail["action"] == "shuffle_deck"]
+    assert len(shuffles) == 1
+    assert [c.iid for c in p0.discard] == [60]

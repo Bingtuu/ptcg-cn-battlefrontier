@@ -57,7 +57,7 @@ V-UNION 缺口 0（一期不做，无冲突）。
 | 能量输送 | trainer | search | 玛俐长毛巨魔雪妖女 | A | 现有原语 | done（task 025 闸1/2 过，gate3 已核销 2026-09-06） |
 | 赛富豪ex | pokemon | draw | 赛富豪 | A | 现有原语 | blocked:缺 discard 区间弃置 + 弃置张数计数词（holder_is_active WP1 已备）（2026-09-07） |
 | 赤松 | trainer | search,energy_accel | 猛雷鼓厄诡椪/多龙黑夜魔灵 | A | 现有原语 | blocked:缺 distinct-type 约束 + 检索拆分去向(hand+attach) |
-| 赫普的包包 | trainer | search | 赫普的苍响 | A | 现有原语 | blocked:db cards.owner 未覆盖赫普组（实测 DISTINCT owner=玛俐/竹兰/莉莉艾/N/火箭队，不回落卡名硬推——数据缺口需 db 侧补数；owner_pokemon 过滤器 WP1 已备）（2026-09-07） |
+| 赫普的包包 | trainer | search | 赫普的苍响 | A | 现有原语 | done（2026-09-07：db owner 赫普组补数后解锁，task 026 闸1/2 过，first_pass=false（测试夹具笔误，DSL 零修改），gate3 待核销） |
 | 赫普的古月鸟 | pokemon | - | 赫普的苍响 | A | 现有原语 | done（task 026 WP1 闸1/2 过，gate3 待核销；opponent_prizes_in:[4,3] + on_attack 招式失败钩子） |
 | 超级能量回收 | trainer | discard_recover | 赛富豪 | A | 现有原语 | blocked:缺 recover_from_discard hand up-to(min_choose=0) |
 | 雪童子 | pokemon | - | 玛俐长毛巨魔雪妖女 | A | 现有原语 | blocked:缺对手手牌随机单张回牌库原语（hand_disrupt） |

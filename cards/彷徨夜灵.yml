@@ -1,0 +1,19 @@
+# 彷徨夜灵（CSV8C-082，1阶，特性：咒怨炸弹）
+# text_raw 原文：「特性: 咒怨炸弹
+# 在自己的回合可以使用1次，如果使用了，则令这只宝可梦【昏厥】。给对手的1只宝可梦身上，
+# 放置5个伤害指示物。
+#
+# 【超】【超】 磷火 50」
+# 语序保真：先自我昏厥（ko_self，对手立即拿奖赏）、后给对手 1 只放 5 个伤害指示物；
+# 战斗场自我昏厥的换上推迟到效果完成后按 promote_queue 统一进行（rules-reference
+# 附录 A·2026-09-07 决议）。磷火 50 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 彷徨夜灵
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-07）：全 H 标
+  card_ids: [CSV8C-082, CSV8C-211, CSV9.5C-070, SVP-347]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    actions:
+      - {action: ko_self, selector: self}
+      - {action: place_damage_counters, selector: opponent_pokemon_any, choose: 1, args: {counters: 5}}

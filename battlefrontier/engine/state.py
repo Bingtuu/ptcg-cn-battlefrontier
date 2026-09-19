@@ -96,6 +96,13 @@ class InPlayPokemon(FrozenModel):
     attached_tool: CardInstance | None = None
     damage: int = 0
     conditions: frozenset[SpecialCondition] = frozenset()
+    # 攻击冷却锁（task 026 WP4 裁决 2，lock_attack 原语）：被锁招式名 + 锁定施加时的
+    # turn（解禁时点见 core._begin_turn；撤退/离场/昏厥清除，进化继承——决议口径待核）
+    attack_locks: tuple[str, ...] = ()
+    attack_lock_turn: int | None = None
+    # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：被锁目标下个自己回合无法撤退
+    # （回合结束 core._on_turn_end 解除；进化/离场清除）
+    retreat_lock: bool = False
 
     @property
     def current(self) -> CardInstance:
@@ -125,6 +132,22 @@ class PendingChoice(FrozenModel):
     payload: tuple[int, ...] = ()
     # 挂起瞬间冻结的掷币结果（task 025 节点级门控穿透：恢复时重建 ctx.last_flip）
     flip_result: bool | None = None
+    # 挂起瞬间冻结的 cost 段弃置 iid（task 026 WP4：恢复时重建
+    # ctx.cost_discarded_iids，供 recover_from_discard exclude_cost_discarded 池剔除）
+    cost_discarded: tuple[int, ...] = ()
+    # 挂起瞬间冻结的本效果前序弃置张数（task 026 WP5：恢复时重建
+    # ctx.discarded_this_effect，供 damage 的 discarded_this_effect 计数词读取）
+    discarded_count: int = 0
+    # 有序选择（task 026 WP6 暗码迷的解读 deck_top 去向）：选择顺序即牌顶顺序（FIFO），
+    # 枚举层按排列展开（(a,b) 与 (b,a) 是两条合法行动）
+    ordered: bool = False
+    # 互异约束（task 026 WP6 赤松 distinct=energy_type）：pool_buckets 与 pool_iids
+    # 平行（同下标），枚举层仅产出桶值两两互异的子集
+    distinct: str = ""
+    pool_buckets: tuple[int, ...] = ()
+    # 二选一组合约束（task 026 WP6 小刚的发掘 choose_groups）：元素 = (组池 iids,
+    # 组内 up-to 上限)；组间互斥（混合不可达），枚举层按组分别展开子集再取并集
+    choose_groups: tuple[tuple[tuple[int, ...], int], ...] = ()
     # 完成模式：trainer = 效果完成后本体进弃牌区；ability = 特性不弃置
     completion: str = "trainer"
     # 嵌套帧（task 020 copy_attack）：inner = 内层效果定位（card_id, 卡名, 招式名）
@@ -134,6 +157,10 @@ class PendingChoice(FrozenModel):
     inner: tuple[str, str, str] | None = None
     outer_cursor: int = -1
     outer_choice: tuple[int, ...] = ()
+    # 挂起瞬间冻结的攻击方栈顶 iid（task 026 WP6 own_ko_by_attack，同 flip/
+    # cost_discarded/discarded_count 穿透口径：恢复时重建 ctx.attacker_iid，
+    # 供 place_damage_counters 的 opponent_attacker 选择器在恢复后继续读取）
+    attacker_iid: int | None = None
 
 
 class PlayerState(FrozenModel):
@@ -158,11 +185,15 @@ class PlayerState(FrozenModel):
     # 竞技场（task 017）：每回合限打出 1 张 / stadium_grant 行动每回合 1 次
     stadium_played_this_turn: bool = False
     stadium_used_this_turn: bool = False
+    # 回合级奖赏加成标记（task 026 WP5 白蕾雅，D-WP5-2 🔲 待核）：本回合自己太晶
+    # 宝可梦招式伤害致对手战斗场昏厥时多拿 1 张奖赏；回合结束 _on_turn_end 清除
+    extra_prize_tera_ko: bool = False
 
     @model_validator(mode="after")
     def _zone_limits(self) -> PlayerState:
-        if len(self.bench) > 5:
-            raise ValueError("备战区最多 5 只")
+        if len(self.bench) > 8:
+            # 规则上限 5；零之大空洞（task 026 WP6）覆写为 8——构造期守卫取绝对上限
+            raise ValueError("备战区最多 8 只（零之大空洞覆写上限）")
         if len(self.prizes) > 6:
             raise ValueError("奖赏卡最多 6 张")
         return self
@@ -237,9 +268,30 @@ class GameState(FrozenModel):
     # 换上后回合权归属（默认 None = 换上方回合，普通昏厥语义）；
     # 混乱反面自我昏厥时置为对手（攻击已消耗，D1 决议 task 013），_do_promote 读后清零
     turn_after_promote: int | None = None
-    # 主阶段内换上标记（task 025 bounce：效果致战斗场空置时置位）——
-    # 换上后回 main 继续当前回合（不推进回合、不抽牌），_do_promote 读后清零
-    promote_to_main: bool = False
+    # 等待换上的玩家队列（task 026 WP2，FIFO）：效果内昏厥的换上推迟到效果全部结算
+    # 完毕后按队列统一进行（D-WP2-1，🔲 待核）；多昏厥按结算顺序入队逐条换上（D-WP2-2）。
+    # check_knockouts / ko_self 入队，_do_promote 逐条弹出
+    promote_queue: tuple[int, ...] = ()
+    # 换上队列清空后的去向（task 026 WP2，D-WP2-4：归并 task 025 的 promote_to_main）：
+    # (玩家, 阶段)，本期值恒为 (回合方, "main")——效果致昏厥/bounce 换上后回效果方主阶段
+    resume_after_promotes: tuple[int, str] | None = None
+    # 待分发的事件触发队列（task 026 WP3，用户裁决 2026-09-07，FIFO）：DSL 进化路径
+    # （神奇糖果 skip_stage 等 _apply_evolution zone="hand"）的 own_evolve_from_hand
+    # 触发请求入队，效果完成后由 _run_or_suspend 完成路径统一排水（与 promote_queue
+    # 同哲学：不在效果执行中嵌套分发）；元素 = (player, card_iid, event)，
+    # 排水时来源已不在场上则跳过（离场即失效）
+    pending_event_triggers: tuple[tuple[int, int, str], ...] = ()
+    # 待分发的昏厥触发队列（task 026 WP6 沙铃仙人掌 炸裂针刺，D-WP6-6，FIFO）：
+    # own_ko_by_attack——战斗场受对手招式伤害昏厥时入队，效果完成后统一排水；
+    # 元素 = (被昏厥方, 被昏厥宝可梦栈顶 iid, 攻击方栈顶 iid | None（无来源招式
+    # 路径不入队——_knockout_one 判 None 跳过）)；排水时来源（已昏厥）
+    # 从弃牌区解析，攻击方已离场则效果内 no-op
+    pending_ko_triggers: tuple[tuple[int, int, int | None], ...] = ()
+    # 备战区失效缩减（task 026 WP6 零之大空洞，D-WP6-2）：bench_shrink 阶段的待缩减
+    # 玩家队列（FIFO，双方同缩由旧竞技场持有者先）与缩减完成后的去向
+    # （"main"=回出牌方主阶段 / "begin_turn"=换上后开始该方回合）
+    bench_shrink_queue: tuple[int, ...] = ()
+    bench_shrink_resume: tuple[int, str] | None = None
     # 竞技场放置方（task 017：旧竞技场被替换时进其放置方弃牌区，rules-manual §5）
     stadium_owner: int | None = None
 

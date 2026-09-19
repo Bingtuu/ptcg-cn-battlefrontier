@@ -1,0 +1,17 @@
+# 索财灵（CSV4C-063，基础，超属性）——「连掷硬币」G 标文本类
+# （同名多文本拆分：H 标「小使者」类 / G 标「躲入箱中」类等另文，见 task 026 WP5 范围纪律）
+# text_raw 原文：「【无】 连掷硬币 20×
+# 抛掷硬币直到出现反面，造成正面次数×20伤害。」
+# 连掷硬币 20×（task 026 WP5，until_tails 口径）：coin_flip args.until_tails=true
+# （单次行动内连续掷到反面为止，逐次走引擎单一随机源，种子确定性不变）→
+# 正面次数经 flip_heads_count 计数词 ×20 结算；首掷即反面 → 伤害 0。
+card:
+  name_group: 索财灵
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：「连掷硬币」G 标 3 印刷
+  card_ids: [CSV4C-063, CSV4C-133, CSV9.5C-080]
+effects:
+  - trigger: on_attack
+    attack: 连掷硬币
+    actions:
+      - {action: coin_flip, args: {until_tails: true}}
+      - {action: damage, selector: opponent_active, count: flip_heads_count, args: {op: "×", per: 20}}

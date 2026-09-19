@@ -1,0 +1,25 @@
+# 米立龙（CSV8C-160，基础，特性：揽客）
+# text_raw 原文：「特性: 揽客
+# 如果这只宝可梦在战斗场上的话，则在自己的回合可以使用1次。查看自己牌库上方6张卡牌，选择其中1张支援者，在给对手看过之后，加入手牌。将剩余的卡牌放回牌库并重洗牌库。
+#
+# 【火】【水】 冲浪 50」
+# search_deck top_n rest=shuffle（task 026 WP4）：args.top_n=6 检视牌库顶 6 张为选择池，
+# args.rest=shuffle 未选卡与牌库其余合并后整库重洗（本节点直接洗牌，不再写 shuffle_deck
+# 节点）；空选/窗内无支援者时重洗依然成立（清单 3）。「选择其中1张」从宽按检索统一
+# up-to 纪律（min_choose=0，rules-reference 附录 A 决议）。reveal 一期口径：仅落结构化
+# 事件流（iids+卡名），对手可见视图不建模泄露。
+# 冲浪 50 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 米立龙
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：揽客类全 H 标 10 印刷；
+  # 其余文本类（毒针/呼唤同伴等）未写，不在本文件挂载
+  card_ids: [CBB5C-2801, CBB5C-2802, CBB5C-2803, CBB5C-2804, CBB5C-2805, CBB5C-2806, CBB5C-2807, CSV8C-160, CSV9.5C-135, CSVM2bC-008]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    condition: self_is_active
+    # 决策聚合锚点（task 022）：检视选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [trainer_supporter], choose: 1, destination: hand, args: {top_n: 6, rest: shuffle}}
+      - {action: reveal, selector: own_hand, filters: [trainer_supporter]}

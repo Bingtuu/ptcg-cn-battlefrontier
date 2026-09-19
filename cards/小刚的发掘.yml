@@ -1,0 +1,24 @@
+# 小刚的发掘（CSVM2bC-025，支援者）
+# text_raw 原文：「选择自己牌库中最多2张【基础】宝可梦或1张进化宝可梦，在给对手看过之后
+# 加入手牌。并重洗牌库。」
+# 二选一组合约束（task 026 WP6，D-WP6-3 🔲 待核）：search_deck args.choose_groups——
+# 组间互斥（基础至多 2 张 ∪ 进化至多 1 张，混合不可达），各组内 up-to（最多 = min 0）；
+# 「给对手看过」= reveal own_hand（猫头夜鹰先例，仅落结构化事件流）；检索后必洗牌。
+card:
+  name_group: 小刚的发掘
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全赛制合法 5 印刷
+  card_ids: [CSVM2bC-025, SVP-351, CSV10C-207, CSV10C-255, CSV10C-276]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - action: search_deck
+        selector: own_deck
+        destination: hand
+        args:
+          choose_groups:
+            - {filters: [basic_pokemon], choose: 2}
+            - {filters: [evolved_pokemon], choose: 1}
+      - {action: reveal, selector: own_hand, filters: [pokemon]}
+      - {action: shuffle_deck}

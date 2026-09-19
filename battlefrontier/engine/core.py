@@ -130,6 +130,14 @@ class GameEngine:
         )
         self.events: list[GameEvent] = []
         self.state: GameState
+        # 效果执行中标记（task 026 WP2）：run_effect 期间置位——效果内造成的昏厥
+        # 只入 promote_queue 不翻阶段（换上推迟到效果完成后由完成路径统一进行，D-WP2-1）
+        self._in_effect = False
+        # 招式伤害落点瞬时记录（task 026 WP5 白蕾雅，D-WP5-2；WP6 扩为三元组）：
+        # (攻方, 攻方是否太晶, 攻方栈顶 iid)，由攻击伤害路径在 check_knockouts 前置位；
+        # check_knockouts 进入即取走并清空（consume-on-read，防残留串到后续非招式伤害
+        # 路径）；iid 供 own_ko_by_attack 触发解析攻击方（task 026 WP6，D-WP6-6）
+        self._attack_damage_active: tuple[int, bool, int | None] | None = None
 
     # ── 事件 ─────────────────────────────────────────────
 
@@ -230,6 +238,9 @@ class GameEngine:
         if s.phase == "promote":
             # 【规则书·昏厥】战斗场昏厥后须从备战区换上 1 只
             return [Action(kind="promote", bench_index=i) for i in range(len(p.bench))]
+        if s.phase == "bench_shrink":
+            # 备战区失效缩减（task 026 WP6 零之大空洞，D-WP6-2）：超容方逐只自选弃置
+            return [Action(kind="shrink_bench", choices=(m.current.iid,)) for m in p.bench]
         if s.phase == "choice":
             # chooser 挂起：仅挂起方可行动，枚举合法选择（PRD §5.2）
             pc = s.pending_choice
@@ -253,8 +264,9 @@ class GameEngine:
         actions: list[Action] = []
         in_play: list[InPlayPokemon] = ([p.active] if p.active else []) + list(p.bench)
 
-        # 放置基础宝可梦到备战区：不限次，≤5（规则书·行动阶段）
-        if len(p.bench) < 5:
+        # 放置基础宝可梦到备战区：不限次，容量按有效备战上限（规则书·行动阶段；
+        # task 026 WP6 零之大空洞 bench_size 声明式覆写，_bench_size 读声明）
+        if len(p.bench) < self._bench_size(player):
             for c in p.hand:
                 if c.card.supertype == Supertype.POKEMON and c.card.stage == 0:
                     actions.append(Action(kind="place_bench", iid=c.iid))
@@ -290,12 +302,15 @@ class GameEngine:
                             Action(kind="attach_tool", iid=c.iid, target_iid=t.current.iid)
                         )
 
-        # 撤退：每回合 1 次机会（pokemon.cn basic_rules05）；弃撤退费用数量的能量，与备战区对换
+        # 撤退：每回合 1 次机会（pokemon.cn basic_rules05）；弃撤退费用数量的能量，与备战区对换；
+        # 有效撤退费含常驻修正（task 026 WP4，_effective_retreat_cost 读 DSL 声明）；
+        # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：被锁战斗宝可梦不枚举撤退
         if (
             p.active
+            and not p.active.retreat_lock
             and p.bench
             and not p.retreated_this_turn
-            and len(p.active.attached_energy) >= p.active.current.card.retreat_cost
+            and len(p.active.attached_energy) >= self._effective_retreat_cost(p.active, player)
         ):
             for i in range(len(p.bench)):
                 actions.append(Action(kind="retreat", bench_index=i))
@@ -315,7 +330,15 @@ class GameEngine:
                 tool_doc = effect_doc(self.card_effects, tool.card)
                 combined += [(a, tool_doc) for a in tool.card.attacks]
             for i, (attack, doc) in enumerate(combined):
-                if not _energy_satisfied(p.active.attached_energy, attack.cost):
+                # 攻击冷却锁（task 026 WP4 裁决 2，lock_attack）：被锁招式不枚举
+                if attack.name in p.active.attack_locks:
+                    continue
+                # 有效招式费（task 026 WP5，D-WP5-4）：_effective_attack_cost 读 DSL
+                # modify_attack_cost 声明（月月熊 老练招式）；枚举与执行共用求值点
+                if not _energy_satisfied(
+                    p.active.attached_energy,
+                    self._effective_attack_cost(p.active, player, attack),
+                ):
                     continue
                 has_dsl = doc is not None and any(
                     e.trigger == "on_attack" and e.attack == attack.name
@@ -343,7 +366,7 @@ class GameEngine:
             effect = next(e for e in doc.effects if e.trigger == "on_play")
             if not condition_met(effect.condition, self, player):
                 continue
-            if not playable_feasible(effect, p, bench_full=len(p.bench) >= 5,
+            if not playable_feasible(effect, p, bench_full=len(p.bench) >= self._bench_size(player),
                                      opponent=s.players[1 - player],
                                      first_turn=s.turn == 1):
                 continue
@@ -367,7 +390,7 @@ class GameEngine:
                 (e for e in sdoc.effects if e.trigger == "stadium_grant"), None,
             ) if sdoc else None
             if seffect is not None and playable_feasible(
-                seffect, p, bench_full=len(p.bench) >= 5,
+                seffect, p, bench_full=len(p.bench) >= self._bench_size(player),
                 opponent=s.players[1 - player], first_turn=s.turn == 1,
             ):
                 actions.append(Action(kind="use_stadium"))
@@ -431,14 +454,120 @@ class GameEngine:
         self._emit("place_active", player, iid=card.iid, name=card.card.name)
         self.state = self.state.model_copy(update={"phase": "setup_bench"})
 
+    def _queue_event_trigger(self, player: int, iid: int, event: str) -> None:
+        """事件触发请求入队（task 026 WP3，pending_event_triggers；FIFO）。"""
+        self.state = self.state.model_copy(update={
+            "pending_event_triggers": self.state.pending_event_triggers
+            + ((player, iid, event),),
+        })
+
+    def _fire_trigger_on_event(
+        self, player: int, source: CardInstance, holder: InPlayPokemon | None,
+        event: str, attacker_iid: int | None = None,
+    ) -> bool:
+        """trigger_on_event 分发公共点（task 026 WP2/WP3/WP6）：检索来源卡文档中挂该事件的
+        效果，condition 门控后自动发动（「可使用」的放弃选项不建模，D-WP2-3）；
+        completion="ability" = 特性卡本体不弃置，完成后回主阶段。
+        own_ko_by_attack（WP6）：来源已因昏厥进弃牌堆（holder=None，condition 以
+        holder=None 求值）；completion="attack" 且发动前置 turn_after_promote=触发方——
+        攻击方的回合已因攻击消耗，触发效果结算与换上完毕后回合权归被攻击方（D-WP6-6）。
+        attacker_iid 穿透进 ctx.attacker_iid（opponent_attacker 选择器数据源）。
+        同卡多个同事件效果 = DslError（不猜，需要时再扩展顺序分发）。
+        返回是否实际发动（排水方据此决定继续排下一条还是交棒给被触发效果）。
+        """
+        doc = effect_doc(self.card_effects, source.card)
+        if doc is None:
+            return False
+        matched = [
+            (i, e) for i, e in enumerate(doc.effects)
+            if e.trigger == "trigger_on_event" and e.event == event
+        ]
+        if len(matched) > 1:
+            raise DslError(
+                f"{source.card.name}: 一张卡多个同事件 trigger_on_event 效果"
+                f"（event={event}；需要时再扩展顺序分发）"
+            )
+        if not matched:
+            return False
+        effect_index, effect = matched[0]
+        from battlefrontier.dsl.chooser import condition_met
+
+        if not condition_met(effect.condition, self, player, holder):
+            return False
+        self._emit("trigger_on_event", player, iid=source.iid,
+                   name=source.card.name, event=event)
+        if event == "own_ko_by_attack":
+            # 触发方的换上完成后回合权归被攻击方（=触发方自己；攻击方回合已消耗）
+            self.state = self.state.model_copy(update={
+                "turn_after_promote": player,
+            })
+            self._run_or_suspend(player, source, effect_index, start=0,
+                                 completion="attack", attacker_iid=attacker_iid)
+        else:
+            self._run_or_suspend(player, source, effect_index, start=0,
+                                 completion="ability")
+        return True
+
+    def _drain_event_triggers(self) -> bool:
+        """事件触发队列共享排水（task 026 WP3/WP6）：先排 pending_event_triggers
+        （own_evolve_from_hand 等），再排 pending_ko_triggers（own_ko_by_attack）。
+        来源已不在场上时——own_ko_by_attack 从该玩家弃牌堆按 iid 找回来源（昏厥离场
+        后仍可发动，holder=None）；其余事件离场即失效，跳过排下一条。
+        返回是否实际发动了某条（发动则交棒给被触发效果的执行/挂起）。
+        """
+        while self.state.pending_event_triggers:
+            tp, tiid, tevent = self.state.pending_event_triggers[0]
+            self.state = self.state.model_copy(update={
+                "pending_event_triggers": self.state.pending_event_triggers[1:],
+            })
+            try:
+                _, _, holder = self._find_in_play(self.state.players[tp], tiid)
+            except IllegalActionError:
+                continue  # 来源已不在场上：离场即失效，跳过
+            if self._fire_trigger_on_event(tp, holder.current, holder, tevent):
+                return True
+        while self.state.pending_ko_triggers:
+            tp, tiid, tattacker = self.state.pending_ko_triggers[0]
+            self.state = self.state.model_copy(update={
+                "pending_ko_triggers": self.state.pending_ko_triggers[1:],
+            })
+            holder: InPlayPokemon | None = None
+            try:
+                _, _, holder = self._find_in_play(self.state.players[tp], tiid)
+                source = holder.current
+            except IllegalActionError:
+                # 昏厥离场：从弃牌堆按 iid 找回来源卡（整叠进弃牌堆，必然在）
+                source = next(
+                    (c for c in self.state.players[tp].discard if c.iid == tiid),
+                    None,
+                )
+                if source is None:
+                    continue
+            if self._fire_trigger_on_event(tp, source, holder,
+                                           "own_ko_by_attack",
+                                           attacker_iid=tattacker):
+                return True
+        return False
+
     def _do_place_bench(self, player: int, action: Action) -> None:
-        """【规则出处·游戏准备】备战区可放任意只基础宝可梦（≤5）。"""
+        """【规则出处·游戏准备】备战区可放任意只基础宝可梦（≤5）。
+
+        trigger_on_event 分发（task 026 WP2）：仅当进入时 phase=="main"（自己的回合
+        从手牌使出放于备战区）；setup 阶段的放置不触发，DSL search_deck
+        destination=bench 不经本行动（天然不触发）。
+        """
+        entered_phase = self.state.phase
         p, card = self._take_from_hand(self.state.players[player], action.iid)  # type: ignore[arg-type]
         self._set_player(player, p.model_copy(update={
             "bench": p.bench + (InPlayPokemon(stack=(card,)),),
             "entered_play_this_turn": p.entered_play_this_turn | {card.iid},
         }))
         self._emit("place_bench", player, iid=card.iid, name=card.card.name)
+        if entered_phase != "main":
+            return
+        placed = self.state.players[player].bench[-1]  # 刚放置的宝可梦（bench 末尾）
+        self._fire_trigger_on_event(player, placed.current, placed,
+                                    "own_play_from_hand_to_bench")
 
     def _do_confirm_setup(self, player: int, action: Action) -> None:
         if player == 0:
@@ -473,18 +602,29 @@ class GameEngine:
         return p.model_copy(update={"bench": tuple(bench)})
 
     def _do_evolve(self, player: int, action: Action) -> None:
-        """【规则书·进化】手牌进化卡覆盖到对应宝可梦上，特殊状态恢复，伤害保留。"""
+        """【规则书·进化】手牌进化卡覆盖到对应宝可梦上，特殊状态恢复，伤害保留。
+
+        trigger_on_event 分发（task 026 WP3，own_evolve_from_hand）：本行动直发
+        （不入队）；DSL evolve 原语路径按用户裁决（2026-09-07）分流——zone="hand"
+        （神奇糖果跳阶）经 _apply_evolution 入队 pending_event_triggers 效果完成后
+        排水，zone="deck"（招式学习器「进化」）不触发；setup 阶段无进化行动，
+        天然不触发。
+        """
         p, card = self._take_from_hand(self.state.players[player], action.iid)  # type: ignore[arg-type]
         slot, idx, target = self._find_in_play(p, action.target_iid)  # type: ignore[arg-type]
         evolved = target.model_copy(update={
             "stack": target.stack + (card,),
             "conditions": frozenset(),
+            # 撤退锁随进化解除（task 026 WP6，D-WP6-6）
+            "retreat_lock": False,
         })
         p = self._replace_in_play(p, slot, idx, evolved)
         self._set_player(player, p.model_copy(update={
             "evolved_this_turn": p.evolved_this_turn | {card.iid},
         }))
         self._emit("evolve", player, iid=card.iid, name=card.card.name, onto=target.current.card.name)
+        _, _, holder = self._find_in_play(self.state.players[player], card.iid)
+        self._fire_trigger_on_event(player, card, holder, "own_evolve_from_hand")
 
     def _do_attach_energy(self, player: int, action: Action) -> None:
         """【规则书·能量】每回合限 1 张，从手牌附着到场上宝可梦。"""
@@ -523,6 +663,9 @@ class GameEngine:
             }))
         self._emit("play_stadium", player, iid=card.iid, name=card.card.name,
                    replaced=old.card.name if old else None)
+        # 备战区失效缩减（task 026 WP6 零之大空洞，D-WP6-2）：旧竞技场离场后超容方
+        # 逐只自选弃置，双方同缩由旧场持有者先执行；缩减完成后回出牌方主阶段
+        self._check_bench_shrink(first=old_owner, resume=(player, "main"))
 
     def _do_use_stadium(self, player: int, action: Action) -> None:
         """stadium_grant 行动（task 017）：以当前玩家为 ctx 跑竞技场 DSL 效果块，
@@ -579,23 +722,41 @@ class GameEngine:
     def _on_turn_end(self, player: int) -> None:
         """回合结束统一收尾（所有回合结束路径必经）：道具回合末弃置（task 015）
         + 跨回合 KO 标记清除（task 017 化危为吉「上一个对手的回合」语义：
-        标记只保留到自己回合结束）。"""
+        标记只保留到自己回合结束）+ 回合级奖赏加成标记清除（task 026 WP5 白蕾雅，
+        D-WP5-2 turn scoped）+ 撤退锁解除（task 026 WP6 穷追不舍「下个对手的回合」，
+        D-WP6-6：被锁目标自己的回合结束解除）。"""
         self._discard_turn_end_tools(player)
         p = self.state.players[player]
+        if any(m.retreat_lock for m in ([p.active] if p.active else []) + list(p.bench)):
+            def _unlock(mon: InPlayPokemon) -> InPlayPokemon:
+                return mon.model_copy(update={"retreat_lock": False}) if mon.retreat_lock else mon
+
+            p = p.model_copy(update={
+                "active": _unlock(p.active) if p.active else None,
+                "bench": tuple(_unlock(m) for m in p.bench),
+            })
+            self._set_player(player, p)
+        update: dict[str, object] = {}
         if p.own_ko_during_opponent_turn:
-            self._set_player(player, p.model_copy(update={
-                "own_ko_during_opponent_turn": False,
-            }))
+            update["own_ko_during_opponent_turn"] = False
+        if p.extra_prize_tera_ko:
+            update["extra_prize_tera_ko"] = False
+        if update:
+            self._set_player(player, p.model_copy(update=update))
 
     def _do_retreat(self, player: int, action: Action) -> None:
-        """【规则书·撤退】弃撤退费用数量的能量，与备战区对换，撤退方特殊状态恢复。"""
+        """【规则书·撤退】弃撤退费用数量的能量，与备战区对换，撤退方特殊状态恢复。
+        有效撤退费含常驻修正（task 026 WP4，_effective_retreat_cost 读 DSL 声明）。"""
         p = self.state.players[player]
         active = p.active
-        cost = active.current.card.retreat_cost
+        cost = self._effective_retreat_cost(active, player)
         discarded = active.attached_energy[:cost]
         retreated = active.model_copy(update={
             "attached_energy": active.attached_energy[cost:],
             "conditions": frozenset(),
+            # 攻击冷却锁随撤退清除（task 026 WP4 裁决 2，同特殊状态恢复口径）
+            "attack_locks": (),
+            "attack_lock_turn": None,
         })
         new_active = p.bench[action.bench_index]  # type: ignore[index]
         bench = list(p.bench)
@@ -688,9 +849,16 @@ class GameEngine:
         self._set_player(defender, d.model_copy(update={"active": target}))
         self._emit("attack", player, name=atk.current.card.name, attack=attack.name,
                    damage=dmg, target=target.current.card.name)
+        # 白蕾雅奖赏加成（task 026 WP5，D-WP5-2）：招式伤害落点对手战斗场 → 置瞬时记录，
+        # check_knockouts → _knockout_one 的 take_prize 触点读取（仅 final>0 才算
+        # 「招式的伤害导致」）；效果/指示物路径永不置位
+        if dmg > 0:
+            self._attack_damage_active = (player, atk.current.card.is_tera, atk.current.iid)
         self.check_knockouts()
-        if self.state.phase in ("game_over", "promote"):
-            return  # 游戏已结束或等待换上
+        if self.state.phase in ("game_over", "promote", "choice"):
+            # 游戏已结束 / 等待换上 / 昏厥触发器挂起选择（own_ko_by_attack，task 026 WP6
+            # ——挂起的选择属于被触发效果，其恢复路径自行收尾，本层不推进回合）
+            return
         self._on_turn_end(player)
         self._begin_turn(defender)
 
@@ -711,6 +879,11 @@ class GameEngine:
 
         for effect in doc.effects:
             if effect.trigger != "passive_static":
+                continue
+            # 仅对含 modify_hp 声明的效果求 condition（task 026 WP4：紧急滑板同卡
+            # holder_hp_le 条件读有效 HP——不加此前置过滤会经 condition_met 递归回
+            # 本方法；无关效果的 condition 本就不影响 HP 求和）
+            if not any(node.action == "modify_hp" for node in effect.actions):
                 continue
             if not condition_met(effect.condition, self, player, mon):
                 continue
@@ -746,6 +919,137 @@ class GameEngine:
                     mod += node.args["amount"]
         return mod
 
+    def _effective_retreat_cost(self, mon: InPlayPokemon, player: int) -> int:
+        """撤退费用含常驻修正（task 026 WP4，D-WP4-1/D-WP4-2，🔲 待核；仿 _effective_hp）。
+
+        引擎对卡牌内容零硬编码：修正读 DSL 声明——
+        ① 持有者道具的 passive_static modify_retreat_cost（holder 口径，无 scope 键；
+        condition 如 holder_hp_le:30 在求值点判定，紧急滑板「剩余HP≤30 则全免」）；
+        ② 自己全场宝可梦卡的 passive_static modify_retreat_cost + args.scope=
+        own_basic_all（拉帝亚斯ex 天际线：仅作用自己 stage==0 宝可梦；对手场不扫）。
+        规约：value=非负 int 减少量加总后 clamp 下限 0，"all" 直接归零（无顺序依赖，
+        可交换）；非法 value / 未知 scope = DslError（不猜）。
+        来源离场 / 道具被弃 / 进化换栈顶即失效（求值点实时读声明，天然满足）。
+        """
+        from battlefrontier.dsl.chooser import condition_met
+        from battlefrontier.dsl.loader import DslError
+
+        reduction = 0
+        zeroed = False
+
+        def apply(node) -> None:
+            nonlocal reduction, zeroed
+            v = node.args.get("value")
+            if v == "all":
+                zeroed = True
+            elif isinstance(v, int) and not isinstance(v, bool) and v >= 0:
+                reduction += v
+            else:
+                raise DslError(
+                    f'modify_retreat_cost 的 value 须为非负 int 或 "all"（收到 {v!r}）'
+                )
+
+        def scan(doc, holder: InPlayPokemon, *, expect_scope: str | None) -> None:
+            for effect in doc.effects:
+                if effect.trigger != "passive_static":
+                    continue
+                if not condition_met(effect.condition, self, player, holder):
+                    continue
+                for node in effect.actions:
+                    if node.action != "modify_retreat_cost":
+                        continue
+                    scope = node.args.get("scope")
+                    if scope != expect_scope:
+                        raise DslError(
+                            f"modify_retreat_cost 的 scope={scope!r} 在该挂载点未支持"
+                            f"（期望 {expect_scope!r}；不猜）"
+                        )
+                    apply(node)
+
+        # ① 持有者道具（holder 口径：道具文档不声明 scope）
+        tool = mon.attached_tool
+        if tool is not None:
+            doc = effect_doc(self.card_effects, tool.card)
+            if doc is not None:
+                scan(doc, mon, expect_scope=None)
+        # ② 自己全场特性卡 scope=own_basic_all：仅作用【基础】宝可梦（stage==0）
+        if mon.current.card.stage == 0:
+            p = self.state.players[player]
+            for m in ([p.active] if p.active else []) + list(p.bench):
+                doc = effect_doc(self.card_effects, m.current.card)
+                if doc is None:
+                    continue
+                if not any(
+                    node.action == "modify_retreat_cost"
+                    and node.args.get("scope") is not None
+                    for effect in doc.effects
+                    if effect.trigger == "passive_static"
+                    for node in effect.actions
+                ):
+                    continue  # 无 scope 声明的卡文档不逐节点校验（holder 口径不由本路径读取）
+                scan(doc, m, expect_scope="own_basic_all")
+        if zeroed:
+            return 0
+        return max(0, mon.current.card.retreat_cost - reduction)
+
+    def _effective_attack_cost(
+        self, mon: InPlayPokemon, player: int, attack: AttackDef
+    ) -> tuple[str, ...]:
+        """招式有效费用含常驻修正（task 026 WP5，D-WP5-4，🔲 待核；仿 _effective_retreat_cost）。
+
+        引擎对卡牌内容零硬编码：修正读持有者自身卡文档 passive_static 的
+        modify_attack_cost 声明（月月熊 赫月ex 老练招式「血月费用减对手已拿奖赏数
+        ×【无】」；condition 在求值点判定）。args：attack=招式名（只作用该招式）、
+        value=非负 int 或 counters 计数词（如 opponent_taken_prizes，求值走
+        interpreter._eval_counter 单一点）。
+        规约：只减【无】部分、下限 0（费用不可为负，减免超过无色部分 clamp）；
+        非法 value / 未知计数词 = DslError（不猜）。来源离场/进化换栈顶即失效
+        （求值点实时读声明，天然满足）。攻击枚举与执行共用本求值点。
+        """
+        from battlefrontier.dsl.chooser import condition_met
+
+        cost = list(attack.cost)
+        doc = effect_doc(self.card_effects, mon.current.card)
+        if doc is None:
+            return tuple(cost)
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            nodes = [n for n in effect.actions if n.action == "modify_attack_cost"]
+            if not nodes:
+                continue
+            if not condition_met(effect.condition, self, player, mon):
+                continue
+            for node in nodes:
+                if node.args.get("attack") != attack.name:
+                    continue
+                v = node.args.get("value")
+                if isinstance(v, bool):
+                    raise DslError(
+                        f"modify_attack_cost 的 value 须为非负 int 或计数表达式"
+                        f"（收到 {v!r}）"
+                    )
+                if isinstance(v, str):
+                    from battlefrontier.dsl.primitives import _eval_counter
+
+                    ctx = ExecutionContext(
+                        engine=self, player=player, source=mon.current,
+                        effect_id="passive:modify_attack_cost", trigger="passive_static",
+                    )
+                    reduce_n = _eval_counter(ctx, v)
+                elif isinstance(v, int) and v >= 0:
+                    reduce_n = v
+                else:
+                    raise DslError(
+                        f"modify_attack_cost 的 value 须为非负 int 或计数表达式"
+                        f"（收到 {v!r}）"
+                    )
+                # 只减【无】部分，clamp 下限 0（D-WP5-4）
+                remove = min(reduce_n, cost.count("无"))
+                for _ in range(remove):
+                    cost.remove("无")
+        return tuple(cost)
+
     def _effective_weakness(self, attacker: int, defender: InPlayPokemon) -> str | None:
         """防守方有效弱点（task 017 妖精领域）：攻方场上有 passive_static 的
         modify_weakness 声明且防守栈顶属性命中 target_type → 弱点视为 becomes
@@ -771,15 +1075,146 @@ class GameEngine:
             return declared.get("becomes")
         return defender.current.card.weakness
 
+    def _bench_size(self, player: int) -> int:
+        """有效备战区容量（task 026 WP6 零之大空洞，D-WP6-2，🔲 待核；仿 _effective_hp）。
+
+        引擎对卡牌内容零硬编码：覆写读场上竞技场 DSL 文档 passive_static 的
+        bench_size 声明（condition 如 own_tera_in_play 逐玩家在求值点判定——
+        双方各看自己场上是否有太晶）；无竞技场 / 条件不成立 → 5；多条取 max。
+        value 须为 5..8 的 int，否则 DslError（求值点不猜）。竞技场离场即无声明可读，
+        失效由求值点语义天然保证（缩减结算走 _check_bench_shrink）。
+        """
+        stadium = self.state.stadium
+        if stadium is None:
+            return 5
+        doc = effect_doc(self.card_effects, stadium.card)
+        if doc is None:
+            return 5
+        from battlefrontier.dsl.chooser import condition_met
+
+        size = 5
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            nodes = [n for n in effect.actions if n.action == "bench_size"]
+            if not nodes:
+                continue
+            if not condition_met(effect.condition, self, player):
+                continue
+            for node in nodes:
+                v = node.args.get("value")
+                if not isinstance(v, int) or isinstance(v, bool) or v < 5 or v > 8:
+                    raise DslError(f"bench_size 的 value 须为 5..8 的 int（收到 {v!r}）")
+                size = max(size, v)
+        return size
+
+    def _check_bench_shrink(self, *, first: int | None, resume: tuple[int, str]) -> bool:
+        """备战区失效缩减检查（task 026 WP6，D-WP6-2）：任一玩家备战数超有效容量
+        → 进 bench_shrink 阶段，超容方按队列逐只自选弃置；双方同缩由 first
+        （旧竞技场持有者）先执行。缩减完成后按 resume 恢复（("main") 回出牌方
+        主阶段 / ("begin_turn") 开始该方回合）。返回是否进入了缩减阶段。
+        """
+        overflow = [
+            i for i in (0, 1)
+            if len(self.state.players[i].bench) > self._bench_size(i)
+        ]
+        if not overflow:
+            return False
+        if first is not None and first in overflow:
+            overflow = [first] + [i for i in overflow if i != first]
+        self.state = self.state.model_copy(update={
+            "phase": "bench_shrink", "current_player": overflow[0],
+            "bench_shrink_queue": tuple(overflow), "bench_shrink_resume": resume,
+        })
+        return True
+
+    def _do_shrink_bench(self, player: int, action: Action) -> None:
+        """失效缩减执行（D-WP6-2）：所选备战宝可梦整叠（进化链+能量+道具）进弃牌区
+        ——非昏厥（无奖赏、不进换上队列、不触发昏厥事件）；缩减至不超容后推进队列，
+        队列空则按 bench_shrink_resume 恢复。"""
+        p = self.state.players[player]
+        iid = action.choices[0]
+        idx = next(i for i, m in enumerate(p.bench) if m.current.iid == iid)
+        mon = p.bench[idx]
+        pile = mon.stack + mon.attached_energy + (
+            (mon.attached_tool,) if mon.attached_tool is not None else ()
+        )
+        self._set_player(player, p.model_copy(update={
+            "bench": p.bench[:idx] + p.bench[idx + 1:],
+            "discard": p.discard + pile,
+        }))
+        self._emit("bench_shrink", player, iid=iid, name=mon.current.card.name)
+        if len(self.state.players[player].bench) > self._bench_size(player):
+            return  # 仍超容：同一玩家继续逐只弃置
+        queue = self.state.bench_shrink_queue[1:]
+        self.state = self.state.model_copy(update={"bench_shrink_queue": queue})
+        if queue:
+            self.state = self.state.model_copy(update={
+                "phase": "bench_shrink", "current_player": queue[0],
+            })
+            return
+        resume = self.state.bench_shrink_resume
+        assert resume is not None  # 进入 bench_shrink 阶段时必已设置
+        self.state = self.state.model_copy(update={"bench_shrink_resume": None})
+        if resume[1] == "begin_turn":
+            self._begin_turn(resume[0])
+        else:
+            self.state = self.state.model_copy(update={
+                "phase": "main", "current_player": resume[0],
+            })
+
+    def _protected_from_attack_effects(self, mon: InPlayPokemon, owner: int) -> bool:
+        """招式附加效果免疫判定（task 026 WP6 火恐龙 闪焰之幕，D-WP6-7，🔲 待核）。
+
+        引擎对卡牌内容零硬编码：读持有者卡文档 passive_static 的 protection 声明
+        （scope=opponent_attack_effects；未知 scope = DslError 求值点不猜），
+        condition 在求值点判定。由效果落点（place_damage_counters / apply_status）
+        在 ctx.trigger == "on_attack" 时调用——训练家卡效果不经本判定（不受保护），
+        伤害本体也不经本判定（不免疫）。
+        一期守卫落点清单：apply_status / place_damage_counters / lock_retreat /
+        devolve——新增攻击效果落点须显式评估是否接入本守卫（不接 = 不受保护，不猜）。
+        """
+        doc = effect_doc(self.card_effects, mon.current.card)
+        if doc is None:
+            return False
+        from battlefrontier.dsl.chooser import condition_met
+
+        declared = False
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            nodes = [n for n in effect.actions if n.action == "protection"]
+            if not nodes:
+                continue
+            for node in nodes:
+                scope = node.args.get("scope")
+                if scope != "opponent_attack_effects":
+                    raise DslError(
+                        f"protection 的 scope 暂仅支持 opponent_attack_effects"
+                        f"（收到 {scope!r}；不猜）"
+                    )
+            if not condition_met(effect.condition, self, owner, mon):
+                continue
+            declared = True
+        return declared
+
+
     def check_knockouts(self) -> None:
         """任意伤害来源后的统一昏厥检查入口（rules-manual §8；§7.2 检查后结算同源）。
 
-        扫描双方备战区与战斗场，伤害 ≥ 最大 HP（含道具修正，_effective_hp）即昏厥：
-        整叠（进化链+能量+道具）进弃牌堆、对手按规则盒拿取奖赏；战斗场昏厥进换上
-        （promote）流程，备战昏厥无需换上。
-        双方同时多只昏厥的结算顺序见 rules-manual 附录待核清单（当前伤害源为单体
-        招式，不会触发）。
+        多昏厥扫描（task 026 WP2）：按 玩家0→1、备战区→战斗场 顺序结算全部昏厥
+        （D-WP2-2，🔲 待核）——整叠（进化链+能量+道具）进弃牌堆、对手按规则盒拿取奖赏；
+        对手拿完奖赏立即获胜时清空换上队列并终止结算。
+        战斗场昏厥：无备战 → 场上无宝可梦判负（§8 胜利条件②）；双方本次扫描后都无
+        战斗场且无备战 → 平局（§8 同时胜利口径，🔲 待核）；有备战 → 入 promote_queue
+        （不重复入队）。扫描结束后队列非空且不在效果执行中 → 立即进 promote 阶段；
+        效果进行中则只入队不翻阶段（由 _run_or_suspend 完成路径翻，D-WP2-1）。
         """
+        wiped: list[int] = []  # 本次扫描后场上无宝可梦（战斗场昏厥且备战空）的玩家
+        # 白蕾雅奖赏加成（task 026 WP5，D-WP5-2）：取走并清空招式伤害瞬时记录——
+        # 本次扫描内的战斗场昏厥若由太晶宝可梦招式伤害导致，take_prize 触点加成
+        attack_ctx = self._attack_damage_active
+        self._attack_damage_active = None
         for player in (0, 1):
             p = self.state.players[player]
             # 备战区昏厥
@@ -787,6 +1222,7 @@ class GameEngine:
             for b in p.bench:
                 if b.damage >= self._effective_hp(b, player):
                     if self._knockout_one(player, b):
+                        self.state = self.state.model_copy(update={"promote_queue": ()})
                         return  # 对手拿完奖赏，立即获胜
                 else:
                     kept.append(b)
@@ -798,22 +1234,51 @@ class GameEngine:
             if p.active and p.active.damage >= self._effective_hp(p.active, player):
                 active = p.active
                 self._set_player(player, p.model_copy(update={"active": None}))
-                if self._knockout_one(player, active):
+                if self._knockout_one(player, active, active_ko=True,
+                                      attack_ctx=attack_ctx):
+                    self.state = self.state.model_copy(update={"promote_queue": ()})
                     return
                 d = self.state.players[player]
                 if not d.bench:
-                    # 【rules-manual §8 胜利条件②】战斗场昏厥且备战区无可换上
-                    self._game_over(winner=1 - player, reason="no_pokemon")
-                    return
-                self.state = self.state.model_copy(update={
-                    "phase": "promote", "current_player": player,
-                })
-                return
+                    wiped.append(player)  # 战斗场昏厥且备战区无可换上
+                elif player not in self.state.promote_queue:
+                    self.state = self.state.model_copy(update={
+                        "promote_queue": self.state.promote_queue + (player,),
+                    })
+        if len(wiped) == 2:
+            # 【rules-manual §8 同时胜利口径】双方同时无场上宝可梦 → 平局（🔲 待核）
+            self._game_over(winner=None, reason="no_pokemon", is_draw=True)
+            return
+        if wiped:
+            # 【rules-manual §8 胜利条件②】战斗场昏厥且备战区无可换上
+            self._game_over(winner=1 - wiped[0], reason="no_pokemon")
+            return
+        # 招式昏厥触发器排水（task 026 WP6，own_ko_by_attack）：先于 promote 翻阶段——
+        # 被昏厥方场上的触发效果（如仙人掌反伤）在其宝可梦换上之前结算；被触发效果
+        # 以 completion="attack" 发动且发动前置 turn_after_promote=被攻击方，其完成
+        # 路径统一翻 promote，换上后回合权归被攻击方（D-WP6-6）。
+        if (
+            self.state.pending_ko_triggers
+            and not self._in_effect
+            and self._drain_event_triggers()
+        ):
+            return
+        if self.state.promote_queue and not self._in_effect:
+            self.state = self.state.model_copy(update={
+                "phase": "promote", "current_player": self.state.promote_queue[0],
+            })
 
-    def _knockout_one(self, player: int, knocked_mon: InPlayPokemon) -> bool:
+    def _knockout_one(
+        self, player: int, knocked_mon: InPlayPokemon, *, active_ko: bool = False,
+        attack_ctx: tuple[int, bool, int | None] | None = None,
+    ) -> bool:
         """结算一只昏厥：整叠（进化链 + 能量 + 道具）进弃牌堆，对手按规则盒拿奖赏
         （rules-manual §1.4/§8，不看正面；任意顺序拿取暂以固定取顶实现，统计等价）。
 
+        白蕾雅奖赏加成（task 026 WP5，D-WP5-2 🔲 待核）：take_prize 触点——
+        拿取方 extra_prize_tera_ko 回合标记在 且 本昏厥为战斗场（active_ko）且
+        由拿取方太晶宝可梦招式伤害导致（attack_ctx）→ 多拿 1 张；奖赏不足按剩余
+        拿取（拿完即胜，由下方 prizes 空判定承接）。
         返回 True 表示对手拿完奖赏立即获胜（胜利条件①，调用方停止后续结算）。
         """
         p = self.state.players[player]
@@ -824,6 +1289,19 @@ class GameEngine:
             "discard": p.discard + pile,
         }))
         self._emit("knockout", player, name=knocked_mon.current.card.name)
+        # 招式昏厥触发器入队（task 026 WP6，own_ko_by_attack）：战斗场被对手招式伤害
+        # 昏厥 → 记录（被昏厥方, 被昏厥栈顶 iid, 攻击方栈顶 iid）；分发在
+        # check_knockouts 扫描结束后 / _run_or_suspend 完成路径统一进行（离场即失效）
+        if (
+            active_ko
+            and attack_ctx is not None
+            and attack_ctx[0] == 1 - player
+            and attack_ctx[2] is not None
+        ):
+            self.state = self.state.model_copy(update={
+                "pending_ko_triggers": self.state.pending_ko_triggers
+                + ((player, knocked_mon.current.iid, attack_ctx[2]),),
+            })
         # 跨回合标记（task 017 化危为吉）：「上一个对手的回合」内我方宝可梦昏厥——
         # 昏厥归属方不是当前回合方时置位，其回合结束时清除（_on_turn_end）
         if player != self.state.current_player:
@@ -834,6 +1312,15 @@ class GameEngine:
         taker_idx = 1 - player
         taker = self.state.players[taker_idx]
         n = PRIZE_BY_RULE_BOX.get(knocked_mon.current.card.rule_box or "", 1)
+        if (
+            active_ko
+            and attack_ctx is not None
+            and attack_ctx[0] == taker_idx
+            and attack_ctx[1]
+            and taker.extra_prize_tera_ko
+        ):
+            n += 1  # 白蕾雅：太晶宝可梦招式伤害昏厥对手战斗场 → 多拿 1 张
+            self._emit("prize_bonus", taker_idx, source="extra_prize_tera_ko")
         taken = taker.prizes[:n]
         self._set_player(taker_idx, taker.model_copy(update={
             "hand": taker.hand + taken, "prizes": taker.prizes[len(taken):],
@@ -852,19 +1339,39 @@ class GameEngine:
         bench = p.bench[: action.bench_index] + p.bench[action.bench_index + 1 :]  # type: ignore[index]
         self._set_player(player, p.model_copy(update={"active": new_active, "bench": bench}))
         self._emit("promote", player, name=new_active.current.card.name)
-        # 主阶段内换上（task 025 bounce：效果致战斗场空置）：换上后继续当前主阶段，
-        # 不推进回合、不抽牌（与昏厥换上不同——回合未被攻击消耗）
-        if self.state.promote_to_main:
+        # 多昏厥换上队列（task 026 WP2，D-WP2-2）：逐条弹出，未空则继续下一位换上
+        queue = self.state.promote_queue
+        if queue:
+            queue = queue[1:]
+            self.state = self.state.model_copy(update={"promote_queue": queue})
+        if queue:
             self.state = self.state.model_copy(update={
-                "promote_to_main": False, "phase": "main",
+                "phase": "promote", "current_player": queue[0],
             })
+            return
+        # 效果内昏厥/bounce 的换上：队列清空后回效果方主阶段（D-WP2-1；
+        # D-WP2-4 归并 task 025 promote_to_main）——不推进回合、不抽牌
+        resume = self.state.resume_after_promotes
+        if resume is not None:
+            self.state = self.state.model_copy(update={
+                "resume_after_promotes": None,
+                "phase": resume[1], "current_player": resume[0],
+            })
+            # 失效缩减复查（task 026 WP6，D-WP6-2）：bounce 战斗场唯一太晶后换上
+            # 完成时太晶已离场——恢复主阶段前复查超容（resume 原样传递）
+            self._check_bench_shrink(first=None, resume=resume)
             return
         # 换上后回合权：默认换上方回合（普通昏厥）；turn_after_promote 置位时给指定方
         # （混乱反面自我昏厥：攻击已消耗，回合权给对手——D1 决议 task 013）
         nxt = self.state.turn_after_promote
         if nxt is not None:
             self.state = self.state.model_copy(update={"turn_after_promote": None})
-        self._begin_turn(nxt if nxt is not None else player)
+        target = nxt if nxt is not None else player
+        # 备战区缩编复查（task 026 WP6，零之大空洞）：昏厥/换上后竞技场可能已被顶掉，
+        # 超容方按 shrink_bench 阶段逐个弃置，全部完成后才开回合（D-WP6-2）
+        if self._check_bench_shrink(first=None, resume=(target, "begin_turn")):
+            return
+        self._begin_turn(target)
 
     def _do_end_turn(self, player: int, action: Action) -> None:
         self._emit("end_turn", player)
@@ -923,6 +1430,9 @@ class GameEngine:
         *, inner: tuple[str, str, str] | None = None, outer_cursor: int = -1,
         outer_choice: tuple[int, ...] = (), inner_done: bool = False,
         flip: bool | None = None,
+        cost_discarded: tuple[int, ...] = (),
+        discarded_count: int = 0,
+        attacker_iid: int | None = None,
     ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
@@ -932,6 +1442,10 @@ class GameEngine:
         flip（task 025）：挂起冻结的掷币结果，恢复时穿透进 ctx.last_flip；
         嵌套帧内层完成恢复外层时不穿透（外层 copy 节点后接掷币门控节点的组合
         会在解释器显式 DslError——不猜，需要时再扩展多级冻结）。
+        cost_discarded（task 026 WP4）：挂起冻结的 cost 段弃置 iid，恢复时穿透进
+        ctx.cost_discarded_iids（同 flip 口径，嵌套帧不穿透）。
+        discarded_count（task 026 WP5）：挂起冻结的前序弃置张数，恢复时穿透进
+        ctx.discarded_this_effect（同 flip 口径，嵌套帧不穿透）。
         """
         from battlefrontier.dsl.chooser import build_pending
 
@@ -953,7 +1467,14 @@ class GameEngine:
             effect_id=effect_id, trigger=effect.trigger,
         )
         ctx.inner_done = inner_done
-        need = run_effect(ctx, effect, start=start, choice=choice, carry=carry, flip=flip)
+        ctx.attacker_iid = attacker_iid
+        self._in_effect = True
+        try:
+            need = run_effect(ctx, effect, start=start, choice=choice, carry=carry,
+                              flip=flip, cost_discarded=cost_discarded,
+                              discarded_count=discarded_count)
+        finally:
+            self._in_effect = False
         if need is not None:
             if need.inner is not None:
                 if inner is not None:
@@ -985,19 +1506,48 @@ class GameEngine:
             return
         # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置；
         # 攻击结算完毕推进对手回合（rules-manual §6：攻击后回合结束）。
-        # 效果内若已触发换上/终局（check_knockouts），不覆盖其阶段。
         if completion == "trainer":
             p = self.state.players[player]
             self._set_player(player, p.model_copy(update={"discard": p.discard + (card,)}))
+        # 事件触发队列排水（task 026 WP3/WP6，用户裁决 2026-09-07）：DSL 进化路径
+        # （神奇糖果 skip_stage zone="hand"）入队的 own_evolve_from_hand 与招式昏厥
+        # 入队的 own_ko_by_attack 在效果全部结算完毕后统一分发——先于 promote 翻阶段；
+        # 来源已不在场上 / condition 不满足则跳过排下一条（own_evolve 离场即失效；
+        # own_ko_by_attack 从弃牌堆找回来源）；实际发动则交棒（被触发效果的自身完成
+        # 路径递归排剩余队列 / 翻 promote / 回主阶段，本层不再执行后续收尾）
+        if self.state.phase != "game_over" and self._drain_event_triggers():
+            return
+        # 效果内昏厥的推迟换上（task 026 WP2，D-WP2-1/2）：队列非空 → 统一进 promote
+        # 阶段；ability/trainer/stadium 完成后回效果方主阶段（resume_after_promotes），
+        # attack 不设（换上后默认 begin_turn(换上方)=防守方回合开始，与现行为一致）
+        if self.state.phase != "game_over" and self.state.promote_queue:
+            update: dict[str, object] = {
+                "phase": "promote",
+                "current_player": self.state.promote_queue[0],
+                "pending_choice": None,
+            }
+            if completion in ("ability", "trainer", "stadium"):
+                update["resume_after_promotes"] = (player, "main")
+            self.state = self.state.model_copy(update=update)
+            return
+        # 效果内若已终局（game_over）或翻上换阶段（bounce 直接翻），不覆盖其阶段。
         if self.state.phase in ("main", "choice"):
             if completion == "attack":
                 self.state = self.state.model_copy(update={"pending_choice": None})
                 self._on_turn_end(player)
+                # 失效缩减复查（task 026 WP6 零之大空洞，D-WP6-2 触点②③：
+                # transform/bounce/昏厥等离场在效果结算完毕后统一复查——沿用
+                # bench_shrink 挂起-恢复机制；check_knockouts 触点①经本路径覆盖，
+                # 效果中途不翻阶段）——超容方缩减完成后 begin_turn（对手）
+                if self._check_bench_shrink(first=None, resume=(1 - player, "begin_turn")):
+                    return
                 self._begin_turn(1 - player)
             else:
-                self.state = self.state.model_copy(update={
-                    "phase": "main", "pending_choice": None,
-                })
+                self.state = self.state.model_copy(update={"pending_choice": None})
+                # 同上（D-WP6-2）：trainer/ability/stadium 完成后回效果方主阶段前复查
+                if self._check_bench_shrink(first=None, resume=(player, "main")):
+                    return
+                self.state = self.state.model_copy(update={"phase": "main"})
         else:
             self.state = self.state.model_copy(update={"pending_choice": None})
 
@@ -1045,7 +1595,10 @@ class GameEngine:
                              start=pc.cursor, choice=action.choices,
                              carry=pc.payload, completion=pc.completion,
                              inner=pc.inner, outer_cursor=pc.outer_cursor,
-                             outer_choice=pc.outer_choice, flip=pc.flip_result)
+                             outer_choice=pc.outer_choice, flip=pc.flip_result,
+                             cost_discarded=pc.cost_discarded,
+                             discarded_count=pc.discarded_count,
+                             attacker_iid=pc.attacker_iid)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。
@@ -1072,6 +1625,24 @@ class GameEngine:
         self.state = self.state.model_copy(update={
             "turn": turn, "current_player": player, "phase": "draw",
         })
+        # 攻击冷却解禁（task 026 WP4 裁决 2）：攻击于 turn N → 下个自己回合（N+1）
+        # 仍锁 → N+2 回合开始解禁（turn 仅在先攻方回合开始递增）
+        p = self.state.players[player]
+        if any(
+            m.attack_lock_turn is not None and turn - m.attack_lock_turn >= 2
+            for m in ([p.active] if p.active else []) + list(p.bench)
+        ):
+            def _unlock(mon: InPlayPokemon) -> InPlayPokemon:
+                if mon.attack_lock_turn is not None and turn - mon.attack_lock_turn >= 2:
+                    return mon.model_copy(update={
+                        "attack_locks": (), "attack_lock_turn": None,
+                    })
+                return mon
+
+            self._set_player(player, p.model_copy(update={
+                "active": _unlock(p.active) if p.active else None,
+                "bench": tuple(_unlock(m) for m in p.bench),
+            }))
         if not p.deck:
             self._emit("deck_out", player)
             self._game_over(winner=1 - player, reason="deck_out")

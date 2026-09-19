@@ -1,0 +1,17 @@
+# 暗码迷的解读（CSV7C-191，支援者）
+# text_raw 原文：「选择自己牌库中任意2张卡牌。将剩余的牌库重洗，将选择的卡牌以任意顺序
+# 重新排列，放回牌库上方。」
+# 有序牌顶去向（task 026 WP6，D-WP6-5 🔲 待核）：search_deck destination=deck_top +
+# args.ordered=true——选择顺序即牌顶 FIFO（先选的在更上方）；「任意2张」按检索统一
+# up-to 纪律从宽（min 0，牌库不足按池收缩）；「剩余的牌库重洗」在本节点内结算
+# （rest 走单一随机源 shuffle，rest=shuffle 先例），不写独立 shuffle_deck 节点。
+card:
+  name_group: 暗码迷的解读
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全赛制合法 6 印刷
+  card_ids: [CSV7C-191, CSV7C-228, CSV7C-245, CSV9.5C-185, CSVM2cC-024, SVP-198]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, choose: 2, destination: deck_top, args: {ordered: true}}

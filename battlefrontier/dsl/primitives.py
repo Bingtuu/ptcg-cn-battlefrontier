@@ -16,7 +16,13 @@ from battlefrontier.dsl.chooser import (
 from battlefrontier.dsl.interpreter import ExecutionContext, register, run_effect
 from battlefrontier.dsl.loader import DslError
 from battlefrontier.dsl.schema import ActionNode
-from battlefrontier.engine.state import InPlayPokemon, PlayerState, SpecialCondition
+from battlefrontier.engine.actions import IllegalActionError
+from battlefrontier.engine.state import (
+    CardInstance,
+    InPlayPokemon,
+    PlayerState,
+    SpecialCondition,
+)
 
 
 def _require_no_choose(node: ActionNode, name: str) -> None:
@@ -66,14 +72,105 @@ def _draw(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | Non
 
 @register("discard")
 def _discard(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
-    """手牌→弃牌区：count=all 全弃（自动）；choose=N 由 Agent 选 N 张（chooser）。"""
-    if node.selector != "own_hand":
-        raise DslError(f"discard 暂仅支持 selector=own_hand（收到 {node.selector!r}）")
-    if node.count == "all" and node.choose is None:
+    """手牌/场上附着能量→弃牌区：count=all 全弃（自动）；choose=N 由 Agent 选 N 张。
+
+    args.any_count=true（task 026 WP5，D-WP5-1）：「任意数量」= up-to all
+    （min_choose=0，max=池大小；选 0 张合法）；与 count/choose 互斥。
+    selector=own_attached_energy（task 026 WP5 猛雷鼓ex 极雷轰）：自己场上全体
+    宝可梦附着能量池（filters 如 basic_energy），摘下弃置——仅 any_count 形式。
+    结果字典恒带 discarded 张数：解释器累计进 ctx.discarded_this_effect，
+    供 damage 的 discarded_this_effect 计数词读取（×N 伤害族）。
+    """
+    if node.selector not in ("own_hand", "own_attached_energy"):
+        raise DslError(
+            f"discard 暂仅支持 selector=own_hand/own_attached_energy（收到 {node.selector!r}）"
+        )
+    any_count = node.args.get("any_count", False)
+    if not isinstance(any_count, bool):
+        raise DslError(f"discard 的 any_count 须为 bool（收到 {any_count!r}）")
+    if any_count and (node.choose is not None or node.count is not None):
+        raise DslError("discard 的 any_count 与 count/choose 互斥（「任意数量」= up-to all）")
+    if (
+        node.selector == "own_attached_energy" and not any_count
+        and not (node.choose == 1 and node.count is None)
+    ):
+        raise DslError(
+            "discard own_attached_energy 暂仅支持 args.any_count=true（任意数量）"
+            "或 choose=1（「这只宝可梦身上」定点弃 1，task 026 WP6）形式"
+            f"（收到 choose={node.choose!r}/count={node.count!r}，不猜）"
+        )
+    if node.count == "all" and node.choose is None and not any_count:
         p = ctx.player_state
         n = len(p.hand)
         ctx.set_player_state(p.model_copy(update={"hand": (), "discard": p.discard + p.hand}))
         return {"discarded": n}
+    if any_count:
+        p = ctx.player_state
+        if choice is None:
+            pool = resolve_pool(p, node.selector, node.filters)
+            if not pool:
+                return {"discarded": 0, "iids": []}  # 池空不挂起，尽力而为空结算
+            return NeedChoice(pool=node.selector, filters=node.filters,
+                              min_choose=0, max_choose=len(pool))
+        chosen_ids = set(choice)
+        if node.selector == "own_hand":
+            chosen = tuple(c for c in p.hand if c.iid in chosen_ids)
+            ctx.set_player_state(p.model_copy(update={
+                "hand": tuple(c for c in p.hand if c.iid not in chosen_ids),
+                "discard": p.discard + chosen,
+            }))
+            return {"discarded": len(chosen), "iids": list(choice)}
+        # own_attached_energy：从各持有宝可梦身上摘下弃置
+        def strip(mon: InPlayPokemon) -> InPlayPokemon:
+            if not any(e.iid in chosen_ids for e in mon.attached_energy):
+                return mon
+            return mon.model_copy(update={
+                "attached_energy": tuple(
+                    e for e in mon.attached_energy if e.iid not in chosen_ids
+                ),
+            })
+
+        mons = ([p.active] if p.active else []) + list(p.bench)
+        moved = tuple(e for m in mons for e in m.attached_energy if e.iid in chosen_ids)
+        ctx.set_player_state(p.model_copy(update={
+            "active": strip(p.active) if p.active else None,
+            "bench": tuple(strip(m) for m in p.bench),
+            "discard": p.discard + moved,
+        }))
+        return {"discarded": len(moved), "iids": list(choice)}
+    if node.selector == "own_attached_energy":
+        # choose=1（task 026 WP6，火恐龙 大字爆炎「选择这只宝可梦身上附着的1张能量」）：
+        # 池收窄为来源宝可梦附着能量（其他自己宝可梦的能量经 exclude_iids 剔除）；
+        # 来源无匹配能量 → no-op 不挂起（伤害等前序/后续节点照算，清单 28）
+        source_mon = _find_source_mon(ctx)
+        if source_mon is None:
+            raise DslError("discard own_attached_energy choose=1：来源宝可梦不在场上")
+        p = ctx.player_state
+        if choice is None:
+            pool = tuple(e for e in source_mon.attached_energy
+                         if matches(e, node.filters))
+            if not pool:
+                return {"discarded": 0, "iids": []}
+            others = tuple(
+                e.iid
+                for m in ([p.active] if p.active else []) + list(p.bench)
+                if m.current.iid != source_mon.current.iid
+                for e in m.attached_energy
+            )
+            return NeedChoice(pool="own_attached_energy", filters=node.filters,
+                              min_choose=1, max_choose=1, exclude_iids=others)
+        slot, idx, holder = ctx.engine._find_in_play(p, source_mon.current.iid)
+        moved = tuple(e for e in holder.attached_energy if e.iid in choice)
+        holder = holder.model_copy(update={
+            "attached_energy": tuple(e for e in holder.attached_energy
+                                     if e.iid not in choice),
+        })
+        ctx.set_player_state(
+            ctx.engine._replace_in_play(p, slot, idx, holder).model_copy(update={
+                "discard": p.discard + moved,
+            })
+        )
+        return {"discarded": len(moved), "iids": list(choice)}
     if node.choose is not None:
         if choice is None:
             return NeedChoice(pool="own_hand", min_choose=node.choose, max_choose=node.choose)
@@ -93,26 +190,177 @@ def _search_deck(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
 
     规则出处：检索为 up-to 语义（牌库非公开区域，可以不找，min_choose=0）；
     检索后必须洗牌（由后续 shuffle_deck 节点表达，DSL 编写纪律）。
-    destination=bench = 直放备战区（巢穴球/深钵镇），登场联动 entered_play_this_turn。
+    destination=bench = 直放备战区（巢穴球/深钵镇），登场联动 entered_play_this_turn；
+    备战区 5 只容量上限在池解析即截断（task 026 WP3，超出容量的匹配经 exclude 剔除）。
+
+    top_n 检视（task 026 WP3，多龙奇 侦察指令）：args.top_n=N 检视牌库顶 N 张为选择池
+    （其余牌经 exclude_iids 剔除）；args.rest=deck_top|deck_bottom 指定未选卡归位
+    （按原序，不洗牌——检视语义无洗牌义务，DSL 不写 shuffle_deck 节点）；
+    args.rest=shuffle（task 026 WP4，米立龙 揽客/宝可装置3.0「剩余放回牌库并重洗」）：
+    未选卡与牌库其余合并后整库重洗（本节点直接洗牌，DSL 不再写 shuffle_deck 节点——
+    重复洗牌 = 种子消耗差异）；空选（选 0 张）/窗内无匹配时重洗依然成立（清单 3）。
+    私密检视观测纪律：事件流只落选择结果，未选卡不落任何事件（清单 9）。
     """
     if node.selector != "own_deck":
         raise DslError(f"search_deck 暂仅支持 selector=own_deck（收到 {node.selector!r}）")
-    if node.destination not in ("hand", "bench"):
-        raise DslError(f"search_deck 暂仅支持 destination=hand/bench（收到 {node.destination!r}）")
-    if node.choose is None:
+    if node.destination not in ("hand", "bench", "deck_top"):
+        raise DslError(
+            f"search_deck 暂仅支持 destination=hand/bench/deck_top"
+            f"（收到 {node.destination!r}）"
+        )
+    # ── task 026 WP6 扩展形态校验（choose_groups / distinct+split / deck_top ordered）
+    choose_groups = node.args.get("choose_groups")
+    distinct = node.args.get("distinct")
+    split = node.args.get("split")
+    ordered = node.args.get("ordered", False)
+    if not isinstance(ordered, bool):
+        raise DslError(f"search_deck 的 ordered 须为 bool（收到 {ordered!r}）")
+    if choose_groups is not None:
+        # 小刚的发掘 二选一组合约束（D-WP6-3）：组间互斥、组内自带 choose/filters，
+        # 仅 hand 去向，与 top_n/rest 检视互斥
+        if node.choose is not None or node.filters:
+            raise DslError(
+                "search_deck 的 choose_groups 与 choose/filters 互斥"
+                "（组内自带 choose/filters，不猜混合语义）"
+            )
+        if node.destination != "hand":
+            raise DslError(
+                f"search_deck 的 choose_groups 暂仅支持 destination=hand"
+                f"（收到 {node.destination!r}）"
+            )
+        if node.args.get("top_n") is not None or node.args.get("rest") is not None:
+            raise DslError("search_deck 的 choose_groups 与 top_n/rest 互斥（不猜）")
+        if not isinstance(choose_groups, (list, tuple)) or not choose_groups:
+            raise DslError(
+                f"search_deck 的 choose_groups 须为非空组列表（收到 {choose_groups!r}）"
+            )
+        for g in choose_groups:
+            if (
+                not isinstance(g, dict)
+                or "choose" not in g
+                or "filters" not in g
+                or not isinstance(g["choose"], int)
+                or isinstance(g["choose"], bool)
+                or g["choose"] <= 0
+            ):
+                raise DslError(
+                    f"search_deck 的 choose_groups 组需要 choose=正 int + filters"
+                    f"（收到 {g!r}）"
+                )
+    if distinct is not None:
+        # 赤松 属性互异 + 拆分去向（D-WP6-4）：distinct 与 split 必须成对出现
+        if distinct != "energy_type":
+            raise DslError(
+                f"search_deck 的 distinct 暂仅支持 energy_type（收到 {distinct!r}）"
+            )
+        if split is None:
+            raise DslError(
+                "search_deck 的 distinct 需要配合 args.split（拆分去向，不猜）"
+            )
+    if split is not None:
+        if split != "hand_attach":
+            raise DslError(
+                f"search_deck 的 split 暂仅支持 hand_attach（收到 {split!r}）"
+            )
+        if distinct is None:
+            raise DslError("search_deck 的 split 需要配合 args.distinct（不猜）")
+        if node.destination != "hand":
+            raise DslError(
+                f"search_deck 的 split=hand_attach 暂仅支持 destination=hand"
+                f"（收到 {node.destination!r}）"
+            )
+    if node.destination == "deck_top":
+        # 暗码迷的解读（D-WP6-5）：选择顺序即牌顶 FIFO，必须显式 ordered=true
+        if ordered is not True:
+            raise DslError(
+                "search_deck destination=deck_top 需要 args.ordered=true"
+                "（选择顺序即牌顶 FIFO；不猜无序语义）"
+            )
+    elif ordered:
+        raise DslError(
+            f"search_deck 的 ordered 仅 deck_top 去向可用"
+            f"（收到 destination={node.destination!r}）"
+        )
+    if node.choose is None and choose_groups is None:
         raise DslError("search_deck 需要 choose=N（检索必须经 chooser 交互选择）")
     choose = node.choose
+    top_n = node.args.get("top_n")
+    rest = node.args.get("rest")
+    if top_n is not None:
+        if not isinstance(top_n, int) or isinstance(top_n, bool) or top_n <= 0:
+            raise DslError(f"search_deck 的 top_n 须为正 int（收到 {top_n!r}）")
+        if choose > top_n:
+            raise DslError(f"search_deck 的 choose={choose} 不可超过 top_n={top_n}（不猜）")
+        if rest not in ("deck_top", "deck_bottom", "shuffle"):
+            raise DslError(
+                f"search_deck top_n 检视需要 args.rest=deck_top/deck_bottom/shuffle"
+                f"（收到 {rest!r}）"
+            )
+    elif rest is not None:
+        raise DslError("search_deck 的 args.rest 需配合 top_n 使用（不猜）")
+    if choose_groups is not None:
+        return _search_deck_choose_groups(ctx, node, choose_groups, choice)
+    if distinct is not None:
+        return _search_deck_distinct_split(ctx, node, choice)
     if choice is None:
-        # 池空不挂起：尽力而为（空结算，洗牌仍由后续节点执行）
-        if not resolve_pool(ctx.player_state, "own_deck", node.filters):
+        p = ctx.player_state
+        window = p.deck[:top_n] if top_n is not None else p.deck
+        pool = tuple(c for c in window if matches(c, node.filters))
+        excluded: tuple[int, ...] = ()
+        if top_n is not None:
+            excluded += tuple(c.iid for c in p.deck[len(window):])  # 检视窗外不进池
+        if node.destination == "bench":
+            capacity = ctx.engine._bench_size(ctx.player) - len(p.bench)
+            excluded += tuple(c.iid for c in pool[capacity:])
+            pool = pool[:capacity]
+        # 池空不挂起：尽力而为（空结算）；rest=shuffle 时「剩余放回牌库并重洗」
+        # 在窗内无匹配（=空选）时依然成立（task 026 WP4 清单 3）——整库重洗；
+        # deck_top（task 026 WP6）同口径：余库重洗义务不随空池免除
+        if not pool:
+            if rest == "shuffle" or node.destination == "deck_top":
+                ctx.set_player_state(p.model_copy(update={
+                    "deck": ctx.engine.rng.shuffle(p.deck),
+                }))
             return {"found": 0, "iids": [], "destination": node.destination}
-        return NeedChoice(
+        if node.destination in ("bench", "deck_top"):
+            max_choose = min(choose, len(pool))
+        else:
+            max_choose = choose
+        need = NeedChoice(
             pool="own_deck", filters=node.filters,
-            min_choose=0, max_choose=choose, destination=node.destination,
+            min_choose=0, max_choose=max_choose, destination=node.destination,
+            exclude_iids=excluded,
         )
+        need.ordered = ordered  # deck_top：选择顺序即牌顶 FIFO（排列枚举）
+        return need
     p = ctx.player_state
+    if node.destination == "deck_top":
+        # deck_top 恢复（task 026 WP6 暗码迷的解读，D-WP6-5）：选择顺序即牌顶 FIFO，
+        # 未选余库在本节点内整库重洗（DSL 不写 shuffle_deck 节点——重复洗牌 =
+        # 种子消耗差异）；选 0 → 仅整库重洗（「剩余的牌库重洗」空选依然成立）
+        picked_top = tuple(
+            next(c for c in p.deck if c.iid == iid) for iid in choice
+        )
+        rest_deck = tuple(c for c in p.deck if c.iid not in choice)
+        ctx.set_player_state(p.model_copy(update={
+            "deck": picked_top + ctx.engine.rng.shuffle(rest_deck),
+        }))
+        return {"found": len(picked_top), "iids": list(choice),
+                "destination": "deck_top"}
     picked = tuple(c for c in p.deck if c.iid in choice)
-    p = p.model_copy(update={"deck": tuple(c for c in p.deck if c.iid not in choice)})
+    if top_n is not None:
+        # 检视模式：rest=shuffle 时未选卡与牌库其余合并后整库重洗（task 026 WP4）；
+        # deck_bottom / deck_top 按原序归位，窗口外不动、不洗牌
+        window = p.deck[:top_n]
+        rest_cards = tuple(c for c in window if c.iid not in choice)
+        tail = p.deck[top_n:]
+        if rest == "shuffle":
+            deck = ctx.engine.rng.shuffle(rest_cards + tail)
+        else:
+            deck = tail + rest_cards if rest == "deck_bottom" else rest_cards + tail
+        p = p.model_copy(update={"deck": deck})
+    else:
+        p = p.model_copy(update={"deck": tuple(c for c in p.deck if c.iid not in choice)})
     if node.destination == "hand":
         p = p.model_copy(update={"hand": p.hand + picked})
     else:  # bench：直放备战区，当回合登场（不可进化联动）
@@ -126,6 +374,103 @@ def _search_deck(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     return {"found": len(picked), "iids": list(choice), "destination": node.destination}
 
 
+def _search_deck_choose_groups(
+    ctx: ExecutionContext, node: ActionNode,
+    groups: list | tuple, choice: tuple[int, ...] | None,
+) -> dict[str, object] | NeedChoice:
+    """choose_groups 组间互斥检索（task 026 WP6 小刚的发掘，D-WP6-3）：各组按自身
+    filters 在牌库解析候选池、独立 up-to 组 cap，枚举取并集、跨组混合不可达；
+    仅 hand 去向（形态校验在主函数）。恢复：选中各张入手、牌库移除，
+    重洗由后续 shuffle_deck 节点表达。
+    """
+    p = ctx.player_state
+    if choice is None:
+        resolved = tuple(
+            (tuple(c.iid for c in p.deck if matches(c, tuple(g["filters"]))),
+             g["choose"])
+            for g in groups
+        )
+        if not any(pool for pool, _ in resolved):
+            return {"found": 0, "iids": [], "destination": node.destination}
+        # pool_iids = 各组池并集，由 build_pending 的 choose_groups 直通分支计算
+        # （该分支不经 resolve_pool，exclude_iids 在此无效，不传）
+        need = NeedChoice(
+            pool="own_deck", min_choose=0,
+            max_choose=max(cap for _, cap in resolved),
+            destination="hand",
+        )
+        need.choose_groups = resolved  # 组池按牌库序冻结，build_pending 直通
+        return need
+    picked = tuple(c for c in p.deck if c.iid in choice)
+    ctx.set_player_state(p.model_copy(update={
+        "hand": p.hand + picked,
+        "deck": tuple(c for c in p.deck if c.iid not in choice),
+    }))
+    return {"found": len(picked), "iids": list(choice), "destination": "hand"}
+
+
+def _search_deck_distinct_split(
+    ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None,
+) -> dict[str, object] | NeedChoice:
+    """distinct+split 三段流（task 026 WP6 赤松，D-WP6-4）：段1 选 ≤choose 张属性
+    互异能量（distinct=energy_type 分桶，桶数 < choose 自动收缩）→ 段2 从中选 1 张
+    入手 → 段3 剩余附着到自己场上 1 只宝可梦。选 0 → no-op（重洗由后续节点）；
+    选 1 → 直接入手，无段2/段3。
+
+    段标记靠 carry（PendingChoice.payload 穿透）：carry 空 = 段1恢复；
+    choice[0] ∈ carry = 段2恢复（选入手张）；否则 = 段3恢复（选附着目标）。
+    """
+    p = ctx.player_state
+    carry = ctx.carry
+    if choice is None:
+        pool = tuple(c for c in p.deck if matches(c, node.filters))
+        if not pool:
+            return {"found": 0, "iids": [], "destination": node.destination}
+        cap = min(node.choose, len({c.card.energy_type for c in pool}))  # 桶数收缩
+        need = NeedChoice(pool="own_deck", filters=node.filters,
+                          min_choose=0, max_choose=cap, destination="hand")
+        need.distinct = "energy_type"  # build_pending 冻结分桶，枚举只产互异子集
+        return need
+    if carry and choice and choice[0] in carry:
+        # 段2恢复：入手张从牌库移入手牌，剩余进入段3（附着目标选择）
+        picked = next(c for c in p.deck if c.iid == choice[0])
+        rest = tuple(i for i in carry if i != choice[0])
+        ctx.set_player_state(p.model_copy(update={
+            "hand": p.hand + (picked,),
+            "deck": tuple(c for c in p.deck if c.iid != choice[0]),
+        }))
+        return NeedChoice(pool="own_pokemon_in_play", min_choose=1, max_choose=1,
+                          carry=rest)
+    if carry:
+        # 段3恢复：剩余能量从牌库摘下，附着到所选自己场上宝可梦
+        slot, idx, mon = ctx.engine._find_in_play(p, choice[0])
+        attached = tuple(c for c in p.deck if c.iid in carry)
+        ctx.set_player_state(
+            ctx.engine._replace_in_play(p, slot, idx, mon.model_copy(update={
+                "attached_energy": mon.attached_energy + attached,
+            })).model_copy(update={
+                "deck": tuple(c for c in p.deck if c.iid not in carry),
+            })
+        )
+        return {"found": len(carry) + 1, "iids": [*carry],
+                "destination": "hand_attach", "attached_to": choice[0]}
+    # 段1恢复：选 0 → no-op；选 1 → 直接入手（无段2/段3）；≥2 → 段2 选入手张
+    if not choice:
+        return {"found": 0, "iids": [], "destination": node.destination}
+    if len(choice) == 1:
+        picked = next(c for c in p.deck if c.iid == choice[0])
+        ctx.set_player_state(p.model_copy(update={
+            "hand": p.hand + (picked,),
+            "deck": tuple(c for c in p.deck if c.iid != choice[0]),
+        }))
+        return {"found": 1, "iids": list(choice), "destination": "hand"}
+    return NeedChoice(
+        pool="own_deck", filters=node.filters, min_choose=1, max_choose=1,
+        carry=tuple(choice),
+        exclude_iids=tuple(c.iid for c in p.deck if c.iid not in choice),
+    )
+
+
 @register("shuffle_deck")
 def _shuffle_deck(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
     """重洗牌库（规则：检索牌库后必须洗牌）。"""
@@ -137,34 +482,79 @@ def _shuffle_deck(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
 
 @register("recover_from_discard")
 def _recover_from_discard(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
-    """弃牌区回收：过滤器 + 选择 + 去向（hand 入手 / deck 回牌库）。
+    """弃牌区回收：过滤器 + 选择 + 去向（hand 入手 / deck 回牌库 / bench 直放备战区）。
 
-    hand：至少 1 张（夜间担架）；deck：up-to 语义（厉害钓竿「最多3张」，min_choose=0，
-    洗牌由后续 shuffle_deck 节点表达）。无合法目标时不挂起、效果 no-op。
+    hand：至少 1 张（夜间担架）；args.up_to=true 改 up-to 语义（min_choose=0，
+    水莲的照顾「最多3张」，task 026 WP3）。deck：up-to 语义（厉害钓竿，min_choose=0，
+    洗牌由后续 shuffle_deck 节点表达）。bench（task 026 WP3，夜巡灵 渡魂）：up-to
+    （min_choose=0），必须 choose=N 形式；直放备战区为 InPlayPokemon 并登记
+    entered_play_this_turn；备战区 5 只容量上限在池解析即截断（超出经 exclude 剔除）。
+    无合法目标 / 容量 0 时不挂起、效果 no-op。
+    args.exclude_cost_discarded=true（task 026 WP4，超级能量回收「无法选择因为
+    这张卡牌的效果而被放于弃牌区的能量」）：cost 段弃置的 iid（执行上下文
+    cost_discarded_iids，挂起/恢复经 PendingChoice.cost_discarded 穿透）从池剔除；
+    无 cost 段时为空集无影响。
     """
     if node.selector != "own_discard":
         raise DslError(f"recover_from_discard 暂仅支持 selector=own_discard（收到 {node.selector!r}）")
-    if node.destination not in ("hand", "deck"):
-        raise DslError(f"recover_from_discard 暂仅支持 destination=hand/deck（收到 {node.destination!r}）")
+    if node.destination not in ("hand", "deck", "bench"):
+        raise DslError(
+            f"recover_from_discard 暂仅支持 destination=hand/deck/bench"
+            f"（收到 {node.destination!r}）"
+        )
+    up_to = node.args.get("up_to", False)
+    if not isinstance(up_to, bool):
+        raise DslError(f"recover_from_discard 的 up_to 须为 bool（收到 {up_to!r}）")
+    exclude_cost = node.args.get("exclude_cost_discarded", False)
+    if not isinstance(exclude_cost, bool):
+        raise DslError(
+            f"recover_from_discard 的 exclude_cost_discarded 须为 bool"
+            f"（收到 {exclude_cost!r}）"
+        )
+    if up_to and node.destination != "hand":
+        raise DslError(
+            f"recover_from_discard 的 up_to 仅 hand 去向可用（deck/bench 本即 up-to；"
+            f"收到 destination={node.destination!r}）"
+        )
+    if node.destination == "bench" and node.choose is None:
+        raise DslError("recover_from_discard 的 bench 去向需要 choose=N（不猜 count 形式）")
     choose = node.choose or (node.count if isinstance(node.count, int) else None)
     if choose is None:
         raise DslError("recover_from_discard 需要 choose=N 或 count=int")
     if choice is None:
         targets = tuple(c for c in ctx.player_state.discard if matches(c, node.filters))
+        excluded: tuple[int, ...] = ()
+        if exclude_cost and ctx.cost_discarded_iids:
+            excluded += tuple(ctx.cost_discarded_iids)
+            targets = tuple(c for c in targets if c.iid not in excluded)
+        if node.destination == "bench":
+            capacity = ctx.engine._bench_size(ctx.player) - len(ctx.player_state.bench)
+            excluded = tuple(c.iid for c in targets[capacity:])
+            targets = targets[:capacity]
         if not targets:
             return {"found": 0, "iids": [], "destination": node.destination}
+        min_choose = 0 if (node.destination != "hand" or up_to) else 1
+        max_choose = min(choose, len(targets)) if node.destination == "bench" else choose
         return NeedChoice(
             pool="own_discard", filters=node.filters,
-            min_choose=1 if node.destination == "hand" else 0,
-            max_choose=choose, destination=node.destination,
+            min_choose=min_choose, max_choose=max_choose, destination=node.destination,
+            exclude_iids=excluded,
         )
     p = ctx.player_state
     picked = tuple(c for c in p.discard if c.iid in choice)
     update: dict[str, object] = {"discard": tuple(c for c in p.discard if c.iid not in choice)}
     if node.destination == "hand":
         update["hand"] = p.hand + picked
-    else:  # deck：回牌库上方（洗牌由后续节点执行）
+    elif node.destination == "deck":  # 回牌库上方（洗牌由后续节点执行）
         update["deck"] = p.deck + picked
+    else:  # bench：直放备战区，当回合登场（不可进化联动）
+        bench = p.bench
+        entered = p.entered_play_this_turn
+        for c in picked:
+            bench = bench + (InPlayPokemon(stack=(c,)),)
+            entered = entered | {c.iid}
+        update["bench"] = bench
+        update["entered_play_this_turn"] = entered
     ctx.set_player_state(p.model_copy(update=update))
     return {"found": len(picked), "iids": list(choice), "destination": node.destination}
 
@@ -178,6 +568,17 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
     如 would_survive_20 = 「对会被昏厥的宝可梦无法使用」精神拥抱守卫）；
     args.damage_counters 附着后在目标身上放伤害指示物（每个 10 伤害）。
     完成后统一 check_knockouts（守卫外的理论兜底）。
+
+    args.multi_target=true（task 026 WP3，奥琳博士的气魄「最多2只各附着1张」）：
+    段1 选能量 up-to N（min_choose=0）→ 段2 选等量目标（args.target_filters，
+    min 收缩至 min(能量数, 目标池大小)，D-WP3-1）→ 按选择顺序 FIFO 一一配对，
+    每只目标各附 1 张；未配对能量留弃牌区。任一侧为空 no-op 不挂起。
+
+    args.target_pool=own_bench（task 026 WP4，怒鹦哥ex 鼓足干劲/飞天螳螂 辅助斩
+    「附着于备战宝可梦」）：段2 目标池改备战区（战斗场不可选）；目标空（无备战）
+    → no-op 不挂起。args.energy_up_to=true（「最多N张」，D-WP4-4）：段1
+    min_choose=0，选 0 张 → 不进段2 直接完成。multi_target × target_pool=own_bench
+    组合暂不支持（DslError 不猜，需要时再扩展）。
     """
     if node.destination != "attach":
         raise DslError(f"attach_energy 暂仅支持 destination=attach（收到 {node.destination!r}）")
@@ -189,19 +590,51 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
     counters = node.args.get("damage_counters", 0)
     if not isinstance(counters, int) or counters < 0:
         raise DslError(f"attach_energy 的 damage_counters 须为非负 int（收到 {counters!r}）")
+    multi = node.args.get("multi_target", False)
+    if not isinstance(multi, bool):
+        raise DslError(f"attach_energy 的 multi_target 须为 bool（收到 {multi!r}）")
+    target_pool = node.args.get("target_pool", "own_pokemon_in_play")
+    if target_pool not in ("own_pokemon_in_play", "own_bench"):
+        raise DslError(
+            f"attach_energy 的 target_pool 暂仅支持 own_pokemon_in_play/own_bench"
+            f"（收到 {target_pool!r}）"
+        )
+    if multi and target_pool != "own_pokemon_in_play":
+        raise DslError(
+            "attach_energy 的 multi_target × target_pool=own_bench 组合暂不支持"
+            "（不猜，需要时再扩展）"
+        )
+    energy_up_to = node.args.get("energy_up_to", False)
+    if not isinstance(energy_up_to, bool):
+        raise DslError(f"attach_energy 的 energy_up_to 须为 bool（收到 {energy_up_to!r}）")
+
+    if multi:
+        return _attach_energy_multi(ctx, node, choice, target_filters, counters)
 
     if choice is None:
-        # 第一段：选能量（池空不挂起，尽力而为空结算）
+        # 第一段：选能量（池空不挂起，尽力而为空结算）；bench-only 形态目标空
+        # （无备战）→ no-op 不挂起（task 026 WP4 清单 4）
         if not resolve_pool(ctx.player_state, node.selector, node.filters):
             return {"attached": 0, "iids": [], "destination": "attach"}
+        if target_pool == "own_bench" and not resolve_pool(
+            ctx.player_state, "own_bench", target_filters,
+            hp_of=lambda m: ctx.engine._effective_hp(m, ctx.player),
+        ):
+            return {"attached": 0, "iids": [], "destination": "attach",
+                    "reason": "no_targets"}
         return NeedChoice(
             pool=node.selector, filters=node.filters,
-            min_choose=node.choose, max_choose=node.choose, destination="attach",
+            min_choose=0 if energy_up_to else node.choose,
+            max_choose=node.choose, destination="attach",
         )
     if not ctx.carry:
-        # 第二段：选目标宝可梦（能量选择经 carry 冻结传递）
+        # 段1 恢复：energy_up_to 选 0 张 → 直接完成，不进段2（D-WP4-4）
+        if energy_up_to and not choice:
+            return {"attached": 0, "iids": [], "destination": "attach"}
+        # 第二段：选目标宝可梦（能量选择经 carry 冻结传递；target_pool=own_bench
+        # 时目标池为备战区，战斗场不可选）
         return NeedChoice(
-            pool="own_pokemon_in_play", filters=target_filters,
+            pool=target_pool, filters=target_filters,
             min_choose=1, max_choose=1, destination="attach", carry=tuple(choice),
         )
 
@@ -230,6 +663,69 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
     return {
         "attached": len(energies), "energy_iids": sorted(energy_iids),
         "target_iid": target_iid, "damage_counters": counters,
+    }
+
+
+def _attach_energy_multi(
+    ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None,
+    target_filters: tuple[str, ...], counters: int,
+) -> dict[str, object] | NeedChoice:
+    """attach_energy 多目标各附1（task 026 WP3，D-WP3-1 配对口径，🔲 待核）。"""
+    if choice is None:
+        # 段1：选能量 up-to N（池空不挂起，尽力而为空结算）
+        if not resolve_pool(ctx.player_state, node.selector, node.filters):
+            return {"attached": 0, "iids": [], "destination": "attach"}
+        return NeedChoice(
+            pool=node.selector, filters=node.filters,
+            min_choose=0, max_choose=node.choose, destination="attach",
+        )
+    if not ctx.carry:
+        # 段1 恢复：选 0 张能量 → 直接完成（不进段2）
+        if not choice:
+            return {"attached": 0, "iids": [], "destination": "attach"}
+        # 段2：选等量目标宝可梦（目标空 no-op 不挂起，已选能量留弃牌区不消耗）
+        targets = resolve_in_play_pool(
+            ctx.player_state, target_filters,
+            hp_of=lambda m: ctx.engine._effective_hp(m, ctx.player),
+        )
+        if not targets:
+            return {"attached": 0, "iids": [], "destination": "attach",
+                    "reason": "no_targets"}
+        return NeedChoice(
+            pool="own_pokemon_in_play", filters=target_filters,
+            min_choose=min(len(choice), len(targets)), max_choose=len(choice),
+            destination="attach", carry=tuple(choice),
+        )
+
+    # 恢复完成：carry = 能量 iids（选择顺序），choice = 目标栈顶 iids（选择顺序）
+    # FIFO 一一配对（D-WP3-1）：能量[i] → 目标[i]，未配对能量留弃牌区
+    p = ctx.player_state
+    pairs = tuple(zip(ctx.carry, choice))  # min 收缩时 len(choice) < len(carry)，弃多余能量
+    energy_iids = {ei for ei, _ in pairs}
+    energies = tuple(c for c in p.discard if c.iid in energy_iids)
+    p = p.model_copy(update={
+        "discard": tuple(c for c in p.discard if c.iid not in energy_iids),
+    })
+
+    def attach(mon: InPlayPokemon) -> InPlayPokemon:
+        adds = tuple(c for ei, ti in pairs if ti == mon.current.iid
+                     for c in energies if c.iid == ei)
+        if not adds:
+            return mon
+        return mon.model_copy(update={
+            "attached_energy": mon.attached_energy + adds,
+            "damage": mon.damage + counters * 10,
+        })
+
+    ctx.set_player_state(p.model_copy(update={
+        "active": attach(p.active) if p.active else None,
+        "bench": tuple(attach(m) for m in p.bench),
+    }))
+    ctx.engine.check_knockouts()  # 兜底（同单目标口径；附能量本身不致昏厥）
+    return {
+        "attached": len(pairs),
+        "pairs": [[ei, ti] for ei, ti in pairs],
+        "damage_counters": counters,
     }
 
 
@@ -262,6 +758,26 @@ def _eval_counter(ctx: ExecutionContext, word: str, target: InPlayPokemon | None
         return len(opp.active.attached_energy) if opp.active else 0
     if word == "bench_count_both":
         return len(p.bench) + len(opp.bench)
+    if word == "attached_energy_on_target":
+        # task 026 WP5（猛雷鼓 落雷风暴）：目标宝可梦附着能量数量
+        if target is None:
+            raise DslError(
+                "attached_energy_on_target 需要已选目标（choose 挂起后求值）"
+            )
+        return len(target.attached_energy)
+    if word == "opponent_taken_prizes":
+        # task 026 WP5（月月熊 老练招式）：对手已拿奖赏 = 6 − 对手剩余奖赏
+        return 6 - len(opp.prizes)
+    if word == "discarded_this_effect":
+        # task 026 WP5（D-WP5-1 ×N 伤害族）：本效果内前序 discard 节点弃置张数
+        return ctx.discarded_this_effect
+    if word == "flip_heads_count":
+        # task 026 WP5（until_tails 索财灵）：本效果内掷币正面次数
+        if ctx.flip_heads_count is None:
+            raise DslError(
+                "flip_heads_count 需要本效果内前置 coin_flip（无掷币结果，不猜）"
+            )
+        return ctx.flip_heads_count
     raise DslError(f"计数表达式 {word!r} 非数值或未知（数值上下文不猜）")
 
 
@@ -336,6 +852,14 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     engine._set_player(defender_idx, engine._replace_in_play(
         d, slot, idx, target.model_copy(update={"damage": target.damage + final}),
     ))
+    # 白蕾雅奖赏加成（task 026 WP5，D-WP5-2）：招式伤害（on_attack）落点对手战斗场
+    # 且 final>0 → 置瞬时记录（攻方, 攻方是否太晶），check_knockouts 取走并清空；
+    # 备战落点/效果触发/0 伤害永不置位
+    if slot == "active" and ctx.trigger == "on_attack" and final > 0:
+        engine._attack_damage_active = (
+            ctx.player, attacker is not None and attacker.current.card.is_tera,
+            attacker.current.iid if attacker is not None else None,
+        )
     engine.check_knockouts()
     return {
         "amount": amount, "damage_mod": mod, "final": final,
@@ -393,6 +917,12 @@ def _apply_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
         # 效果序列中前序节点已致昏厥（等待换上）：目标不存在，状态施加空结算
         # （昏厥宝可梦进弃牌区，状态随之消失——rules-manual §4）
         return {"applied": None, "reason": "target_knocked_out"}
+    if ctx.trigger == "on_attack" and engine._protected_from_attack_effects(
+        d.active, defender_idx
+    ):
+        # 闪焰之幕（task 026 WP6，D-WP6-7）：对手招式施加的特殊状态不适用
+        # （伤害本体不免疫——damage 节点不经本判定；训练家卡效果不受保护）
+        return {"applied": None, "reason": "protected"}
     engine._set_player(defender_idx, d.model_copy(update={
         "active": d.active.model_copy(update={
             "conditions": d.active.conditions | {status},
@@ -488,6 +1018,9 @@ def _apply_evolution(ctx: ExecutionContext, card_iid: int, target_iid: int, zone
     """进化突变（规则书·进化：特殊状态恢复、伤害保留；当回合不可再进化）。
 
     card 从 zone（hand/deck）取出压上目标栈顶；发 evolve 引擎事件（与 _do_evolve 对齐）。
+    zone="hand"（神奇糖果跳阶等）时 own_evolve_from_hand 触发请求入队
+    （pending_event_triggers，用户裁决 2026-09-07：「从手牌使出并进化」含 DSL 手牌路径；
+    zone="deck" 学习器路径不经过手牌，不触发）。
     """
     engine = ctx.engine
     p = ctx.player_state
@@ -504,6 +1037,10 @@ def _apply_evolution(ctx: ExecutionContext, card_iid: int, target_iid: int, zone
         "evolved_this_turn": p.evolved_this_turn | {card.iid},
     }))
     ctx.emit("evolve", iid=card.iid, name=card.card.name, onto=target.current.card.name)
+    if zone == "hand":
+        # 进化卡从手牌使出（神奇糖果跳阶等 DSL 路径）：own_evolve_from_hand 触发请求
+        # 入队（用户裁决 2026-09-07），效果完成后由 _run_or_suspend 完成路径排水
+        engine._queue_event_trigger(ctx.player, card.iid, "own_evolve_from_hand")
     return {"iid": card.iid, "name": card.card.name, "target_iid": target_iid}
 
 
@@ -748,6 +1285,13 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     engine._set_player(opp_idx, d.model_copy(update={
         "active": d.active.model_copy(update={"damage": d.active.damage + dmg}),
     }))
+    # 白蕾雅奖赏瞬时记录（task 026 WP5，D-WP5-2）：复制招式也是我方宝可梦所使用
+    # 的招式——招式伤害落点对手战斗场且 dmg>0 → 置位（攻方太晶读持有者栈顶）
+    if dmg > 0:
+        engine._attack_damage_active = (
+            ctx.player, attacker is not None and attacker.current.card.is_tera,
+            attacker.current.iid if attacker is not None else None,
+        )
     engine.check_knockouts()
     return {"copied": attack.name, "via": "whiteboard", "damage": dmg}
 
@@ -827,14 +1371,31 @@ def _coin_flip(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] 
 
     逐次结果存 ExecutionContext.last_flip（= 最后一次），节点级门控
     if_flip_heads / if_flip_tails 据此求值（interpreter）；明细落 effect_primitive 事件。
-    多掷计数（正面数×N 计伤/计奖）本期不做——遇卡按不猜纪律标 blocked（task 025 设计表）。
+    args.until_tails=true（task 026 WP5 索财灵 连掷硬币「抛掷硬币直到出现反面」）：
+    单次行动内连续掷到反面为止（逐次走同一随机源，种子确定性不变），
+    正面次数存 ExecutionContext.flip_heads_count 供 damage 的 flip_heads_count
+    计数词引用；与 times 互斥。常规路径同样写 flip_heads_count（times 次正面数）。
     """
     _require_no_choose(node, "coin_flip")
-    times = node.args.get("times", 1)
-    if not isinstance(times, int) or isinstance(times, bool) or times < 1:
-        raise DslError(f"coin_flip 的 times 须为正 int（收到 {times!r}）")
-    flips = [ctx.engine.rng.flip_coin() for _ in range(times)]
+    until_tails = node.args.get("until_tails", False)
+    if not isinstance(until_tails, bool):
+        raise DslError(f"coin_flip 的 until_tails 须为 bool（收到 {until_tails!r}）")
+    if until_tails and "times" in node.args:
+        raise DslError("coin_flip 的 until_tails 与 times 互斥（不猜）")
+    if until_tails:
+        flips: list[bool] = []
+        while True:
+            heads = ctx.engine.rng.flip_coin()
+            flips.append(heads)
+            if not heads:
+                break
+    else:
+        times = node.args.get("times", 1)
+        if not isinstance(times, int) or isinstance(times, bool) or times < 1:
+            raise DslError(f"coin_flip 的 times 须为正 int（收到 {times!r}）")
+        flips = [ctx.engine.rng.flip_coin() for _ in range(times)]
     ctx.last_flip = flips[-1]
+    ctx.flip_heads_count = sum(flips)
     return {
         "flips": ["heads" if f else "tails" for f in flips],
         "heads": sum(flips),
@@ -848,7 +1409,8 @@ def _bounce(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     规则决议见 rules-reference 附录 A·2026-08-30 bounce 条目）。
 
     战斗场目标被放回（rules-reference 附录 A 决议）：
-    有备战 → 换上流程（promote_to_main：主阶段内换上后继续当前回合，不推进/不抽牌）；
+    有备战 → 换上流程（resume_after_promotes=(效果方, main)：主阶段内换上后继续
+    当前回合，不推进/不抽牌；task 026 WP2 D-WP2-4 归并 promote_to_main）；
     无备战 → 场上无宝可梦判负（reason=no_pokemon，🔲 待核）。
     回手牌不触发昏厥/奖赏；特殊状态随离场消失（rules-manual §7.1 恢复途径）。
     """
@@ -856,9 +1418,17 @@ def _bounce(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
         raise DslError(f"bounce 暂仅支持 selector=own_pokemon_in_play（收到 {node.selector!r}）")
     if node.choose != 1:
         raise DslError(f"bounce 需要 choose=1（收到 choose={node.choose}）")
+    # task 026 WP5（牡丹「以及放于其身上的所有卡牌，放回手牌」）：attachments=hand
+    # 时附着能量/道具随整叠回手牌；默认 discard 行为不变（弗图博士的剧本等回归）
+    attachments_mode = node.args.get("attachments", "discard")
+    if attachments_mode not in ("discard", "hand"):
+        raise DslError(
+            f"bounce 的 attachments 暂仅支持 discard/hand（收到 {attachments_mode!r}）"
+        )
     engine = ctx.engine
     if choice is None:
-        return NeedChoice(pool="own_pokemon_in_play", min_choose=1, max_choose=1)
+        # filters（task 026 WP5 牡丹 basic_pokemon：进化体不可选）随池解析冻结
+        return NeedChoice(pool="own_pokemon_in_play", filters=node.filters, min_choose=1, max_choose=1)
     p = ctx.player_state
     slot, idx, mon = engine._find_in_play(p, choice[0])
     returned = mon.stack  # 整叠宝可梦卡（底→顶）回手牌
@@ -869,24 +1439,404 @@ def _bounce(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
         p = p.model_copy(update={"active": None})
     else:
         p = p.model_copy(update={"bench": p.bench[:idx] + p.bench[idx + 1:]})
-    p = p.model_copy(update={
-        "hand": p.hand + returned,
-        "discard": p.discard + attachments,
-    })
+    if attachments_mode == "hand":
+        p = p.model_copy(update={"hand": p.hand + returned + attachments})
+    else:
+        p = p.model_copy(update={
+            "hand": p.hand + returned,
+            "discard": p.discard + attachments,
+        })
     ctx.set_player_state(p)
     if slot == "active":
         if ctx.player_state.bench:
             # 战斗场空置：换上后继续当前主阶段（附录 A 决议）
             engine.state = engine.state.model_copy(update={
                 "phase": "promote", "current_player": ctx.player,
-                "promote_to_main": True,
+                "resume_after_promotes": (ctx.player, "main"),
             })
         else:
             # 场上无宝可梦判负（附录 A 决议，🔲 待核）
             engine._game_over(winner=1 - ctx.player, reason="no_pokemon")
     return {
         "returned": [c.iid for c in returned],
-        "discarded": [c.iid for c in attachments],
+        "discarded": [c.iid for c in attachments] if attachments_mode == "discard" else [],
+        "attachments_to": attachments_mode,
         "from": slot,
         "name": mon.current.card.name,
     }
+
+
+# ── task 026 WP2：ko_self（自我昏厥）+ place_damage_counters（放置伤害指示物）──
+
+
+@register("ko_self")
+def _ko_self(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """自我昏厥（task 026 WP2，彷徨夜灵 咒怨炸弹机制件）。
+
+    【rules-manual §8】自己的宝可梦昏厥：整叠（进化链+能量+道具）进弃牌区、
+    对手按规则盒拿奖赏；战斗场昏厥须换上——换上推迟到效果全部结算完毕后按
+    promote_queue 统一进行（D-WP2-1，🔲 待核），本原语只入队不翻阶段
+    （ko_self 恒在效果内，翻阶段由 _run_or_suspend 完成路径做）。
+    """
+    _require_no_choose(node, "ko_self")
+    if node.selector != "self":
+        raise DslError(f"ko_self 暂仅支持 selector=self（收到 {node.selector!r}）")
+    engine = ctx.engine
+    mon = _find_source_mon(ctx)
+    if mon is None:
+        raise DslError("ko_self：来源宝可梦不在场上")
+    p = ctx.player_state
+    was_active = p.active is not None and p.active.current.iid == mon.current.iid
+    if was_active:
+        ctx.set_player_state(p.model_copy(update={"active": None}))
+    else:
+        ctx.set_player_state(p.model_copy(update={
+            "bench": tuple(b for b in p.bench if b.current.iid != mon.current.iid),
+        }))
+    if engine._knockout_one(ctx.player, mon):
+        # 对手拿完奖赏立即获胜：终局，不入队不换上
+        return {"ko_self": mon.current.card.name, "game_over": "prizes"}
+    if was_active:
+        d = ctx.player_state
+        if not d.bench:
+            # 与 check_knockouts 同口径（rules-manual §8 胜利条件②）：
+            # 对手也无场上宝可梦 → 平局（§8 同时胜利口径，🔲 待核），否则判负
+            opp = engine.state.players[1 - ctx.player]
+            if opp.active is None and not opp.bench:
+                engine._game_over(winner=None, reason="no_pokemon", is_draw=True)
+            else:
+                engine._game_over(winner=1 - ctx.player, reason="no_pokemon")
+        elif ctx.player not in engine.state.promote_queue:
+            engine.state = engine.state.model_copy(update={
+                "promote_queue": engine.state.promote_queue + (ctx.player,),
+            })
+    return {"ko_self": mon.current.card.name, "was_active": was_active}
+
+
+@register("place_damage_counters")
+def _place_damage_counters(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
+    """放置伤害指示物（task 026 WP2，咒怨炸弹/摔角鹰人机制件）：对手场上 choose 只
+    各放 args.counters 个（每个 = 10 伤害）。
+
+    【rules-manual §6】伤害指示物不是招式伤害：不结算弱点/抗性；放置后统一
+    check_knockouts（§8）。「可使用」的放弃选项不建模、满足即自动发动
+    （D-WP2-3）：池不足 min_choose 收缩至池大小，池空 no-op 不挂起。
+    """
+    if node.selector not in ("opponent_pokemon_any", "opponent_bench", "opponent_attacker"):
+        raise DslError(
+            f"place_damage_counters 暂仅支持 opponent_pokemon_any/opponent_bench/"
+            f"opponent_attacker（收到 {node.selector!r}）"
+        )
+    counters = node.args.get("counters")
+    if not isinstance(counters, int) or isinstance(counters, bool) or counters <= 0:
+        raise DslError(f"place_damage_counters 需要 args.counters 正 int（收到 {counters!r}）")
+    engine = ctx.engine
+    opp_idx = 1 - ctx.player
+    if node.selector == "opponent_attacker":
+        # 沙铃仙人掌 炸裂针刺（task 026 WP6，D-WP6-6）：目标 = 造成昏厥的攻击方
+        # 宝可梦（ctx.attacker_iid，own_ko_by_attack 触发时由引擎穿透）——
+        # choose 形态校验先于上下文校验（挂起纪律）；攻击方已离场 → no-op
+        if node.choose is not None:
+            raise DslError(
+                f"place_damage_counters opponent_attacker 不支持 choose"
+                f"（收到 choose={node.choose}；目标唯一 = 攻击方）"
+            )
+        if ctx.attacker_iid is None:
+            raise DslError(
+                "place_damage_counters opponent_attacker 需要昏厥事件上下文"
+                "（own_ko_by_attack 触发时由引擎记录攻击方；无记录不猜）"
+            )
+        o = engine.state.players[opp_idx]
+        try:
+            slot, idx, mon = engine._find_in_play(o, ctx.attacker_iid)
+        except IllegalActionError:
+            return {"placed": 0, "reason": "attacker_gone"}  # 攻击方已离场 → no-op
+        engine._set_player(opp_idx, engine._replace_in_play(
+            o, slot, idx, mon.model_copy(update={"damage": mon.damage + counters * 10}),
+        ))
+        engine.check_knockouts()
+        return {"placed": 1, "counters_each": counters,
+                "target_iids": [ctx.attacker_iid]}
+    if node.choose is None:
+        raise DslError("place_damage_counters 需要 choose=N（目标经 chooser 交互选择）")
+    if node.selector == "opponent_pokemon_any" and node.choose != 1:
+        raise DslError(
+            f"place_damage_counters opponent_pokemon_any 暂仅支持 choose=1"
+            f"（收到 choose={node.choose}）"
+        )
+    if choice is None:
+        o = engine.state.players[opp_idx]
+        if node.selector == "opponent_pokemon_any":
+            pool = ([o.active] if o.active else []) + list(o.bench)
+        else:
+            pool = list(o.bench)
+        if not pool:
+            return {"placed": 0, "reason": "no_targets"}  # D-WP2-3：池空 no-op 不挂起
+        return NeedChoice(pool=node.selector,
+                          min_choose=min(node.choose, len(pool)),
+                          max_choose=node.choose)
+    placed = 0
+    skipped: list[int] = []
+    for iid in choice:
+        o = engine.state.players[opp_idx]
+        slot, idx, mon = engine._find_in_play(o, iid)
+        # 闪焰之幕（task 026 WP6，D-WP6-7）：对手招式效果落点守卫——被保护目标
+        # 跳过放置（仅招式路径 on_attack；训练家卡效果不受保护）
+        if ctx.trigger == "on_attack" and engine._protected_from_attack_effects(
+            mon, opp_idx
+        ):
+            skipped.append(iid)
+            continue
+        engine._set_player(opp_idx, engine._replace_in_play(
+            o, slot, idx, mon.model_copy(update={"damage": mon.damage + counters * 10}),
+        ))
+        placed += 1
+    engine.check_knockouts()
+    result: dict[str, object] = {
+        "placed": placed, "counters_each": counters, "target_iids": list(choice),
+    }
+    if skipped:
+        result["skipped_protected"] = skipped
+    return result
+
+
+# ── task 026 WP3：reveal（给对手看过）────────────────────────────────────────
+
+
+@register("reveal")
+def _reveal(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """给对手看过（task 026 WP3，词表 actions 既有词本期实现）：selector 池 iids + 卡名
+    落 reveal 事件，无状态变更（D-WP3-4 一期口径：仅结构化事件流，对手 Agent 可见视图
+    不引入手牌内容泄露建模，PRD 观测范围纪律）。
+
+    承接前序 search/recover 节点（猫头夜鹰 寻找宝石 / 水莲的照顾「给对手看过之后」）：
+    池按 selector+filters 在执行时重新解析，DSL 编写纪律 = 紧跟移动节点之后、
+    filters 与移动目标一致。
+    """
+    _require_no_choose(node, "reveal")
+    if node.selector != "own_hand":
+        raise DslError(f"reveal 暂仅支持 selector=own_hand（收到 {node.selector!r}）")
+    pool = resolve_pool(ctx.player_state, node.selector, node.filters)
+    ctx.emit("reveal", iids=[c.iid for c in pool],
+             names=[c.card.name for c in pool])
+    return {"revealed": len(pool), "iids": [c.iid for c in pool]}
+
+
+@register("lock_attack")
+def _lock_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """招式冷却锁（task 026 WP4 裁决 2，2026-09-14 用户裁决；拉帝亚斯ex 无限之刃
+    「在下一个自己的回合，这只宝可梦无法使用招式」）。
+
+    在 on_attack 效果块内把本效果块绑定的招式名（effect.attack，经
+    ExecutionContext.bound_attack 读取）锁到来源宝可梦（InPlayPokemon.attack_locks
+    + attack_lock_turn = 当前 turn）。selector 非 self / 效果块无 attack 绑定 /
+    来源已不在场上 → DslError（不猜）。
+    解禁时点：core._begin_turn 清除距当前 turn ≥2 的锁（turn 仅在先攻方回合开始
+    递增：攻击于 turn N → 下个自己回合 N+1 仍锁 → N+2 解禁）；撤退/离场/昏厥
+    天然清除；进化继承锁（model_copy 字段保留——决议口径，待核）。
+    """
+    _require_no_choose(node, "lock_attack")
+    if node.selector != "self":
+        raise DslError(f"lock_attack 暂仅支持 selector=self（收到 {node.selector!r}）")
+    attack_name = ctx.bound_attack
+    if attack_name is None:
+        raise DslError("lock_attack 需要效果块 attack 绑定（on_attack 招式效果；不猜）")
+    p = ctx.player_state
+    slot, idx, holder = ctx.engine._find_in_play(p, ctx.source.iid)
+    locked = holder.model_copy(update={
+        "attack_locks": (*holder.attack_locks, attack_name),
+        "attack_lock_turn": ctx.engine.state.turn,
+    })
+    ctx.set_player_state(ctx.engine._replace_in_play(p, slot, idx, locked))
+    return {"locked": attack_name, "turn": ctx.engine.state.turn}
+
+
+# ── task 026 WP5：prize_bonus（白蕾雅奖赏加成标记）+ transform（百变怪变身替换）──
+
+
+@register("prize_bonus")
+def _prize_bonus(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """奖赏加成标记（task 026 WP5 白蕾雅，D-WP5-2 🔲 待核）：回合级标记
+    （PlayerState.extra_prize_tera_ko，core._on_turn_end 清除）——本回合自己
+    太晶宝可梦招式伤害致对手战斗场昏厥时多拿 1 张奖赏。
+
+    触发面收窄（不猜）：仅「招式伤害 → 对手战斗场昏厥」路径（效果/指示物致昏厥、
+    备战昏厥不触发）；结算触点 = core._knockout_one 的 take_prize（奖赏不足按
+    剩余拿取、拿完即胜）。args.amount 暂仅支持 1、scope 暂仅支持 tera_attack_ko。
+    """
+    _require_no_choose(node, "prize_bonus")
+    amount = node.args.get("amount")
+    if not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
+        raise DslError(f"prize_bonus 需要 args.amount 正 int（收到 {amount!r}）")
+    if amount != 1:
+        raise DslError(f"prize_bonus 的 amount 暂仅支持 1（收到 {amount!r}；多档需要时再扩展）")
+    scope = node.args.get("scope")
+    if scope != "tera_attack_ko":
+        raise DslError(
+            f"prize_bonus 的 scope 暂仅支持 tera_attack_ko（收到 {scope!r}；不猜）"
+        )
+    ctx.set_player_state(ctx.player_state.model_copy(update={
+        "extra_prize_tera_ko": True,
+    }))
+    return {"prize_bonus": amount, "scope": scope}
+
+
+@register("transform")
+def _transform(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
+    """变身替换（task 026 WP5 百变怪 变身启动，D-WP5-3 🔲 待核）：战斗场来源宝可梦
+    整叠+附着物进弃牌区 → 牌库选 1 张匹配宝可梦（filters 如 basic_pokemon +
+    not_name:百变怪）入原位置 → 重洗由后续 shuffle_deck 节点表达（DSL 编写纪律）。
+
+    替换不触发昏厥/奖赏/换上（非昏厥离场）；伤害/特殊状态/效果不继承（全新
+    InPlayPokemon）；新宝可梦登记 entered_play_this_turn。
+    检索 up-to（牌库非公开区域，min_choose=0）：可以不找 → no-op（重洗仍执行）；
+    牌库无合法目标 → 不挂起 no-op。战斗场/首回合门控由 effect.condition
+    （self_is_active_and_first_own_turn）承担。
+    """
+    if node.selector != "self":
+        raise DslError(f"transform 暂仅支持 selector=self（收到 {node.selector!r}）")
+    if node.choose != 1:
+        raise DslError(f"transform 需要 choose=1（收到 choose={node.choose}）")
+    p = ctx.player_state
+    if choice is None:
+        if not resolve_pool(p, "own_deck", node.filters):
+            return {"transformed": False, "reason": "no_legal_target"}
+        return NeedChoice(pool="own_deck", filters=node.filters,
+                          min_choose=0, max_choose=1)
+    if not choice:
+        return {"transformed": False, "reason": "declined"}  # 可以不找（重洗仍执行）
+    if p.active is None or p.active.current.iid != ctx.source.iid:
+        raise DslError(
+            "transform：来源宝可梦不在战斗场（战斗场门控 = effect.condition self_is_active）"
+        )
+    card = next(c for c in p.deck if c.iid == choice[0])
+    old = p.active
+    pile = old.stack + old.attached_energy + (
+        (old.attached_tool,) if old.attached_tool is not None else ()
+    )
+    ctx.set_player_state(p.model_copy(update={
+        "deck": tuple(c for c in p.deck if c.iid != choice[0]),
+        "active": InPlayPokemon(stack=(card,)),
+        "discard": p.discard + pile,
+        "entered_play_this_turn": p.entered_play_this_turn | {card.iid},
+    }))
+    ctx.emit("transform", into=card.card.name, out=old.current.card.name)
+    return {"transformed": True, "into": card.card.name, "iid": card.iid}
+
+
+# ── task 026 WP6：手牌扰乱 / 撤退锁 / 退化 ──────────────────────────────────
+
+
+@register("hand_disrupt")
+def _hand_disrupt(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """手牌扰乱（task 026 WP6 雪童子 惊吓，D-WP6-1）：「在不看正面的前提下选择
+    对手1张手牌，查看该卡牌的正面后，放回对手牌库并重洗牌库」。
+
+    「不看正面选择」= 均匀随机（engine.rng.randbelow，单一随机源，种子确定性）；
+    「查看正面」= reveal 结构化事件（iids+卡名，一期口径同猫头夜鹰 reveal）；
+    「放回牌库并重洗」= 该卡入对手牌库（尾）后整库 rng.shuffle。
+    对手空手 → no-op（disrupted=0/empty_hand，无 reveal 事件），其他节点照算。
+    """
+    _require_no_choose(node, "hand_disrupt")
+    if node.count is not None:
+        raise DslError(
+            f"hand_disrupt 不支持 count（收到 count={node.count!r}；随机 1 张语义固定）"
+        )
+    if node.selector != "opponent_hand":
+        raise DslError(f"hand_disrupt 暂仅支持 selector=opponent_hand（收到 {node.selector!r}）")
+    engine = ctx.engine
+    opp_idx = 1 - ctx.player
+    o = engine.state.players[opp_idx]
+    if not o.hand:
+        return {"disrupted": 0, "reason": "empty_hand"}
+    i = engine.rng.randbelow(len(o.hand))
+    picked = o.hand[i]
+    ctx.emit("reveal", iids=[picked.iid], names=[picked.card.name])
+    engine._set_player(opp_idx, o.model_copy(update={
+        "hand": o.hand[:i] + o.hand[i + 1:],
+        "deck": engine.rng.shuffle(o.deck + (picked,)),
+    }))
+    return {"disrupted": 1, "iids": [picked.iid], "names": [picked.card.name]}
+
+
+@register("lock_retreat")
+def _lock_retreat(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：「在下一个对手的回合，
+    受到这个招式影响的宝可梦无法撤退」——目标战斗宝可梦置 retreat_lock，
+    撤退行动枚举层拦截；目标自己回合结束解除（core._on_turn_end），进化亦清除
+    （core._do_evolve 重置，rules-manual §7.1 进化恢复口径延伸，🔲 待核）。
+
+    闪焰之幕守卫（D-WP6-7）：对手招式（on_attack）落点且目标持 protection 声明
+    → 锁不适用（一期守卫落点清单见 core._protected_from_attack_effects docstring）。
+    """
+    _require_no_choose(node, "lock_retreat")
+    if node.selector != "opponent_active":
+        raise DslError(f"lock_retreat 暂仅支持 selector=opponent_active（收到 {node.selector!r}）")
+    engine = ctx.engine
+    opp_idx = 1 - ctx.player
+    o = engine.state.players[opp_idx]
+    if o.active is None:
+        # 前序节点已致昏厥（等待换上）：目标不存在，锁空结算（同 apply_status 口径）
+        return {"locked": False, "reason": "target_knocked_out"}
+    if ctx.trigger == "on_attack" and engine._protected_from_attack_effects(
+        o.active, opp_idx
+    ):
+        return {"locked": False, "reason": "protected"}
+    engine._set_player(opp_idx, o.model_copy(update={
+        "active": o.active.model_copy(update={"retreat_lock": True}),
+    }))
+    return {"locked": True, "target": o.active.current.card.name}
+
+
+@register("devolve")
+def _devolve(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """退化（task 026 WP6 招式学习器 退化，D-WP6-8 🔲 待核）：「对手的进化宝可梦
+    全部退化」——对手全场（战斗场先、备战区后）各退栈顶 1 张回其手牌（保序）。
+
+    退后：伤害指示物保留、特殊状态恢复（进化链变化，rules-manual §7.1 恢复途径
+    口径延伸）、附着能量/道具不动；retreat_lock 保留（退化非进化/离场，
+    「受到这个招式影响」的招式效果锁不随退化解除，🔲 待核）；
+    退后 HP 超限的昏厥走既有 check_knockouts（§8，奖赏/换上正常结算）。
+    未进化（栈长 1）不动；对手全场无已进化 → no-op。
+
+    闪焰之幕守卫（D-WP6-7）：对手招式（on_attack）落点且目标持 protection 声明
+    → 该目标不退化（记入 skipped_protected），其余目标照常。
+    """
+    _require_no_choose(node, "devolve")
+    if node.selector != "opponent_pokemon_all":
+        raise DslError(
+            f"devolve 暂仅支持 selector=opponent_pokemon_all（收到 {node.selector!r}）"
+        )
+    engine = ctx.engine
+    opp_idx = 1 - ctx.player
+    o = engine.state.players[opp_idx]
+    returned: list[CardInstance] = []
+    skipped: list[int] = []
+
+    def devolve_mon(mon: InPlayPokemon) -> InPlayPokemon:
+        if len(mon.stack) < 2:
+            return mon
+        if ctx.trigger == "on_attack" and engine._protected_from_attack_effects(
+            mon, opp_idx
+        ):
+            skipped.append(mon.current.iid)
+            return mon
+        returned.append(mon.stack[-1])
+        return mon.model_copy(update={
+            "stack": mon.stack[:-1], "conditions": frozenset(),
+        })
+
+    active = devolve_mon(o.active) if o.active is not None else None
+    bench = tuple(devolve_mon(b) for b in o.bench)
+    engine._set_player(opp_idx, o.model_copy(update={
+        "active": active, "bench": bench,
+        "hand": o.hand + tuple(returned),
+    }))
+    if returned:
+        ctx.emit("devolve", iids=[c.iid for c in returned],
+                 names=[c.card.name for c in returned])
+        engine.check_knockouts()  # 退化后 HP 超限昏厥（§8；效果内只入队不翻阶段）
+    result: dict[str, object] = {"devolved": len(returned)}
+    if skipped:
+        result["skipped_protected"] = skipped
+    return result

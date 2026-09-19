@@ -1,0 +1,19 @@
+# 零之大空洞（CSV9.5C-203，竞技场）
+# text_raw 原文：「自己场上有「太晶」宝可梦的玩家，可以放于备战区的宝可梦数量变为8只。
+# （当这张卡牌被放于弃牌区，或者自己场上没有「太晶」宝可梦时，将备战宝可梦放于弃牌区，
+# 直到备战宝可梦的数量变为5只为止。双方都要将备战宝可梦放于弃牌区的话，
+# 则由这张卡牌的持有者开始执行。）」
+# bench_size 声明式覆写（task 026 WP6，D-WP6-2 🔲 待核）：passive_static +
+# condition own_tera_in_play（逐玩家求值——双方各看自己场上是否有太晶）；引擎
+# _bench_size 读声明（无竞技场/条件不成立 → 5；多张叠加取 max）。失效缩减走引擎
+# bench_shrink 阶段：被顶/太晶离场时超容玩家逐只自选弃置至 5（非昏厥、无奖赏），
+# 双方同缩由持有者先执行；战斗场太晶被昏厥先换上（promote）再缩减。
+card:
+  name_group: 零之大空洞
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全赛制合法 5 印刷
+  card_ids: [CSV9.5C-203, CSV9C-207, CSV9C-266, CSVM2aC-031, SVP-342]
+effects:
+  - trigger: passive_static
+    condition: own_tera_in_play
+    actions:
+      - {action: bench_size, args: {value: 8}}

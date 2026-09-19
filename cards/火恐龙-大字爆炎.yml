@@ -1,0 +1,18 @@
+# 火恐龙（151C-005，1阶，火属性）——「大字爆炎」G 标文本类
+# text_raw 原文：「【火】 烈焰 20
+#
+# 【火】【火】【火】 大字爆炎 90
+# 选择这只宝可梦身上附着的1个能量，放于弃牌区。」
+# 大字爆炎（task 026 WP6，D-WP6-8 🔲 待核）：discard selector=own_attached_energy
+# choose=1——池收窄为来源宝可梦（「这只宝可梦身上」）附着的能量，备战区能量不进池；
+# 无能量时弃置 no-op、伤害 90 照算。烈焰 20 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 火恐龙
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：「大字爆炎」G 标 3 印刷
+  card_ids: [151C-005, CSVE1C-013, CSVL1C-091]
+effects:
+  - trigger: on_attack
+    attack: 大字爆炎
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 90}}
+      - {action: discard, selector: own_attached_energy, choose: 1}

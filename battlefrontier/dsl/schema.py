@@ -49,10 +49,13 @@ class Effect(FrozenModel):
     condition 为开放字符串（条件内容解析归解释器）；limit 取 limits 词表。
     attack：on_attack 触发器的招式绑定（task 012，PRD §5.1）——绑定后该招式的
     伤害与效果全部由本效果块结算；仅 on_attack 使用，其余触发器须为 None。
+    event：仅 trigger_on_event 使用（task 026 WP2），值 = events 词表事件词；
+    其余触发器须为 None（loader 层校验）。
     """
 
     trigger: str
     attack: str | None = None
+    event: str | None = None
     condition: str | None = None
     limit: str | None = None
     cost: tuple[ActionNode, ...] = ()

@@ -29,6 +29,17 @@ actions:
   - heal                    # 恢复 HP（去伤害指示物，不超过已有伤害）
   - bounce                  # 放回手牌（场上宝可梦整叠回手，附着能量/道具进弃牌区）
   - modify_damage           # 声明式：招式伤害修正（道具 passive_static，如不服输头带；引擎读声明）
+  - ko_self                 # 自我昏厥（这只宝可梦整叠弃置，对手拿奖赏；咒怨炸弹）
+  - modify_retreat_cost     # 声明式：撤退费用修正（task 026 WP4：道具/特性 passive_static，引擎读声明，解释器不执行）
+  - lock_attack             # 招式冷却锁（task 026 WP4 裁决 2：on_attack 内锁定本招式名，下个自己回合不可使用）
+  - modify_attack_cost      # 声明式：招式费用修正（task 026 WP5：月月熊 赫月ex 老练招式；引擎 _effective_attack_cost 读声明，解释器不执行）
+  - prize_bonus             # 奖赏加成标记（task 026 WP5 白蕾雅：回合级，太晶宝可梦招式伤害昏厥对手战斗场时多拿 1 张）
+  - transform               # 变身替换（task 026 WP5 百变怪 变身启动：自身整叠进弃牌区，牌库基础宝可梦入原位置）
+  - hand_disrupt            # 手牌扰乱（task 026 WP6 雪童子 惊吓：随机看对手 1 张手牌，洗回对手牌库）
+  - bench_size              # 声明式：备战区容量覆写（task 026 WP6 零之大空洞；引擎读声明，解释器不执行）
+  - lock_retreat            # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍：目标下个自己回合无法撤退）
+  - protection              # 声明式：效果免疫（task 026 WP6 火恐龙 闪焰之幕：不受对手招式效果影响；引擎读声明）
+  - devolve                 # 退化（task 026 WP6 招式学习器 退化：移除进化卡放回手牌）
 
 # 选择器（作用对象）
 selectors:
@@ -46,6 +57,8 @@ selectors:
   - opponent_bench          # 对手的备战区
   - opponent_hand           # 对手的手牌（奇树：双方手牌洗回库底）
   - opponent_deck           # 对手的牌库（奇树：对手抽牌）
+  - opponent_attacker       # 使用了招式的对手宝可梦（task 026 WP6 沙铃仙人掌 炸裂针刺：昏厥事件上下文）
+  - opponent_pokemon_all    # 对手全部宝可梦（task 026 WP6 招式学习器 退化：逐只处理，无 choose）
 
 # 触发器（区分主动发动与被动监听）
 triggers:
@@ -65,6 +78,10 @@ counters:
   - damage_counters_on_self        # 自身身上伤害指示物数量
   - attached_energy_on_opponent_active  # 对手战斗宝可梦附着能量数量
   - bench_count_both               # 双方备战宝可梦数量
+  - attached_energy_on_target      # 目标宝可梦附着能量数量（task 026 WP5 猛雷鼓 落雷风暴）
+  - opponent_taken_prizes          # 对手已拿奖赏张数（=6−对手剩余奖赏；task 026 WP5 月月熊）
+  - discarded_this_effect          # 本效果内前序 discard 节点弃置张数（task 026 WP5 ×N 伤害族）
+  - flip_heads_count               # 本效果内掷币正面次数（task 026 WP5 until_tails 索财灵）
 
 # 去向（destination 字段）
 destinations:
@@ -74,9 +91,16 @@ destinations:
   - deck_bottom
   - discard
   - attach                # 附着于宝可梦
+  - deck_top              # 放回牌库上方（task 026 WP6 暗码迷的解读：有序，选择顺序即牌顶 FIFO）
 
 # 限次（limit 字段）
 limits:
   - once_per_turn           # 每回合 1 次（每只/每张独立）
   - once_per_turn_shared    # 每回合 1 次（同名全卡组共享，如「化危为吉」）
   - unlimited               # 任意次
+
+# 事件词（trigger_on_event 的 event 字段）
+events:
+  - own_play_from_hand_to_bench  # 自己的回合，从手牌使出放于备战区时（摔角鹰人 飞身入场）
+  - own_evolve_from_hand         # 自己的回合，从手牌使出并进行进化时（猫头夜鹰 寻找宝石，task 026 WP3）
+  - own_ko_by_attack             # 在战斗场受到对手招式伤害而昏厥时（task 026 WP6 沙铃仙人掌 炸裂针刺）

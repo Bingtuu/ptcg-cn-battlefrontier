@@ -1,0 +1,23 @@
+# 百变怪（151C-132，基础，无属性，特性：变身启动）——「变身启动」G 标文本类
+# （同名多文本拆分：30th「整蛊变身」/「突然变幻」类等另文，见 task 026 WP5 范围纪律）
+# text_raw 原文：「特性: 变身启动
+# 如果这只宝可梦在战斗场上的话，则仅在最初的自己的回合可以使用1次。选择自己牌库中的1张【基础】宝可梦（除「百变怪」外）。然后，将这只宝可梦，以及放于其身上的所有卡牌放于弃牌区，将被选择的宝可梦放于这只宝可梦原先的位置。并重洗牌库。
+#
+# 【无】 粘粑粑 10」
+# 变身启动（task 026 WP5，D-WP5-3 🔲 待核）：transform 替换原语——替换不触发
+# 昏厥/奖赏/换上（非昏厥离场）；伤害/特殊状态/效果不继承（原文未写继承——
+# 与 30th 版整蛊变身「全部继承」措辞差异忠实区分）；新宝可梦登记
+# entered_play_this_turn；检索 up-to（可以不找 → no-op，重洗仍执行）。
+# 门控：self_is_active_and_first_own_turn（战斗场上 + 最初的自己回合）+
+# once_per_turn。粘粑粑 10 = 白板伤害（无 DSL 绑定）。
+card:
+  name_group: 百变怪
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：「变身启动」G 标 4 印刷
+  card_ids: [151C-132, 151C-168, CSVH4aC-002, CSVM2aC-009]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    condition: self_is_active_and_first_own_turn
+    actions:
+      - {action: transform, selector: self, choose: 1, filters: [basic_pokemon, not_name:百变怪]}
+      - {action: shuffle_deck}

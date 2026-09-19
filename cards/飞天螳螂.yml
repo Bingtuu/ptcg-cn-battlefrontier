@@ -1,0 +1,20 @@
+# 飞天螳螂（151C-123，基础）
+# text_raw 原文：「【草】 辅助斩 20
+# 选择自己弃牌区中的1张「基本【草】能量」，附着于备战宝可梦身上。
+#
+# 【草】【无】【无】 薄片利刃 70」
+# 辅助斩（task 026 WP4）：on_attack 绑定后伤害由 DSL 结算（damage 20 节点）；
+# attach bench-only——target_pool=own_bench（段2 目标池备战区，战斗场不可选），
+# filters=[basic_energy, energy_草]（「基本【草】能量」）；弃牌区无匹配时附着效果
+# no-op、伤害照算（清单 19）。薄片利刃 70 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 飞天螳螂
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：151C-123 单印刷（G 标）；
+  # 其余文本类（空斩/居合斩等）未写，不在本文件挂载
+  card_ids: [151C-123]
+effects:
+  - trigger: on_attack
+    attack: 辅助斩
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: attach_energy, selector: own_discard, filters: [basic_energy, energy_草], choose: 1, destination: attach, args: {target_pool: own_bench}}

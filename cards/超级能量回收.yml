@@ -1,0 +1,20 @@
+# 超级能量回收（CSV3C-115，物品）
+# text_raw 原文：「这张卡牌，只有将自己的2张手牌放于弃牌区后才可使用。
+#
+# 选择自己弃牌区中最多4张基本能量，在给对手看过之后，加入手牌。（无法选择因为这张卡牌的效果而被放于弃牌区的能量。）」
+# cost 弃置排除（task 026 WP4，D-WP4-3 实现口径）：cost 段 discard choose=2 的弃置 iid
+# 记入执行上下文（挂起/恢复经 PendingChoice.cost_discarded 穿透），recover 节点
+# args.exclude_cost_discarded=true 时池剔除之；「最多4张」= up-to（min_choose=0）；
+# 手牌（除本体）<2 张不可使用（playable_feasible 门）。reveal 一期口径：仅落结构化
+# 事件流（iids+卡名），对手可见视图不建模泄露。
+card:
+  name_group: 超级能量回收
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 G 标 8 印刷
+  card_ids: [CSV3C-115, CSV3C-164, CSV9.5C-161, CSVE2C-145, CSVE2pC-021, CSVM2aC-016, CSVM2cC-012, SVP-236]
+effects:
+  - trigger: on_play
+    cost:
+      - {action: discard, selector: own_hand, choose: 2}
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [basic_energy], choose: 4, destination: hand, args: {up_to: true, exclude_cost_discarded: true}}
+      - {action: reveal, selector: own_hand, filters: [basic_energy]}

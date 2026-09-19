@@ -1,0 +1,28 @@
+# 怒鹦哥ex（CSV2C-105，基础，规则盒 ex）
+# text_raw 原文：「特性: 英武重抽
+# 只有在最初的自己的回合可以使用1次。将自己的手牌全部放于弃牌区，从牌库上方抽取6张卡牌。在这个回合，如果已经使用了其他的「英武重抽」的话，则无法使用这个特性。
+#
+# 【无】 鼓足干劲 20
+# 选择自己弃牌区中最多2张基本能量，附着于1只备战宝可梦身上。」
+# 英武重抽 = first_own_turn + once_per_turn_shared（同名共享限次）+ discard 全弃 + draw 6
+# （全既有件）。鼓足干劲（task 026 WP4，D-WP4-4 🔲 待核）：on_attack 绑定后伤害由 DSL
+# 结算（damage 20 节点）；「最多2张」= energy_up_to（段1 min_choose=0，选 0 张不进段2
+# no-op）；「附着于1只备战宝可梦」= target_pool=own_bench（段2 备战区必选 1 只；
+# 无备战仍可宣言、伤害照算、附着效果 no-op——2026-09-14 用户裁决：招式附加效果
+# 无法执行不阻却宣言）。
+card:
+  name_group: 怒鹦哥ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 G 标 7 印刷
+  card_ids: [CSV2C-105, CSV2C-144, CSV2C-156, CSVL1C-049, CSVL1C-118, CSVM1bC-014, CSVM1cC-007]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn_shared
+    condition: first_own_turn
+    actions:
+      - {action: discard, selector: own_hand, count: all}
+      - {action: draw, count: 6}
+  - trigger: on_attack
+    attack: 鼓足干劲
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: attach_energy, selector: own_discard, filters: [basic_energy], choose: 2, destination: attach, args: {target_pool: own_bench, energy_up_to: true}}

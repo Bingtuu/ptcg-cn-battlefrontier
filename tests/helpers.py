@@ -73,12 +73,19 @@ def effects_by_name(library) -> dict:
     """CardLibrary → 卡名键朴素 dict：stub 卡（card_id=stub-*）注入的兼容路径。
 
     引擎对朴素 dict 按卡名解析（task 026 WP0）；同名多文档时按名注入有歧义，直接报错。
+    例外（task 026 WP6）：「火恐龙」同文本等价类拆分文件（大字爆炎/闪焰之幕，
+    与索财灵/百变怪拆分同例）保留 name_group=火恐龙——stub 对局用不到该名，
+    真实卡组走 card_id 挂载；已知白名单内的重复组跳过按名注入，其余重复仍报错
+    （防错挂守卫不放宽）。
     """
+    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙"}
     docs = list({id(d): d for d in library.values()}.values())
     names = [d.card.name_group for d in docs]
     dupes = {n for n in names if names.count(n) > 1}
-    assert not dupes, f"同名多文档无法按名注入（应改用 card_id 挂载）: {sorted(dupes)}"
-    return {d.card.name_group: d for d in docs}
+    assert dupes <= KNOWN_MULTI_TEXT_GROUPS, (
+        f"同名多文档无法按名注入（应改用 card_id 挂载）: {sorted(dupes)}"
+    )
+    return {d.card.name_group: d for d in docs if d.card.name_group not in dupes}
 
 
 def doc_of(library, name: str):

@@ -1,0 +1,19 @@
+# 紧急滑板（CSV7C-185，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的宝可梦，【撤退】所需能量减少1个。如果那只宝可梦的剩余HP在「30」及以下的话，则【撤退】所需能量，全部消除。」
+# 声明式常驻修正（task 026 WP4，D-WP4-1 🔲 待核）：引擎 _effective_retreat_cost 读
+# passive_static 声明（解释器不执行），撤退枚举与执行两触点接入。两块叠加规约：
+# 减少量加总后 clamp 下限 0，"all" 直接归零（HP≤30 时两块并存 → 归零，天然满足文本）；
+# 剩余 HP = 有效 HP − 已受伤害（holder_hp_le:30 既有条件词）。道具被弃/替换即失效
+# （求值点实时读声明）。
+card:
+  name_group: 紧急滑板
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 8 印刷
+  card_ids: [CSV7C-185, CSV7C-259, CSV9.5C-173, CSVH4aC-013, CSVH5aC-013, CSVM1cC-017, CSVM2bC-020, SVP-197]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_retreat_cost, args: {value: 1}}
+  - trigger: passive_static
+    condition: holder_hp_le:30
+    actions:
+      - {action: modify_retreat_cost, args: {value: "all"}}

@@ -1,0 +1,19 @@
+# 宝可装置3.0（CSV2C-113，物品）
+# text_raw 原文：「查看自己牌库上方7张卡牌，选择其中1张支援者，在给对手看过之后，加入手牌。将剩余的卡牌放回牌库并重洗牌库。」
+# search_deck top_n rest=shuffle（task 026 WP4）：args.top_n=7 检视牌库顶 7 张为选择池，
+# args.rest=shuffle 未选卡与牌库其余合并后整库重洗（本节点直接洗牌，不再写 shuffle_deck
+# 节点）；空选/窗内无支援者时重洗依然成立（清单 3）。「选择其中1张」从宽按检索统一
+# up-to 纪律（min_choose=0，rules-reference 附录 A 决议）。reveal 一期口径：仅落结构化
+# 事件流（iids+卡名），对手可见视图不建模泄露。
+card:
+  name_group: 宝可装置3.0
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 G 标 5 印刷；
+  # 其余文本类（「查看…。选择…」/「将其中1张…」等 D/C 标措辞异类）未写，不在本文件挂载
+  card_ids: [CSV2C-113, CSVE1C-122, CSVE2C-159, CSVH3aC-012, CSVM2cC-019]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检视选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [trainer_supporter], choose: 1, destination: hand, args: {top_n: 7, rest: shuffle}}
+      - {action: reveal, selector: own_hand, filters: [trainer_supporter]}

@@ -1,0 +1,18 @@
+# 火恐龙（CSV5C-015，1阶，火属性）——「闪焰之幕」G 标文本类
+# （同名多文本拆分：SVP-100 等为异文本类，未写，不在本文件挂载，见 task 026 WP6 范围纪律）
+# text_raw 原文：「特性: 闪焰之幕
+# 这只宝可梦，不受到对手宝可梦所使用招式的效果影响。
+#
+# 【火】【火】 烈焰 50」
+# 闪焰之幕（task 026 WP6，D-WP6-8 🔲 待核）：protection 声明式
+# （scope=opponent_attack_effects）——引擎在招式效果落点守卫（伤害指示物跳过、
+# 特殊状态不适用）；伤害本体不免疫，训练家卡效果不受保护（「对手宝可梦所使用的招式」）。
+# 烈焰 50 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 火恐龙
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：「闪焰之幕」G 标 4 印刷
+  card_ids: [CSV5C-015, CSVL2C-014, CSVL2C-062, CSVM1aC-002]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: protection, args: {scope: opponent_attack_effects}}

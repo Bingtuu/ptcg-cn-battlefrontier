@@ -10,7 +10,7 @@ filters 为开放字符串（loader 不校验），本模块是唯一求值点�
 from __future__ import annotations
 
 from collections.abc import Callable
-from itertools import combinations
+from itertools import combinations, permutations
 from typing import TYPE_CHECKING
 
 from battlefrontier.dsl.loader import DslError
@@ -36,6 +36,8 @@ class NeedChoice:
     能量 iids），随挂起冻结进 PendingChoice.payload，恢复时经 ctx.carry 传回。
     exclude_iids：池冻结时剔除的栈顶/卡 iid（task 014，如能量转移目标排除来源）。
     flip：挂起瞬间的掷币结果（task 025 节点门控穿透），冻结进 PendingChoice.flip_result。
+    cost_discarded：挂起瞬间的 cost 段弃置 iid（task 026 WP4 穿透），
+    冻结进 PendingChoice.cost_discarded（解释器挂起时标注，同 flip）。
     """
 
     def __init__(
@@ -57,11 +59,24 @@ class NeedChoice:
         self.exclude_iids = exclude_iids
         self.cursor: int = -1
         self.flip: bool | None = None  # 解释器挂起时标注（ctx.last_flip 快照）
+        # 解释器挂起时标注（ctx.cost_discarded_iids 快照，task 026 WP4）
+        self.cost_discarded: tuple[int, ...] = ()
+        # 解释器挂起时标注（ctx.discarded_this_effect 快照，task 026 WP5 ×N 伤害族穿透）
+        self.discarded_count: int = 0
+        # 解释器挂起时标注（ctx.attacker_iid 快照，task 026 WP6 own_ko_by_attack 穿透）
+        self.attacker_iid: int | None = None
         # 嵌套传播（task 020 copy_attack）：内层效果挂起时标注效果定位与内层游标
         # （外层 run_effect 会覆盖 self.cursor 为外层节点游标，内层游标需另行转存）
         # inner = (card_id, 卡名, 招式名)：card_id 供 CardLibrary 精确解析（task 026）
         self.inner: tuple[str, str, str] | None = None
         self.inner_cursor: int = -1
+        # task 026 WP6 选择规格扩展（三者互斥，由原语校验保证）：
+        # ordered——选择顺序有语义（deck_top 牌顶 FIFO），枚举展开为排列；
+        # distinct——分桶互异（distinct=energy_type），桶值随 build_pending 冻结；
+        # choose_groups——组间互斥（(组池 iids, 组 cap)），各组独立 up-to 取并集
+        self.ordered: bool = False
+        self.distinct: str | None = None
+        self.choose_groups: tuple[tuple[tuple[int, ...], int], ...] | None = None
 
 
 def _match_one(card: CardInstance, filter_word: str) -> bool:
@@ -88,6 +103,9 @@ def _match_one(card: CardInstance, filter_word: str) -> bool:
     if filter_word.startswith("name:"):
         # 参数化过滤器（task 026 WP1）：「夜巡灵」式按卡名指定（同名回收/检索）
         return c.name == filter_word.split(":", 1)[1]
+    if filter_word.startswith("not_name:"):
+        # 参数化过滤器（task 026 WP5）：「（除「百变怪」外）」式按卡名排除
+        return c.name != filter_word.split(":", 1)[1]
     if filter_word.startswith("owner_pokemon:"):
         # 参数化过滤器（task 026 WP1）：「玛俐的宝可梦」（db cards.owner 供数；
         # db 未覆盖的主人组恒不匹配——不回落卡名硬推）
@@ -236,12 +254,36 @@ def enumerate_choices(pending: PendingChoice) -> list[Action]:
     """合法选择行动枚举：min~max 的全部 iid 子集（iid 排序保确定序）。
 
     min_choose=0 时空集（）即「不找/放弃」（检索类 up-to 语义）。
+    task 026 WP6 扩展（三者互斥，原语侧已校验）：
+    choose_groups——组间互斥：各组池独立 up-to 子集取并集，跨组混合不可达；
+    pool_buckets——distinct 分桶互异：只产桶值两两互异的子集；
+    ordered——选择顺序有语义：每个子集展开为全排列（deck_top 牌顶 FIFO）。
     """
+    if pending.choose_groups:
+        subsets: set[tuple[int, ...]] = {()}
+        for group_pool, cap in pending.choose_groups:
+            g = tuple(sorted(group_pool))
+            for n in range(min(cap, len(g)) + 1):
+                subsets.update(combinations(g, n))
+        return [Action(kind="choose", choices=s) for s in sorted(subsets)]
+    if pending.pool_buckets:
+        pairs = sorted(zip(pending.pool_iids, pending.pool_buckets, strict=True))
+        actions = []
+        for n in range(pending.min_choose, min(pending.max_choose, len(pairs)) + 1):
+            for combo in combinations(pairs, n):
+                if len({b for _, b in combo}) == len(combo):
+                    actions.append(Action(kind="choose",
+                                          choices=tuple(i for i, _ in combo)))
+        return actions
     pool = tuple(sorted(pending.pool_iids))
-    actions: list[Action] = []
+    actions = []
     for n in range(pending.min_choose, min(pending.max_choose, len(pool)) + 1):
         for subset in combinations(pool, n):
-            actions.append(Action(kind="choose", choices=subset))
+            if pending.ordered:
+                for perm in permutations(subset):
+                    actions.append(Action(kind="choose", choices=perm))
+            else:
+                actions.append(Action(kind="choose", choices=subset))
     return actions
 
 
@@ -252,6 +294,31 @@ def build_pending(
     outer_choice: tuple[int, ...] = (),
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
+    # choose_groups（task 026 WP6，D-WP6-3）：各组池已由原语按牌库序解析冻结进
+    # need.choose_groups，此处只取并集（保序去重）作 pool_iids，不再经 resolve_pool
+    if need.choose_groups:
+        seen: list[int] = []
+        for group_pool, _cap in need.choose_groups:
+            for iid in group_pool:
+                if iid not in seen:
+                    seen.append(iid)
+        return PendingChoice(
+            player=player, source=source, effect_index=effect_index, cursor=cursor,
+            pool=need.pool, filters=need.filters,
+            min_choose=need.min_choose, max_choose=need.max_choose,
+            destination=need.destination,
+            pool_iids=tuple(seen),
+            payload=need.carry,
+            completion=completion,
+            inner=inner,
+            outer_cursor=outer_cursor,
+            outer_choice=outer_choice,
+            flip_result=need.flip,
+            cost_discarded=need.cost_discarded,
+            discarded_count=need.discarded_count,
+            attacker_iid=need.attacker_iid,
+            choose_groups=need.choose_groups,
+        )
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
     owner = 1 - player if need.pool.startswith("opponent") else player
     pool_cards = resolve_pool(
@@ -259,12 +326,26 @@ def build_pending(
         opponent=engine.state.players[1 - player],
         hp_of=lambda m: engine._effective_hp(m, owner),
     )
-    iids = tuple(
-        iid for c in pool_cards
-        if (iid := c if isinstance(c, int) else (
+    kept = [
+        c for c in pool_cards
+        if (c if isinstance(c, int) else (
             c.current.iid if isinstance(c, InPlayPokemon) else c.iid))
         not in need.exclude_iids
+    ]
+    iids = tuple(
+        c if isinstance(c, int) else (
+            c.current.iid if isinstance(c, InPlayPokemon) else c.iid)
+        for c in kept
     )
+    buckets: tuple[int, ...] = ()
+    if need.distinct == "energy_type":
+        # 分桶互异（task 026 WP6，D-WP6-4）：按能量属性首现映射桶号，与 pool_iids 对齐
+        order: dict[str, int] = {}
+        buckets = tuple(
+            order.setdefault(c.card.energy_type, len(order))
+            for c in kept
+            if isinstance(c, CardInstance)
+        )
     return PendingChoice(
         player=player, source=source, effect_index=effect_index, cursor=cursor,
         pool=need.pool, filters=need.filters,
@@ -277,6 +358,12 @@ def build_pending(
         outer_cursor=outer_cursor,
         outer_choice=outer_choice,
         flip_result=need.flip,
+        cost_discarded=need.cost_discarded,
+        discarded_count=need.discarded_count,
+        attacker_iid=need.attacker_iid,
+        ordered=need.ordered,
+        distinct=need.distinct or "",
+        pool_buckets=buckets,
     )
 
 
@@ -310,6 +397,34 @@ def playable_feasible(
     for node in effect.actions:
         if node.action == "search_deck" and node.destination == "bench" and bench_full:
             return False
+        if node.action == "attach_energy":
+            # task 026 WP4：bench-only 附着（target_pool=own_bench）能量池/备战池
+            # 为空不可使用（无效果不可使用）；既有 own_pokemon_in_play 形式保持
+            # 不门控（奥琳博士的气魄「无合法目标仍抽 3」存量行为回归）
+            target_pool = node.args.get("target_pool", "own_pokemon_in_play")
+            if target_pool == "own_bench":
+                if not resolve_pool(p, "own_discard", node.filters):
+                    return False
+                if not resolve_pool(p, "own_bench", tuple(node.args.get("target_filters", ()))):
+                    return False
+            elif target_pool != "own_pokemon_in_play":
+                raise DslError(
+                    f"可行性门未支持 attach_energy target_pool={target_pool!r}（不猜）"
+                )
+        if node.action == "recover_from_discard":
+            # task 026 WP3：新形式（bench 去向 / hand up-to）弃牌区无匹配不可使用
+            # （无效果不可使用）；既有形式（hand 默认 / deck）保持不门控（存量行为回归）
+            if node.destination not in ("hand", "deck", "bench"):
+                raise DslError(
+                    f"可行性门未支持 recover_from_discard destination={node.destination!r}（不猜）"
+                )
+            if node.destination == "bench" or (
+                node.destination == "hand" and node.args.get("up_to")
+            ):
+                if not resolve_pool(p, "own_discard", node.filters):
+                    return False
+                if node.destination == "bench" and bench_full:
+                    return False
         if (
             node.action == "switch" and node.selector == "opponent_bench"
             and (opponent is None or not opponent.bench)
@@ -383,6 +498,11 @@ _CONDITIONS = {
     "first_own_turn": (
         lambda engine, player, mon: engine.state.turn == 1
     ),
+    # task 026 WP5（百变怪 变身启动「战斗场上、最初回合限1次」）：双条件组合词
+    "self_is_active_and_first_own_turn": (
+        lambda engine, player, mon: _is_active_holder(engine, player, mon)
+        and engine.state.turn == 1
+    ),
     # task 026 WP1：自己场上有太晶宝可梦（依赖 CardDef.is_tera ← db cards.is_tera）
     "own_tera_in_play": (
         lambda engine, player, mon: any(
@@ -449,7 +569,8 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
     """特性发动前的可行性门（task 011）：关键池为空则不枚举；未知原语形式 DslError（不猜）。
 
     支持：attach_energy（destination=attach，能量池与目标池双侧非空）；draw（恒可行，
-    抽完即止/空结算合法）。HP 类过滤器走有效 HP（task 015）。
+    抽完即止/空结算合法）；recover_from_discard / search_deck（task 026 WP3：匹配池
+    非空，bench 去向备战区须有余量）。HP 类过滤器走有效 HP（task 015）。
     """
     p = engine.state.players[player]
     hp_of = lambda m: engine._effective_hp(m, player)
@@ -459,11 +580,40 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                 raise DslError(
                     f"特性可行性门未支持 attach_energy selector={node.selector!r}（不猜）"
                 )
+            target_pool = node.args.get("target_pool", "own_pokemon_in_play")
+            if target_pool not in ("own_pokemon_in_play", "own_bench"):
+                raise DslError(
+                    f"特性可行性门未支持 attach_energy target_pool={target_pool!r}（不猜）"
+                )
             if not resolve_pool(p, "own_discard", node.filters):
                 return False
             target_filters = tuple(node.args.get("target_filters", ()))
-            if not resolve_in_play_pool(p, target_filters, hp_of=hp_of):
+            if target_pool == "own_bench":
+                # task 026 WP4：bench-only 附着——备战区无合法目标不可行
+                if not resolve_pool(p, "own_bench", target_filters, hp_of=hp_of):
+                    return False
+            elif not resolve_in_play_pool(p, target_filters, hp_of=hp_of):
                 return False
+        elif node.action == "discard":
+            # task 026 WP4（怒鹦哥ex 英武重抽）：手牌全弃恒可支付（后续 draw 有效）
+            # task 026 WP6（火恐龙 大字爆炎）：弃来源宝可梦 1 张附着能量——
+            # 无能量时 no-op 合法（伤害照算），恒可行
+            if not (
+                (
+                    node.selector == "own_hand"
+                    and node.count == "all"
+                    and node.choose is None
+                )
+                or (
+                    node.selector == "own_attached_energy"
+                    and node.choose == 1
+                    and node.count is None
+                )
+            ):
+                raise DslError(
+                    f"特性可行性门未支持 discard 形式 selector={node.selector!r}"
+                    f"/count={node.count!r}/choose={node.choose!r}（不猜）"
+                )
         elif node.action == "draw":
             continue  # 抽牌恒可行（牌库空抽完即止；until_hand 超出空结算）
         elif node.action == "move_damage_counters":
@@ -475,6 +625,83 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
             opp = engine.state.players[1 - player]
             if opp.active is None and not opp.bench:
                 return False
+        elif node.action == "ko_self":
+            # 自我昏厥恒可行（task 026 WP2；来源宝可梦在场上由枚举保证）
+            continue
+        elif node.action == "recover_from_discard":
+            # task 026 WP3：弃牌区无匹配 / bench 去向备战区满 → 不可行
+            if node.destination not in ("hand", "deck", "bench"):
+                raise DslError(
+                    f"特性可行性门未支持 recover_from_discard "
+                    f"destination={node.destination!r}（不猜）"
+                )
+            if not resolve_pool(p, "own_discard", node.filters):
+                return False
+            if node.destination == "bench" and len(p.bench) >= engine._bench_size(player):
+                return False
+        elif node.action == "search_deck":
+            # task 026 WP3（多龙奇 侦察指令等检索特性）：牌库无匹配 → 不可行
+            # （top_n 检视池 ⊆ 全库匹配池，此处按全库口径判空即可）；
+            # bench 去向备战区满 → 不可行；deck_top（task 026 WP6）牌库空则不可行
+            if node.destination not in ("hand", "bench", "deck_top"):
+                raise DslError(
+                    f"特性可行性门未支持 search_deck destination={node.destination!r}（不猜）"
+                )
+            if not resolve_pool(p, "own_deck", node.filters):
+                return False
+            if node.destination == "bench" and len(p.bench) >= engine._bench_size(player):
+                return False
+        elif node.action == "place_damage_counters":
+            # 放置伤害指示物（task 026 WP2）：对手场上有宝可梦（放置落点）
+            if node.selector not in ("opponent_pokemon_any", "opponent_bench"):
+                raise DslError(
+                    f"特性可行性门未支持 place_damage_counters selector={node.selector!r}（不猜）"
+                )
+            opp = engine.state.players[1 - player]
+            if opp.active is None and not opp.bench:
+                return False
+        elif node.action == "reveal":
+            # task 026 WP4（米立龙 揽客「给对手看过」）：展示恒可行——无落点约束，
+            # 空池 = 空 reveal 事件（不改变状态）
+            continue
+        elif node.action == "shuffle_deck":
+            # task 026 WP5（百变怪 变身启动「并重洗牌库」）：重洗恒可行（空库洗牌 = no-op）
+            continue
+        elif node.action == "transform":
+            # task 026 WP5（D-WP5-3）：检索 up-to——牌库无合法目标时 no-op 但重洗
+            # 仍执行（清单 17），故不按池空门控；战斗场/首回合门由 effect.condition 承担
+            if node.selector != "self" or node.choose != 1:
+                raise DslError(
+                    f"特性可行性门未支持 transform 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            continue
+        elif node.action == "hand_disrupt":
+            # task 026 WP6（雪童子 惊吓）：对手手牌空 → 扰乱 no-op，不可行门由
+            # 「无效果不可使用」适用于独立效果；此处校验形态 + 对手空手不门控
+            # （伤害等其他节点可能仍有效，单节点空结算合法）
+            if node.selector != "opponent_hand" or node.choose is not None or node.count is not None:
+                raise DslError(
+                    f"特性可行性门未支持 hand_disrupt 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}/count={node.count!r}（不猜）"
+                )
+            continue
+        elif node.action == "lock_retreat":
+            # task 026 WP6（沙铃仙人掌 穷追不舍）：锁对手战斗场撤退，恒可行
+            if node.selector != "opponent_active" or node.choose is not None:
+                raise DslError(
+                    f"特性可行性门未支持 lock_retreat 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            continue
+        elif node.action == "devolve":
+            # task 026 WP6（招式学习器 退化）：对手全场退化，无已进化时 no-op 合法
+            if node.selector != "opponent_pokemon_all" or node.choose is not None:
+                raise DslError(
+                    f"特性可行性门未支持 devolve 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            continue
         else:
             raise DslError(
                 f"特性可行性门未支持原语 {node.action!r}（不猜；扩展请在 dsl/chooser.py 注册）"

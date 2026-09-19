@@ -1,0 +1,24 @@
+# 招式学习器 退化（CSV5C-120，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的宝可梦，可以使用这张卡牌上的招式。[需要满足使用
+# 招式所需能量。]放于宝可梦身上的这张卡牌，将在自己的回合结束时被放于弃牌区。
+# 【无】 退化
+# 从对手所有已经进化的宝可梦身上，各移除1张「进化卡」使其退化。将被移除的卡牌，
+# 放回对手的手牌。」
+# grant_attack 声明授予招式 + discard_at_turn_end 回合末弃置（引擎读声明，task 015，
+# 同招式学习器 进化先例）；授予招式的能量由持有者附着能量支付。
+# 退化（task 026 WP6，D-WP6-8 🔲 待核）：devolve 原语——对手全场已进化宝可梦
+# （stack≥2）各退栈顶 1 张回对手手牌（「各1张」= 每只仅退 1 张）；退化后伤害保留、
+# 特殊状态恢复、附着能量/道具不动；HP 超限致昏厥/奖赏/换上走既有 check_knockouts。
+card:
+  name_group: 招式学习器 退化
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全赛制合法 4 印刷
+  card_ids: [CSV5C-120, CSV9.5C-181, CSVM1aC-024, CSVM2bC-023]
+effects:
+  - trigger: passive_static
+    actions:
+      - action: grant_attack
+        args: {attack: 退化, discard_at_turn_end: true}
+  - trigger: on_attack
+    attack: 退化
+    actions:
+      - {action: devolve, selector: opponent_pokemon_all}

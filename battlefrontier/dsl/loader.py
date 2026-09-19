@@ -65,6 +65,15 @@ def _check_action(node: ActionNode, vocab: Vocabulary, source: str) -> None:
 def _validate_vocab(doc: CardEffectDoc, vocab: Vocabulary, source: str) -> None:
     for effect in doc.effects:
         vocab.check("triggers", effect.trigger, source)
+        # event 字段仅 trigger_on_event 可用（task 026 WP2），值查 events 词表段
+        if effect.trigger == "trigger_on_event":
+            if effect.event is None:
+                raise DslError(f"{source}: trigger_on_event 缺少 event 字段（events 词表事件词）")
+            vocab.check("events", effect.event, source)
+        elif effect.event is not None:
+            raise DslError(
+                f"{source}: event 字段仅 trigger_on_event 可用（trigger={effect.trigger}）"
+            )
         if effect.limit is not None:
             vocab.check("limits", effect.limit, source)
         for node in (*effect.cost, *effect.actions):

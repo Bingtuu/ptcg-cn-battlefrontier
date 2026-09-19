@@ -95,8 +95,12 @@ def test_state_is_immutable() -> None:
 def test_bench_limit_five() -> None:
     basic = _pokemon("stub-小拉达")
     six = tuple(InPlayPokemon(stack=(_inst(i, basic),)) for i in range(6))
+    # 规则上限 5 在行动层（GameEngine._bench_size / legal_actions）拦截；
+    # 模型构造期守卫取绝对上限 8（零之大空洞覆写，task 026 WP6）
+    PlayerState(bench=six)  # 6 只：规则层拦截，模型层合法
+    nine = tuple(InPlayPokemon(stack=(_inst(i, basic),)) for i in range(9))
     with pytest.raises(ValidationError):
-        PlayerState(bench=six)
+        PlayerState(bench=nine)
 
 
 def test_prizes_limit_six() -> None:

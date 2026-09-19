@@ -114,6 +114,67 @@ effects:
 备战区目标不计算——rules-manual §6），`AttackDef.damage` 仅作装载/展示数据；
 未绑定的招式仍走引擎白板固定伤害路径。
 
+**事件触发（task 026 WP2 补充）**：`trigger: trigger_on_event` 的效果块须以 `event: <事件词>`
+字段声明监听的事件（开放字符串，登记在 `vocabularies.yml` 的 `events` 段；如
+`own_play_from_hand_to_bench` = 从手牌使出放于备战区）。事件由引擎规则骨架在对应行动点
+分发（如主阶段 `place_bench`），效果经解释器结算、可挂起；非 `trigger_on_event` 的效果块
+不得携带 `event` 字段。事件触发效果内造成的昏厥：弃牌与奖赏按文本语序立即结算，换上
+（promote）推迟到效果结算完毕后按队列统一进行，随后回到当前回合方主阶段
+（rules-reference 附录 A，2026-09-07 决议）。
+
+**检索检视与回收扩展（task 026 WP3 补充）**：`search_deck` 支持 `args.top_n: N`
+= 仅检视牌库上方 N 张作为选择池（私密检视，事件流只落选择结果），未选卡按
+`args.rest: deck_top|deck_bottom` 归位且不洗牌（区别于全库检索后必须洗牌的纪律）；
+`recover_from_discard` 去向扩展 `bench`（直放备战区，登记 entered_play_this_turn，
+受备战容量截断）与 `hand` up-to（`args.up_to: true` → min_choose=0）；
+`attach_energy` 支持多目标各附 1（先选能量 up-to N、再选等量目标，按选择顺序
+一一配对——附录 A 决议）；`reveal` 原语一期口径 = 仅落结构化事件流，不建模对手
+Agent 的手牌信息泄露。事件词新增 `own_evolve_from_hand`（主阶段从手牌进化时），
+挂点 `_do_evolve`；进化卡本身从手牌使出的 DSL 效果进化（神奇糖果）同样触发
+（经 pending_event_triggers 队列效果完成后分发），牌库来源（招式学习器
+「进化」）不触发（附录 A，2026-09-14 用户裁决）。
+
+**撤退费修正与成本排除（task 026 WP4 补充）**：`modify_retreat_cost` 为声明式原语
+（passive_static，引擎读声明，解释器不执行；仿 `_effective_hp` 建
+`_effective_retreat_cost`，撤退行动的枚举与执行两触点接入），value = 非负 int
+（减少量）或 "all"（全免），多条修正减少量加总后 clamp 下限 0、"all" 归零；
+条件式修正（紧急滑板「剩余HP≤30 全免」）由 effect.condition 引用 holder 有效 HP。
+`search_deck` top_n 检视的 `args.rest` 新增 `shuffle`（未选卡与牌库其余合并整库重洗，
+与 deck_bottom 不洗牌按文本严格区分）；`attach_energy` 新增 `args.target_pool: own_bench`
+（目标限备战区）与 `args.energy_up_to`（段1 能量 min_choose=0）；效果 cost 段弃置的
+手牌 iid 记入执行上下文，`recover_from_discard` 以 `args.exclude_cost_discarded: true`
+剔除（超级能量回收「无法选择因本效果弃置的能量」）。`lock_attack` 原语
+（task 026 WP4）：on_attack 效果块将本招式锁到来源宝可梦——下个自己回合
+不可宣言、再下个自己回合解禁，撤退/离场清除（附录 A 决议）。招式附加效果的
+落点为空不阻却宣言（伤害照算、效果 no-op；附录 A，2026-09-14 用户裁决）。
+
+**变量伤害与修正声明扩展（task 026 WP5 补充）**：「任意数量弃置 ×N 伤害」族——
+discard 支持 `args.any_count: true`（up-to all，selector 扩 own_attached_energy
+场上附着能量池），本效果内前序弃置张数经计数词 `discarded_this_effect` 供后续
+damage 节点引用；计数词新增 `attached_energy_on_target`（目标附着能量数）/
+`opponent_taken_prizes`（=6−对手剩余奖赏）/ `flip_heads_count`（until_tails
+正面次数）；`modify_attack_cost` 声明式（passive_static，引擎 _energy_satisfied
+求值点读声明，只减【无】、下限 0）；回合级奖赏加成钩子（白蕾雅：仅招式伤害
+致昏厥路径，turn scoped）；coin_flip 支持 until_tails 模式（连续掷到反面，
+逐次落事件流）；bounce `args.attachments: hand`（附着物回手，默认 discard 不变）；
+`transform` 原语（百变怪 变身启动：整叠弃置、牌库基础宝可梦接替原位置，
+不触发昏厥/奖赏、伤害状态不继承——附录 A 决议）。
+
+**干扰、场地覆写与退化（task 026 WP6 补充）**：`hand_disrupt` 原语（对手手牌
+均匀随机 1 张 → reveal 落事件流 → 回对手牌库重洗；对手手牌空则效果段 no-op）；
+竞技场 `bench_size` 覆写（零之大空洞：逐玩家动态求值，太晶在场方 5→8；失效触点
+= 竞技场离场或己方太晶离场，立即由该方玩家自选缩减弃置至 5——非昏厥无奖赏，
+双方同时缩减持有者先行）；`search_deck` 组合约束（小刚的发掘：基础 up-to 2 /
+进化 up-to 1 二选一互斥）与 `distinct` 属性互异选择池约束 + 拆分去向（赤松：
+1 张入手 + 剩余附着）；检索去向新增 `deck_top` 有序（暗码迷：选择顺序即牌顶
+顺序 FIFO，余库重洗）；事件词 `own_ko_by_attack`（战斗场受对手招式伤害昏厥时，
+复用 attack_ctx 攻击方识别）+ `lock_retreat` 原语（目标下个其回合无法撤退，
+进化/离场清除）；`protection` 声明式最小版（火恐龙 闪焰之幕：对手招式附加效果
+不适用、伤害不免疫，效果落点逐目标检查）；`devolve` 原语 + 招式学习器载体
+（道具即招式：附着后持有者可宣言、费用照常校验、持有者回合结束自弃；退化 =
+对手全场进化宝可梦各退栈顶 1 张回手，伤害指示物保留、特殊状态恢复、HP 超限
+昏厥结算——附录 A 决议）。
+
 ### 5.3 覆盖策略：原语先行，逐卡落地
 
 从真实卡组反向驱动：取当前 G/H/I 环境 WUR 前 N 套卡组 → 列出涉及全部卡 → 归并所需原语 → 原语实现一个、解锁一批卡。第一批原语只做到覆盖这批卡组为止（YAGNI），不为长尾冷僻效果提前设计。

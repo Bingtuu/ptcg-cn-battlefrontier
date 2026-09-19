@@ -266,9 +266,9 @@ def test_审计收窄_朋友手册_仅收最多2张文本类():
 
 
 def test_退环境且池内零使用_文件出库():
-    """彷徨夜灵（D 标 CS2.5C-018）/ 交替推车 / 捕获香氛：全印刷退环境 + 池内零使用。"""
+    """交替推车 / 捕获香氛：全印刷退环境 + 池内零使用。
+    （彷徨夜灵 H 标 CSV8C-082 已随 task 026 WP2 咒怨炸弹落地回库，不再出库。）"""
     stems = {p.stem for p in CARDS_DIR.glob("*.yml")}
-    assert "彷徨夜灵" not in stems
     assert "交替推车" not in stems
     assert "捕获香氛" not in stems
 
@@ -280,8 +280,10 @@ POOL_DECKS = ["mik_moe:644634", "mik_moe:650353", "mik_moe:652967", "mik_moe:655
               "mik_moe:655776", "mik_moe:643572", "mik_moe:655513", "mik_moe:648346",
               "mik_moe:655512"]
 # 波波 CSV4C-099「起风」白板印刷：同名异文本（「呼朋引伴」版有 DSL），合法不挂载、
-# 装配走覆盖告警（不硬报错）；池内唯一一例同名有文档而未覆盖的印刷
-VANILLA_UNCOVERED_OK = {"CSV4C-099"}
+# 装配走覆盖告警（不硬报错）；
+# 索财灵 CSV9C-096（H 标「小使者」类，task 026 WP5）：同名异文本（G 标「连掷硬币」
+# 类有 DSL），同名多文本严格拆分、合法不挂载
+VANILLA_UNCOVERED_OK = {"CSV4C-099", "CSV9C-096"}
 
 needs_db = pytest.mark.skipif(not DB_PATH.exists(), reason="本机无 ptcg-cn.db")
 
@@ -309,7 +311,7 @@ def test_prepare_experiment_真实卡组_按_card_id_挂载(tmp_path):
 
 @needs_db
 def test_池内卡组印刷覆盖回归():
-    """池内 9 套卡组：同名有效果文档的印刷必须被库覆盖（波波白板印刷除外）。"""
+    """池内 9 套卡组：同名有效果文档的印刷必须被库覆盖（波波/索财灵异文本印刷除外）。"""
     from ptcgdb.sdk import open_db
 
     lib = load_card_dir(CARDS_DIR)

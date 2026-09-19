@@ -1,0 +1,19 @@
+# 夜巡灵（CSV8C-081，基础）
+# text_raw 原文：「【超】 渡魂
+# 选择自己弃牌区中最多3张「夜巡灵」，放于备战区。
+#
+# 【超】【超】 喃喃自语 30」
+# recover_from_discard destination=bench（task 026 WP3）：「最多3张」= up-to
+# （min_choose=0）；直放备战区为 InPlayPokemon 并登记 entered_play_this_turn
+# （当回合不可进化联动）；备战区 5 只容量上限在池解析即截断。
+# 喃喃自语 30 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 夜巡灵
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标；
+  # 其余文本类（预知未来/迷惑/孤魂进化等 C/D/F 标）未写，不在本文件挂载
+  card_ids: [CSV8C-081, CSV8C-210, CSV9.5C-069, SVP-346]
+effects:
+  - trigger: on_attack
+    attack: 渡魂
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: ["name:夜巡灵"], choose: 3, destination: bench}

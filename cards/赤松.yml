@@ -1,0 +1,25 @@
+# 赤松（CSV9.5C-183，支援者）
+# text_raw 原文：「选择自己牌库中，属性各不相同的基本能量最多2张，在给对手看过之后，
+# 将其中1张加入手牌，将剩余的能量附着于自己的宝可梦身上。并重洗牌库。」
+# 属性互异 + 拆分去向（task 026 WP6，D-WP6-4 🔲 待核）：search_deck filters=[basic_energy]
+# choose=2（「最多」= up-to）+ args {distinct: energy_type, split: hand_attach}——
+# 段1 枚举仅含属性互异子集（牌库属性单一时 choose 自动收缩为 1）；段2 从所选能量中
+# 选 1 张入手；段3 剩余能量附着于自己场上 1 只宝可梦（选 0/1 张时无后续段）。
+# 「给对手看过」= reveal own_hand（猫头夜鹰先例）；重洗由 shuffle_deck 节点表达。
+card:
+  name_group: 赤松
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全赛制合法 6 印刷
+  card_ids: [CSV9.5C-183, CSV9.5C-249, CSV9C-196, CSV9C-233, CSVM2aC-025, SVP-339]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - action: search_deck
+        selector: own_deck
+        filters: [basic_energy]
+        choose: 2
+        destination: hand
+        args: {distinct: energy_type, split: hand_attach}
+      - {action: reveal, selector: own_hand, filters: [basic_energy]}
+      - {action: shuffle_deck}

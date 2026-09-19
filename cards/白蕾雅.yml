@@ -1,0 +1,19 @@
+# 白蕾雅（CSV9C-202，支援者）
+# text_raw 原文：「这张卡牌，只有在对手的剩余奖赏卡张数为2张时才可使用。
+#
+# 在这个回合，如果因为自己「太晶」宝可梦所使用的招式的伤害，而导致对手战斗宝可梦【昏厥】了的话，则多拿取1张奖赏卡。」
+# 使用条件 = opponent_prizes_eq:2（task 026 WP1 参数化 condition，playable 门既有）。
+# 奖赏加成（task 026 WP5，D-WP5-2 🔲 待核）：prize_bonus 回合级标记
+# （turn scoped，回合结束清除）——仅「太晶宝可梦招式伤害致对手战斗场昏厥」路径
+# 触发（效果/指示物致昏厥、备战昏厥不触发；太晶判定读 CardDef.is_tera），
+# 多拿 1 张在 take_prize 触点（core._knockout_one）结算，奖赏不足按剩余拿取
+# （拿完即胜）。
+card:
+  name_group: 白蕾雅
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 6 印刷
+  card_ids: [CSV9.5C-197, CSV9C-202, CSV9C-239, CSV9C-255, CSVNC-038, SVP-340]
+effects:
+  - trigger: on_play
+    condition: opponent_prizes_eq:2
+    actions:
+      - {action: prize_bonus, args: {amount: 1, scope: tera_attack_ko}}

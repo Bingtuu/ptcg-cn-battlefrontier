@@ -143,3 +143,50 @@ def test_error_reports_source_file(tmp_path: Path):
     p.write_text(PROFESSORS_RESEARCH.replace("action: draw", "action: fly"), encoding="utf-8")
     with pytest.raises(DslError, match="bad_card.yml"):
         load_card_doc(p)
+
+
+# ── task 026 WP2：trigger_on_event 的 event 字段（events 词表段）────────────
+
+TRIGGER_ON_EVENT = """
+card:
+  name_group: 摔角鹰人
+effects:
+  - trigger: trigger_on_event
+    event: own_play_from_hand_to_bench
+    actions:
+      - {action: place_damage_counters, selector: opponent_bench, choose: 2, args: {counters: 1}}
+"""
+
+
+def test_trigger_on_event_event_field_parses():
+    """event 字段仅 trigger_on_event 使用，值查 events 词表段。"""
+    doc = parse_card_doc(TRIGGER_ON_EVENT)
+    effect = doc.effects[0]
+    assert effect.trigger == "trigger_on_event"
+    assert effect.event == "own_play_from_hand_to_bench"
+
+
+def test_trigger_on_event_missing_event_rejected():
+    bad = TRIGGER_ON_EVENT.replace("    event: own_play_from_hand_to_bench\n", "")
+    with pytest.raises(DslError, match="event"):
+        parse_card_doc(bad)
+
+
+def test_event_on_other_trigger_rejected():
+    bad = TRIGGER_ON_EVENT.replace("trigger: trigger_on_event", "trigger: on_play")
+    with pytest.raises(DslError, match="event"):
+        parse_card_doc(bad)
+
+
+def test_unknown_event_word_rejected():
+    bad = TRIGGER_ON_EVENT.replace("own_play_from_hand_to_bench", "on_vibes")
+    with pytest.raises(DslError, match="on_vibes"):
+        parse_card_doc(bad)
+
+
+def test_own_evolve_from_hand_event_word_parses():
+    """task 026 WP3：events 词表新词 own_evolve_from_hand（猫头夜鹰 寻找宝石）。"""
+    doc = parse_card_doc(
+        TRIGGER_ON_EVENT.replace("own_play_from_hand_to_bench", "own_evolve_from_hand")
+    )
+    assert doc.effects[0].event == "own_evolve_from_hand"

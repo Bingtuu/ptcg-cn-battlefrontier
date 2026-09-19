@@ -1,0 +1,15 @@
+# 水莲的照顾（CSV7C-193，支援者）
+# text_raw 原文：「选择自己弃牌区中的宝可梦（除「拥有规则的宝可梦」外）和基本能量合计最多3张，在给对手看过之后，加入手牌。」
+# recover_from_discard hand up-to（task 026 WP3，args.up_to）：「合计最多3张」=
+# 单一过滤器池（pokemon_no_rule_or_basic_energy = 无规则盒宝可梦 或 基本能量）
+# + min_choose=0。reveal 一期口径：仅落结构化事件流（iids+卡名），对手可见视图
+# 不建模泄露。
+card:
+  name_group: 水莲的照顾
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 7 印刷
+  card_ids: [CSV7C-193, CSV7C-230, CSV7C-246, CSV9.5C-189, CSVH4C-049, CSVM2cC-025, SVP-199]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [pokemon_no_rule_or_basic_energy], choose: 3, destination: hand, args: {up_to: true}}
+      - {action: reveal, selector: own_hand, filters: [pokemon_no_rule_or_basic_energy]}

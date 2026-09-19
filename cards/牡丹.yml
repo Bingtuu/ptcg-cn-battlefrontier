@@ -1,0 +1,14 @@
+# 牡丹（CSV1C-124，支援者）
+# text_raw 原文：「选择自己场上的1只【基础】宝可梦，将该宝可梦，以及放于其身上的所有卡牌，放回手牌。」
+# bounce args.attachments=hand（task 026 WP5）：整叠（含进化链……本卡目标限【基础】，
+# 即栈顶 stage==0 的场上过滤器 basic_pokemon）+ 附着能量/道具全部回手牌
+# （默认 attachments=discard 行为不变——弗图博士的剧本等回归）。
+# 战斗场目标 bounce 后换上流程不变式（resume_after_promotes，附录 A 决议）。
+card:
+  name_group: 牡丹
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 G 标 5 印刷
+  card_ids: [CBB2C-1004, CSV1C-124, CSV1C-151, CSV1C-162, SVP-208]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: bounce, selector: own_pokemon_in_play, choose: 1, filters: [basic_pokemon], args: {attachments: hand}}

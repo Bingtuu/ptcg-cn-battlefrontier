@@ -1,0 +1,28 @@
+# 拉帝亚斯ex（CSV9C-078，基础，规则盒 ex，特性：天际线）
+# text_raw 原文：「特性: 天际线
+# 只要这只宝可梦在场上，自己所有【基础】宝可梦【撤退】所需能量，全部消除。
+#
+# 【超】【超】【无】 无限之刃 200
+# 在下一个自己的回合，这只宝可梦无法使用招式。」
+# 天际线 = 声明式常驻修正（task 026 WP4，D-WP4-2 🔲 待核）：passive_static +
+# scope=own_basic_all（自己全场 stage==0 宝可梦撤退费归零；对手不受影响；
+# 离场即失效——引擎 _effective_retreat_cost 实时读声明）。
+# 无限之刃 200（task 026 WP4 裁决 2，2026-09-14）：on_attack 绑定后伤害由 DSL 结算
+# （damage 200 节点）；招式锁 = lock_attack self（下个自己回合不可宣言，
+# 再下个自己回合解禁；撤退清除/进化继承——决议口径待核）。
+# 已知近似（附录 A D-WP4-5）：原文「无法使用招式」（全部招式），lock_attack 现锁
+# 绑定的本招式名——本卡仅单招式故等价；多招式卡的全部锁需要时再扩展 scope。
+card:
+  name_group: 拉帝亚斯ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 3 印刷
+  card_ids: [CSV9C-078, CSV9C-223, CSV9C-247]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_retreat_cost, args: {value: "all", scope: own_basic_all}}
+  - trigger: on_attack
+    attack: 无限之刃
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 200}}
+      - {action: lock_attack, selector: self}
+

@@ -1,0 +1,18 @@
+# 雪童子（CSV7C-057，基础，水属性）——「惊吓」H 标文本类
+# （同名多文本拆分：C/E/F/G 标异文本类未写，不在本文件挂载，见 task 026 WP6 范围纪律）
+# text_raw 原文：「【水】【无】 惊吓 20
+# 在不看正面的前提下选择对手1张手牌，查看该卡牌的正面后，放回对手牌库并重洗牌库。」
+# 惊吓（task 026 WP6，D-WP6-1 🔲 待核）：hand_disrupt 原语——「不看正面选择」= 均匀随机
+# （rng.randbelow，单一随机源，种子确定性）；「查看正面」= reveal 结构化事件流
+# （iids+卡名，一期口径同猫头夜鹰）；「放回牌库并重洗牌库」= 该卡入对手牌库后 rng.shuffle。
+# 对手空手时扰乱 no-op、伤害 20 照算（damage 节点先行）。
+card:
+  name_group: 雪童子
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：「惊吓」H 标 2 印刷
+  card_ids: [CSV7C-057, CSV9.5C-043]
+effects:
+  - trigger: on_attack
+    attack: 惊吓
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: hand_disrupt, selector: opponent_hand}

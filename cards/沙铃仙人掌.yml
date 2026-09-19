@@ -1,0 +1,27 @@
+# 沙铃仙人掌（CSV10C-008，基础，草属性）——I 标文本类
+# （同名多文本拆分：D/E/G 标异文本类未写，不在本文件挂载，见 task 026 WP6 范围纪律）
+# text_raw 原文：「特性: 炸裂针刺
+# 当这只宝可梦在战斗场上受到对手宝可梦的招式的伤害而【昏厥】时，给使用了招式的宝可梦
+# 身上放置6个伤害指示物。
+#
+# 【无】 穷追不舍 20
+# 在下一个对手的回合，受到这个招式影响的宝可梦无法撤退。」
+# 炸裂针刺（task 026 WP6，D-WP6-6 🔲 待核）：trigger_on_event=own_ko_by_attack——
+# 仅战斗场 + 对手招式伤害致昏厥触发（效果/指示物致昏厥、备战昏厥不触发）；
+# place_damage_counters selector=opponent_attacker 指向攻击方（昏厥事件上下文，
+# 攻击方已离场时 no-op）。穷追不舍（D-WP6-7）：lock_retreat 锁对手战斗场撤退，
+# 目标下个自己回合结束解除（进化亦清除）；伤害 20 照算。
+card:
+  name_group: 沙铃仙人掌
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：I 标 2 印刷
+  card_ids: [CSV10C-008, CSV10C-224]
+effects:
+  - trigger: trigger_on_event
+    event: own_ko_by_attack
+    actions:
+      - {action: place_damage_counters, selector: opponent_attacker, args: {counters: 6}}
+  - trigger: on_attack
+    attack: 穷追不舍
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: lock_retreat, selector: opponent_active}

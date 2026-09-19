@@ -1,0 +1,27 @@
+# 月月熊 赫月ex（CSV8C-172，基础，规则盒 ex，特性：老练招式）
+# text_raw 原文：「特性: 老练招式
+# 这只宝可梦使用「血月」所需能量会减少与对手已经获得的奖赏卡张数相同数量的【无】能量。
+#
+# 【无】【无】【无】【无】【无】 血月 240
+# 在下一个自己的回合，这只宝可梦无法使用招式。」
+# 老练招式（task 026 WP5，D-WP5-4 🔲 待核）：modify_attack_cost 声明式
+# （passive_static，引擎 _effective_attack_cost 求值点读声明；枚举与执行共用）——
+# 减免 = opponent_taken_prizes（=6−对手剩余奖赏）个【无】，下限 0、只减无色部分；
+# 离场即失效（求值点实时读声明）。
+# 血月 240 + lock_attack（task 026 WP4 裁决 2）：「下一个自己的回合无法使用招式」
+# = on_attack 内 lock_attack self（下个自己回合不可宣言，再下个解禁；撤退清除/
+# 进化继承——决议口径待核）。本卡单招式，锁本招式名即等价全锁（D-WP4-5 近似同
+# 拉帝亚斯ex）。
+card:
+  name_group: 月月熊 赫月ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 8 印刷
+  card_ids: [CSV8C-172, CSV8C-231, CSV8C-251, CSV8C-258, CSV9.5C-154, CSV9.5C-247, CSVM2bC-009, CSVNC-031]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_attack_cost, args: {attack: 血月, value: opponent_taken_prizes}}
+  - trigger: on_attack
+    attack: 血月
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 240}}
+      - {action: lock_attack, selector: self}

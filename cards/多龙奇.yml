@@ -1,0 +1,22 @@
+# 多龙奇（CSV8C-158，1阶，特性：侦察指令）
+# text_raw 原文：「特性: 侦察指令
+# 在自己的回合可以使用1次。查看自己牌库上方2张卡牌，选择其中1张卡牌，加入手牌。将剩余的卡牌，放回牌库下方。
+#
+# 【火】【超】 龙之头击 70」
+# search_deck top_n 检视（task 026 WP3）：args.top_n=2 检视牌库顶 2 张为选择池，
+# args.rest=deck_bottom 未选卡按原序放回牌库下方、不洗牌（检视语义无洗牌义务；
+# 私密检视观测纪律：事件流只落选择结果）。「选择其中1张」从宽按检索统一 up-to 纪律
+# （min_choose=0，rules-reference 附录 A 决议）。
+# 龙之头击 70 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 多龙奇
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标；
+  # 其余文本类（叫出/幽魂射击等 D/E/F 标）未写，不在本文件挂载
+  card_ids: [CSV8C-158, CSV9.5C-133, CSVM2bC-006]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    # 决策聚合锚点（task 022）：检视选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, choose: 1, destination: hand, args: {top_n: 2, rest: deck_bottom}}

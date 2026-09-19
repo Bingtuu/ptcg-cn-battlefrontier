@@ -1,0 +1,25 @@
+# 猛雷鼓ex（CSV7C-154，基础，规则盒 ex，龙属性）
+# text_raw 原文：「【无】 飞溅咆哮
+# 将自己的手牌全部放于弃牌区，从牌库上方抽取6张卡牌。
+#
+# 【雷】【斗】 极雷轰 70×
+# 将自己场上宝可梦身上附着的任意数量的基本能量放于弃牌区，造成其张数×70伤害。」
+# 飞溅咆哮：discard own_hand count=all + draw 6（既有件）。
+# 极雷轰 70×（task 026 WP5，D-WP5-1 🔲 待核）：discard own_attached_energy any_count
+# （场上全体宝可梦附着能量池，basic_energy 过滤，从各宝可梦身上摘下弃置）→
+# 张数经 discarded_this_effect 计数词 ×70 结算；选 0 张 → 伤害 0 仍可宣言。
+card:
+  name_group: 猛雷鼓ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 7 印刷
+  card_ids: [CSV7C-154, CSV7C-227, CSV7C-244, CSV7C-256, CSV9.5C-138, CSV9.5C-244, CSVM2aC-008]
+effects:
+  - trigger: on_attack
+    attack: 飞溅咆哮
+    actions:
+      - {action: discard, selector: own_hand, count: all}
+      - {action: draw, count: 6}
+  - trigger: on_attack
+    attack: 极雷轰
+    actions:
+      - {action: discard, selector: own_attached_energy, filters: [basic_energy], args: {any_count: true}}
+      - {action: damage, selector: opponent_active, count: discarded_this_effect, args: {op: "×", per: 70}}

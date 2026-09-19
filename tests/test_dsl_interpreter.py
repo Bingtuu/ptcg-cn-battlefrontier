@@ -42,7 +42,7 @@ card:
 effects:
   - trigger: on_play
     actions:
-      - {action: reveal, selector: own_hand}
+      - {action: put_into_play, selector: own_hand}
 """)
 
 COUNTER_DOC = parse_card_doc("""
@@ -178,8 +178,8 @@ def test_supporter_marker_resets_next_turn():
 
 
 def test_unimplemented_primitive_raises_dsl_error():
-    """词表有而未实现的原语（reveal）= DslError「未实现」（copy_attack 已于 task 017 实现，
-    本测试改用 reveal 锁定「词表有而未实现」路径）。"""
+    """词表有而未实现的原语 = DslError「未实现」（reveal 已于 task 026 WP3 实现，
+    本测试改用 put_into_play 锁定「词表有而未实现」路径）。"""
     state = main_state(p0_extra_hand=(inst(60, item("测试复制")),))
     engine = engine_at(state)
     engine.card_effects = {"测试复制": COPY_DOC}

@@ -1,0 +1,19 @@
+# 猛雷鼓（CSV8C-161，基础，龙属性）
+# text_raw 原文：「【雷】【斗】 落雷风暴
+# 给对手的1只宝可梦，造成这只宝可梦身上附着的能量数量×30伤害。[备战宝可梦不计算弱点、抗性。]
+#
+# 【雷】【斗】【无】 龙之头击 130」
+# 落雷风暴（task 026 WP5）：attached_energy_on_target 计数词——目标宝可梦附着
+# 能量数 ×30；目标 = opponent_pokemon_any choose=1（含备战）。
+# 「备战宝可梦不计算弱点、抗性」= rule_reference 句（task 009 约定排除），
+# 引擎贯穿规则（_damage 备战落点不结算弱抗）天然满足。
+# 龙之头击 130 = 白板伤害（AttackDef.damage，无 DSL 绑定）。
+card:
+  name_group: 猛雷鼓
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 2 印刷
+  card_ids: [CSV8C-161, CSVM2aC-007]
+effects:
+  - trigger: on_attack
+    attack: 落雷风暴
+    actions:
+      - {action: damage, selector: opponent_pokemon_any, choose: 1, count: attached_energy_on_target, args: {op: "×", per: 30}}

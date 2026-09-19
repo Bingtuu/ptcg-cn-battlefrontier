@@ -1,0 +1,26 @@
+# 赛富豪ex（CSV4C-089，1阶进化（索财灵链），规则盒 ex，特性：嘉奖硬币）
+# text_raw 原文：「特性: 嘉奖硬币
+# 在自己的回合可以使用1次。从自己牌库上方抽取1张卡牌。如果这只宝可梦在战斗场上的话，则额外抽取1张卡牌。
+#
+# 【钢】 淘金潮 50×
+# 将自己手牌中任意数量的基本能量放于弃牌区，造成其张数×50伤害。」
+# 嘉奖硬币（task 026 WP5）：once_per_turn + draw 1 + 节点级门控 if_self_active 追加
+# draw 1（「战斗场则额外抽取1张」= 条件式追加抽，节点 condition 实现）。
+# 淘金潮 50×（task 026 WP5，D-WP5-1 🔲 待核）：「任意数量」= up-to all
+# （min_choose=0）；弃置张数经 discarded_this_effect 计数词 ×50 结算；
+# 选 0 张 → 伤害 0，招式仍可宣言（WP4 宣言裁决的延伸应用）。
+card:
+  name_group: 赛富豪ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 G 标 7 印刷
+  card_ids: [CSV4C-089, CSV4C-144, CSV4C-156, CSV4C-162, CSV9.5C-131, CSV9.5C-242, CSVM2cC-007]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    actions:
+      - {action: draw, count: 1}
+      - {action: draw, count: 1, condition: if_self_active}
+  - trigger: on_attack
+    attack: 淘金潮
+    actions:
+      - {action: discard, selector: own_hand, filters: [basic_energy], args: {any_count: true}}
+      - {action: damage, selector: opponent_active, count: discarded_this_effect, args: {op: "×", per: 50}}

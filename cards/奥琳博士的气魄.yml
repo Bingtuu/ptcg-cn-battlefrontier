@@ -1,0 +1,16 @@
+# 奥琳博士的气魄（CSV6C-121，支援者）
+# text_raw 原文：「选择自己最多2只「古代」宝可梦，各附着1张弃牌区中的基本能量。然后，从自己牌库上方抽取3张卡牌。」
+# attach_energy 多目标各附1（task 026 WP3，args.multi_target）：段1 选弃牌区基本能量
+# up-to 2 → 段2 选等量「古代」目标（trait:古代 ← CardDef.labels ← db effect_tags.labels）
+# → 按选择顺序 FIFO 一一配对（rules-reference 附录 A 决议，官方规则未规定分配顺序）；
+# 目标/能量不足按 min(目标数, 能量数, 2) 收缩，任一侧为空 no-op；「然后抽3张」为独立
+# 后续节点，无条件执行。
+card:
+  name_group: 奥琳博士的气魄
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 G 标 7 印刷
+  card_ids: [CSV6C-121, CSV6C-146, CSV6C-156, CSV9.5C-187, CSVH4C-046, CSVM2aC-026, SVP-238]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: attach_energy, selector: own_discard, filters: [basic_energy], choose: 2, destination: attach, args: {target_filters: ["trait:古代"], multi_target: true}}
+      - {action: draw, count: 3}

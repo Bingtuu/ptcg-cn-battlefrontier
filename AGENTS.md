@@ -9,7 +9,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 ## 当前状态
 
-设计阶段完成（2026-08-25），实现未开始。一期里程碑：M1 引擎骨架 → M2 DSL + 解释器 + 首批原语 → M3 启发式 Agent + Runner + 结果库 → M4 报告层 → M5 覆盖扩展 + LLM 辅助编写试验 → M6 校准基线与一期验收。
+M1–M4 已达成（引擎骨架 / DSL+解释器 / 启发式 Agent+Runner+结果库 / 报告层），**M5 覆盖扩展进行中**：卡池 v1 九套已锁定（`config/target-pool.v1.yml`），缺口 81 张中 done 48 / blocked 0 / pending 33（task 026 WP0–WP6 完成，blocked 已清零），DSL 定义库 68 文件，全量 727 测试绿。逐日进展与下一步见 `STATUS.md`（事实源，本文件不抄写细节）。
 
 ## 架构分层与边界
 
@@ -18,7 +18,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 ```
 
 - **引擎对卡牌内容零硬编码**："这张卡做什么"全部由 DSL 定义、解释器执行；引擎只管规则骨架（阶段机、伤害、奖赏、胜负）。
-- **DSL 定义库是独立资产**：每卡一个 YAML，Pydantic schema 强校验，进版本控制，单卡效果测试不依赖整局模拟。
+- **DSL 定义库是独立资产**：每（卡名 + 文本）等价类一个 YAML（同名多文本**严格拆分**，如 `火恐龙-大字爆炎.yml` / `火恐龙-闪焰之幕.yml`），Pydantic schema 强校验，进版本控制，单卡效果测试不依赖整局模拟。**装载键 = card_id 精确挂载**（`card_ids` 必填，2026-09-06 决议；无名字兜底——防取错印刷），闸 1 校验走 `bfsim dsl-check --db`（card_id 存在性 / 文件内归一化 text_raw 一致 / 赛制合法性）。
 - **Agent 接口统一**：`observe(visible_state, legal_actions) -> action`，启发式 / MCTS / RL 共用；Agent 只见过滤后的可见视图（对手手牌内容不可见），引擎枚举合法行动，AI 永不非法操作。
 - **数据只进不出**：消费 db 项目只读；模拟结果落本项目独立 SQLite。
 
@@ -43,16 +43,32 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 - **任务循环**：开发按 `tasks/` 目录的标准循环执行——每个任务一个 `task NNN.md`，流程：读设计文档 → 设计 TDD（验收标准先行）→ 开发 → 测试（pytest 全绿 + ruff 通过）→ 更新 `STATUS.md` + task 文档归档 `tasks/done/`。规范见 `tasks/README.md`。
 - 变更架构、DSL 语义、结果库 schema、统计口径前，**先改 PRD** 并保持代码与 PRD 同步。
-- 一期目标卡组池以 db 项目 `stats_usage(granularity="archetype")` 当前 WUR 排名驱动锁定，不拍脑袋选组。
+- 一期目标卡组池以 db 项目 `stats_usage(granularity="archetype")` 当前 WUR 排名驱动锁定，不拍脑袋选组（卡池 v1 已锁定：`config/target-pool.v1.yml`）。
+- 大批次实现走「子代理 TDD + 主会话独立复验 + 规格/质量双重复核」（task 026 WP2–WP6 惯例）；子代理不得改权威测试迁就实现，测试断言存疑报主会话裁决。
 - LLM 辅助 DSL 编写走固定 harness（skill + 严格 prompt），三道验收闸（schema 校验 → 单卡单元测试 → 人工核销）全过才入库；一期为试验性，需记录一次通过率与人工修改量。
 - CHANGELOG.md 四段式：Added / Changed / Deprecated / Removed。
 
 ## 常用命令
 
-待实现期补充（CLI 入口 `bfsim`）。开发自检与 db 项目对齐：
+CLI 入口 `bfsim`（`pip install -e .` 后可用；开发期等价于 `python -m battlefrontier.cli`）：
 
 ```bash
-# 测试与检查（Windows Git Bash）
+# 跑实验（实验定义见 experiments/*.example.yml；--workers 多进程，结果与串行逐局一致）
+bfsim run experiments/gardevoir-mirror.example.yml --workers 4 --results results/exp.db
+
+# 报告（实验 id 由 run 完成时回显；--decisions 追加决策聚合分节）
+bfsim report 1 --results results/exp.db [--decisions]
+
+# 换卡敏感性（实验定义含 variants 时 run 自动跑整组）
+bfsim sensitivity <base_id> <variant_id>... --results results/exp.db
+
+# DSL 校验（闸 1）：schema + 词表；--db 追加 card_id 存在性 / 文本等价类一致 / 赛制合法
+bfsim dsl-check cards/*.yml --db "C:/Vibe Project/Pokearena/data/ptcg-cn.db"
+```
+
+开发自检（Windows Git Bash，提交前必过）：
+
+```bash
 PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -X utf8 -m pytest -q
 .venv/Scripts/ruff.exe check .
 ```

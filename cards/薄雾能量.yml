@@ -1,0 +1,19 @@
+# 薄雾能量（CSV7C-204，特殊能量）
+# text_raw 原文：「只要这张卡牌，被附着于宝可梦身上，就被视作1个【无】能量。
+#
+# 身上附着了这张卡牌的宝可梦，不受到对手宝可梦所使用的招式的效果影响。（已经受到的效果，不会消失。）」
+# 视作1个【无】：provide_energy types=[无]（task 026 WP8，D-WP8-1）。
+# 效果免疫：protection scope=opponent_attack_effects 声明在能量卡文档（D-WP8-4，
+# 引擎 _protected_from_attack_effects 并集读取持有者附着能量卡文档）；守卫落点
+# （apply_status / place_damage_counters / lock_retreat / devolve）天然满足
+# 「已经受到的效果，不会消失」（落点拦截，不做回顾性清除）。
+card:
+  name_group: 薄雾能量
+  card_ids: [CSV7C-204, CSV9.5C-207, CSVM1aC-033]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: provide_energy, args: {types: [无]}}
+  - trigger: passive_static
+    actions:
+      - {action: protection, args: {scope: opponent_attack_effects}}

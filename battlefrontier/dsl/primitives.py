@@ -995,12 +995,16 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
 
 
 def _find_source_mon(ctx: ExecutionContext) -> InPlayPokemon | None:
-    """按效果来源定位攻方持有宝可梦（来源可为宝可梦栈顶或其道具——授予招式路径）。"""
+    """按效果来源定位攻方持有宝可梦（来源可为宝可梦栈顶、其道具——授予招式
+    路径——或其附着能量：task 026 WP8 喷射能量 own_attach_from_hand_to_bench
+    触发效果的 switch self 定位用）。"""
     p = ctx.engine.state.players[ctx.player]
     for m in ([p.active] if p.active else []) + list(p.bench):
         if m.current.iid == ctx.source.iid:
             return m
         if m.attached_tool is not None and m.attached_tool.iid == ctx.source.iid:
+            return m
+        if any(e.iid == ctx.source.iid for e in m.attached_energy):
             return m
     return None
 
@@ -1073,18 +1077,46 @@ def _apply_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
 @register("switch")
 def _switch(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
     """换位：opponent_bench = gust 强制对手（反击捕捉器）；own_bench = own 侧互换
-    （task 025 交替推车：自己战斗场 ↔ 所选备战）。
+    （task 025 交替推车：自己战斗场 ↔ 所选备战）；self = 来源卡持有者与战斗
+    宝可梦互换（task 026 WP8 喷射能量：手动附着备战时触发，无 choose 固定目标）。
 
     回备战区的宝可梦特殊状态清除（rules-manual §7.1「恢复途径：回到备战区
     （撤退或效果）」），伤害指示物与附着能量保留（§5 撤退条目同理）；
     效果互换不占每回合撤退次数（非撤退行动）。无备战时不挂起、no-op
     （可行性门已提前拦截枚举）。
     """
-    if node.selector not in ("opponent_bench", "own_bench"):
-        raise DslError(f"switch 暂仅支持 selector=opponent_bench/own_bench（收到 {node.selector!r}）")
+    if node.selector not in ("opponent_bench", "own_bench", "self"):
+        raise DslError(f"switch 暂仅支持 selector=opponent_bench/own_bench/self（收到 {node.selector!r}）")
+    engine = ctx.engine
+    if node.selector == "self":
+        # 喷射能量（D-WP8-3）：「将该宝可梦与战斗宝可梦互换」——目标固定为
+        # 来源能量卡的持有者（事件 own_attach_from_hand_to_bench 保证其在备战区），
+        # 无选择交互；回备战方状态清除口径同 own_bench 分支
+        _require_no_choose(node, "switch")
+        o = engine.state.players[ctx.player]
+        holder = _find_source_mon(ctx)
+        if holder is None:
+            raise DslError("switch self：来源卡不在己方场上（不猜）")
+        if holder.current.iid == (o.active.current.iid if o.active else None):
+            return {"switched": False, "reason": "already_active"}
+        if o.active is None:
+            raise DslError("switch：战斗场为空，无法互换")
+        idx = next(i for i, b in enumerate(o.bench)
+                   if b.current.iid == holder.current.iid)
+        promoted = o.bench[idx]
+        retreated = o.active.model_copy(update={
+            "conditions": frozenset(),
+            # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+            "paralyzed_mark": None,
+        })
+        bench = o.bench[:idx] + (retreated,) + o.bench[idx + 1:]
+        engine._set_player(ctx.player, o.model_copy(update={
+            "active": promoted, "bench": bench,
+        }))
+        return {"switched": True, "into": promoted.current.card.name,
+                "out": retreated.current.card.name}
     if node.choose != 1:
         raise DslError(f"switch 需要 choose=1（收到 choose={node.choose}）")
-    engine = ctx.engine
     side_idx = ctx.player if node.selector == "own_bench" else 1 - ctx.player
     o = engine.state.players[side_idx]
     if choice is None:

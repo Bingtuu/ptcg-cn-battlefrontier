@@ -43,6 +43,7 @@ actions:
   - mill                    # 磨牌（task 026 WP7：对手牌库顶 N 张 → 对手弃牌区）
   - discard_stadium         # 弃置竞技场（task 026 WP7：公共场入其持有者弃牌区）
   - shuffle_hand_into_deck  # 手牌洗回牌库（task 026 WP7 裁判：own_hand/opponent_hand 各自回库重洗）
+  - provide_energy          # 声明式：特殊能量提供值（task 026 WP8 喷射/夜光/薄雾：passive_static，引擎读声明，解释器不执行；args.types=[无] 单属性 / all 彩虹）
 
 # 选择器（作用对象）
 selectors:
@@ -109,3 +110,4 @@ events:
   - own_evolve_from_hand         # 自己的回合，从手牌使出并进行进化时（猫头夜鹰 寻找宝石，task 026 WP3）
   - own_ko_by_attack             # 在战斗场受到对手招式伤害而昏厥时（task 026 WP6 沙铃仙人掌 炸裂针刺）
   - pokemon_check                # 每次宝可梦检查时（task 026 WP7 雪妖女 冻结帷幕：双方回合结束后的检查阶段统一触发）
+  - own_attach_from_hand_to_bench  # 自己的回合，从手牌附着能量于备战宝可梦时（task 026 WP8 喷射能量；仅手动附着行动，效果附着不触发）

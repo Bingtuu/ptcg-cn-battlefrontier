@@ -75,6 +75,31 @@ def _energy_satisfied(attached: tuple[CardInstance, ...], cost: tuple[str, ...])
     return len(remaining) >= colorless
 
 
+def _units_cover_cost(
+    units: list[tuple[bool, str | None]], cost: tuple[str, ...]
+) -> bool:
+    """provide_energy 单元抵费匹配（task 026 WP8，D-WP8-1）：有色需求先精确匹配
+    非彩虹单元、再以彩虹单元抵，余下单元抵无色（彩虹全程只算 1 个单元）。
+    单元 = (is_rainbow, energy_type)；energy_type None 与 "无" 同口径（仅充无色）。"""
+    remaining = list(units)
+    for sym in cost:
+        if sym == "无":
+            continue
+        exact = next(
+            (i for i, (rb, t) in enumerate(remaining) if not rb and t == sym),
+            None,
+        )
+        if exact is not None:
+            remaining.pop(exact)
+            continue
+        rainbow = next((i for i, (rb, _) in enumerate(remaining) if rb), None)
+        if rainbow is None:
+            return False
+        remaining.pop(rainbow)
+    colorless = sum(1 for s in cost if s == "无")
+    return len(remaining) >= colorless
+
+
 def _weakness_resistance(
     atk_card: CardDef, defender: InPlayPokemon, dmg: int, *, weakness: str | None = None,
 ) -> int:
@@ -346,8 +371,11 @@ class GameEngine:
                     continue
                 # 有效招式费（task 026 WP5，D-WP5-4）：_effective_attack_cost 读 DSL
                 # modify_attack_cost 声明（月月熊 老练招式）；枚举与执行共用求值点
-                if not _energy_satisfied(
-                    p.active.attached_energy,
+                # 能量抵费（task 026 WP8，D-WP8-1）：_energy_units_satisfied 逐附着
+                # 能量读 DSL provide_energy 声明（特殊能量彩虹/降级），无文档回退
+                # energy_type 旧口径
+                if not self._energy_units_satisfied(
+                    p.active, player,
                     self._effective_attack_cost(p.active, player, attack),
                 ):
                     continue
@@ -640,14 +668,26 @@ class GameEngine:
         self._fire_trigger_on_event(player, card, holder, "own_evolve_from_hand")
 
     def _do_attach_energy(self, player: int, action: Action) -> None:
-        """【规则书·能量】每回合限 1 张，从手牌附着到场上宝可梦。"""
+        """【规则书·能量】每回合限 1 张，从手牌附着到场上宝可梦。
+
+        trigger_on_event 分发（task 026 WP8，D-WP8-3）：手动附着完成且目标为
+        备战区时直发 own_attach_from_hand_to_bench（喷射能量：该宝可梦与战斗
+        宝可梦互换）——附着到战斗场不触发；效果附着（attach_energy 原语，
+        discard/deck 来源）不经本行动，天然不触发（文本「从手牌附着」在一期 =
+        手动附着口径，附录 A 记）。
+        """
         p, card = self._take_from_hand(self.state.players[player], action.iid)  # type: ignore[arg-type]
         slot, idx, target = self._find_in_play(p, action.target_iid)  # type: ignore[arg-type]
-        p = self._replace_in_play(p, slot, idx, target.model_copy(update={
+        attached = target.model_copy(update={
             "attached_energy": target.attached_energy + (card,),
-        }))
+        })
+        p = self._replace_in_play(p, slot, idx, attached)
         self._set_player(player, p.model_copy(update={"energy_attached_this_turn": True}))
         self._emit("attach_energy", player, iid=card.iid, target=target.current.card.name)
+        if slot == "bench":
+            self._fire_trigger_on_event(
+                player, card, attached, "own_attach_from_hand_to_bench"
+            )
 
     def _do_attach_tool(self, player: int, action: Action) -> None:
         """【rules-manual §5】宝可梦道具从手牌放到场上宝可梦身上（每只限 1 个）。"""
@@ -1223,6 +1263,79 @@ class GameEngine:
             return 0
         return max(0, mon.current.card.retreat_cost - reduction)
 
+    def _attached_energy_units(
+        self, mon: InPlayPokemon, player: int
+    ) -> list[tuple[bool, str | None]]:
+        """逐附着能量求提供值单元（task 026 WP8，D-WP8-1，🔲 待核）。
+
+        引擎对卡牌内容零硬编码：提供值读能量卡 DSL 文档 passive_static 的
+        provide_energy 声明。无文档 → 既有行为（card.energy_type，None 仅充无色）。
+        有文档 → 分层求值：有条件块（condition 非 None 且求值点通过）覆盖无条件块
+        （夜光「…的话，则这张卡牌被视作1个【无】能量」是覆盖语义，D-WP8-2 两块的
+        互斥由本分层保证）；同层 ≥2 条 = DslError（不猜）；两层均 0 条 → 回退默认。
+        args.types：["无"]（单属性，1 单元抵 1 个同色需求或充无色）/ "all"（彩虹，
+        1 单元可抵任意 1 个需求符号，含有色）；缺失/多属性/未知值 = DslError。
+        单元随能量离场即失效（求值点实时读声明，天然满足）。
+        """
+        from battlefrontier.dsl.chooser import condition_met
+
+        units: list[tuple[bool, str | None]] = []
+        for e in mon.attached_energy:
+            doc = effect_doc(self.card_effects, e.card)
+            if doc is None:
+                units.append((False, e.card.energy_type))
+                continue
+            conditional = []
+            unconditional = []
+            for eff in doc.effects:
+                if eff.trigger != "passive_static":
+                    continue
+                nodes = [n for n in eff.actions if n.action == "provide_energy"]
+                if not nodes:
+                    continue
+                if eff.condition is None:
+                    unconditional.extend(nodes)
+                elif condition_met(eff.condition, self, player, mon):
+                    conditional.extend(nodes)
+            if len(conditional) > 1:
+                raise DslError(
+                    f"{e.card.name}: {len(conditional)} 条有条件 provide_energy 声明"
+                    f"同时通过（不猜；声明须互斥）"
+                )
+            picked = conditional[0] if conditional else None
+            if picked is None:
+                if len(unconditional) > 1:
+                    raise DslError(
+                        f"{e.card.name}: {len(unconditional)} 条无条件 provide_energy"
+                        f"声明（不猜；一卡至多 1 条基础提供值）"
+                    )
+                picked = unconditional[0] if unconditional else None
+            if picked is None:
+                units.append((False, e.card.energy_type))
+                continue
+            types = picked.args.get("types")
+            if types == "all":
+                units.append((True, None))
+            elif (
+                isinstance(types, list) and len(types) == 1
+                and isinstance(types[0], str)
+            ):
+                units.append((False, types[0]))
+            else:
+                raise DslError(
+                    f"{e.card.name}: provide_energy 的 args.types 须为 [属性]（单属性）"
+                    f"或 all（彩虹）（收到 {types!r}；不猜）"
+                )
+        return units
+
+    def _energy_units_satisfied(
+        self, mon: InPlayPokemon, player: int, cost: tuple[str, ...]
+    ) -> bool:
+        """招式能量需求求值点（task 026 WP8，D-WP8-1）：攻击枚举与执行共用
+        （apply 经 legal_actions 门控）。无 DSL 声明时与 _energy_satisfied 自由
+        函数同口径；Agent 侧三处调用保持自由函数旧口径（D-WP8-5 已知近似）。"""
+        return _units_cover_cost(self._attached_energy_units(mon, player), cost)
+
     def _effective_attack_cost(
         self, mon: InPlayPokemon, player: int, attack: AttackDef
     ) -> tuple[str, ...]:
@@ -1425,34 +1538,39 @@ class GameEngine:
         伤害本体也不经本判定（不免疫）。
         scope=opponent_attack_damage_to_bench（task 026 WP7 谢米，D-WP7-5）是
         伤害免疫，不归本守卫管——跳过（求值点 = _protected_bench_from_attack_damage）。
+        声明来源并集（task 026 WP8 薄雾能量，D-WP8-4，🔲 待核）：持有者**附着能量
+        卡**文档的同 scope 声明与宝可梦卡自身声明并集（任一声明通过即免疫）；
+        「已经受到的效果，不会消失」= 落点守卫设计天然满足（拦截新落点，不做
+        回顾性清除）；能量离场即失效（求值点实时读声明）。
         一期守卫落点清单：apply_status / place_damage_counters / lock_retreat /
         devolve——新增攻击效果落点须显式评估是否接入本守卫（不接 = 不受保护，不猜）。
         """
-        doc = effect_doc(self.card_effects, mon.current.card)
-        if doc is None:
-            return False
         from battlefrontier.dsl.chooser import condition_met
 
-        declared = False
-        for effect in doc.effects:
-            if effect.trigger != "passive_static":
+        docs = [effect_doc(self.card_effects, mon.current.card)]
+        docs += [effect_doc(self.card_effects, e.card) for e in mon.attached_energy]
+        for doc in docs:
+            if doc is None:
                 continue
-            nodes = [n for n in effect.actions if n.action == "protection"]
-            if not nodes:
-                continue
-            for node in nodes:
-                scope = node.args.get("scope")
-                if scope == "opponent_attack_damage_to_bench":
-                    continue  # 伤害免疫 scope：非本守卫职责（D-WP7-5）
-                if scope != "opponent_attack_effects":
-                    raise DslError(
-                        f"protection 的 scope 暂仅支持 opponent_attack_effects/"
-                        f"opponent_attack_damage_to_bench（收到 {scope!r}；不猜）"
-                    )
-            if not condition_met(effect.condition, self, owner, mon):
-                continue
-            declared = True
-        return declared
+            for effect in doc.effects:
+                if effect.trigger != "passive_static":
+                    continue
+                nodes = [n for n in effect.actions if n.action == "protection"]
+                if not nodes:
+                    continue
+                for node in nodes:
+                    scope = node.args.get("scope")
+                    if scope == "opponent_attack_damage_to_bench":
+                        continue  # 伤害免疫 scope：非本守卫职责（D-WP7-5）
+                    if scope != "opponent_attack_effects":
+                        raise DslError(
+                            f"protection 的 scope 暂仅支持 opponent_attack_effects/"
+                            f"opponent_attack_damage_to_bench（收到 {scope!r}；不猜）"
+                        )
+                if not condition_met(effect.condition, self, owner, mon):
+                    continue
+                return True
+        return False
 
     def _protected_bench_from_attack_damage(self, mon: InPlayPokemon, owner: int) -> bool:
         """备战伤害免疫判定（task 026 WP7 谢米，D-WP7-5，🔲 待核）：「对手的招式

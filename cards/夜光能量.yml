@@ -1,0 +1,22 @@
+# 夜光能量（CSV1C-127，特殊能量）——池内印刷文本类
+# （同名多文本拆分：CBB3C-2003/CBB3C-2006/CSV8C-264/CSVE1C-176/CSVH1C-059/
+# CSVM2bC-034/SVP-419 七印刷为异文本类（「这张卡牌的宝可梦，身上还附着了」），
+# 另文未落地，见 task 026 WP8 范围纪律）
+# text_raw 原文：「只要这张卡牌，被附着于宝可梦身上，就被视作1个所有属性的能量。
+#
+# 如果身上附着了这张卡牌宝可梦，身上附着了除这张卡牌以外的特殊能量的话，则这张卡牌被视作1个【无】能量。」
+# 所有属性：provide_energy types=all（彩虹，1 单元抵任意 1 个需求符号含有色，
+# D-WP8-1）。降级：持有者附着特殊能量计数 ≥2（含自身，D-WP8-2——两张夜光互相
+# 降级；基本能量不计）时视作1个【无】；求值点分层——有条件块覆盖无条件块，
+# 恰 1 条生效（同层 ≥2 条 DslError 不猜）。
+card:
+  name_group: 夜光能量
+  card_ids: [CSV1C-127]
+effects:
+  - trigger: passive_static
+    condition: holder_special_energy_count_ge:2
+    actions:
+      - {action: provide_energy, args: {types: [无]}}
+  - trigger: passive_static
+    actions:
+      - {action: provide_energy, args: {types: all}}

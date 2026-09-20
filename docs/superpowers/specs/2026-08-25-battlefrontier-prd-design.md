@@ -196,6 +196,18 @@ selector all_pokemon_both、place_damage_counters +own_active、跨回合精确
 标记 own_ko_by_attack_during_opponent_turn（古玉鱼：仅招式伤害、含备战落点）
 + 节点门控 if_own_ko_by_attack_during_opponent_turn。
 
+**特殊能量被动框架（task 026 WP8 补充）**：特殊能量提供值走 DSL 声明
+（`provide_energy` passive_static，引擎零硬编码）——args.types=[属性] 单属性 /
+all 彩虹（1 单元抵任意 1 个需求符号含有色）；分层求值（有条件块覆盖无条件块、
+同层 ≥2 条 DslError、零条回退 energy_type 旧口径）；能量抵费求值点由自由函数
+改为引擎方法 `_energy_units_satisfied`（逐附着能量读声明；攻击枚举与执行共用，
+Agent 侧保持旧口径近似——D-WP8-5 已知近似，合法性由枚举门控）。夜光能量降级
+= 参数化条件 `holder_special_energy_count_ge:N`（特殊能量计数含自身——两张
+夜光互相降级）；喷射能量换位 = 新事件 `own_attach_from_hand_to_bench`（手动
+附着行动 bench 落点直发，效果附着不触发）+ switch selector self；薄雾能量
+= protection 声明来源扩为宝可梦卡 ∪ 附着能量卡并集（守卫落点不变，
+「已经受到的效果不会消失」由落点拦截天然满足）。
+
 ### 5.3 覆盖策略：原语先行，逐卡落地
 
 从真实卡组反向驱动：取当前 G/H/I 环境 WUR 前 N 套卡组 → 列出涉及全部卡 → 归并所需原语 → 原语实现一个、解锁一批卡。第一批原语只做到覆盖这批卡组为止（YAGNI），不为长尾冷僻效果提前设计。

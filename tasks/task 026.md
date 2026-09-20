@@ -734,6 +734,84 @@ protection 伤害免疫（D-WP7-5）：
 modify_damage scope +own_field + target_rule_box）+ 真机冒烟（赫普的苍响 / 喷火龙大比鸟 /
 猛雷鼓厄诡椪 / 玛俐雪妖女 / 多龙黑夜魔灵 / 赛富豪 池内卡组）
 
+### WP8（特殊能量被动框架 + 喷射/夜光/薄雾 3 卡）——测试清单定稿（2026-09-20）
+
+范围 = coverage-plan C 级「特殊能量被动框架」3 张（池内印刷已实测 2026-09-20，均 G/H 标）：
+
+- 喷射能量（G 标 CSV4C-129，喷火龙大比鸟/赫普的苍响）：视作 1 个【无】；
+  当从手牌附着于备战宝可梦时，该宝可梦与战斗宝可梦互换
+- 夜光能量（G 标 CSV1C-127，多龙喷火龙/多龙巴鲁托）：视作 1 个**所有属性**能量；
+  若持有者还附着其他特殊能量，则视作 1 个【无】
+- 薄雾能量（H 标 CSV7C-204，喷火龙大比鸟）：视作 1 个【无】；持有者不受对手
+  宝可梦招式的效果影响（已经受到的效果不会消失）
+
+**背景实测**（2026-09-20）：db 特殊能量 `types`/`provides` 均 null → CardDef.energy_type
+为 None，现行 `_energy_satisfied`（core.py:64，自由函数）只把它们当【无】计数——
+喷射/薄雾恰好等价、夜光应为彩虹是错误口径；且提供值硬读字段、无 DSL 声明面。
+调用点：core.py:349（攻击枚举）+ agent/heuristic.py 三处（启发式估值用）。
+
+设计决议（主会话定稿 2026-09-20；随落地进附录 A 🔲，gate3 核销后翻 ✅）：
+
+- **D-WP8-1 provide_energy 声明式框架**：特殊能量的提供值走 DSL 声明
+  （引擎零硬编码）——能量卡文档 passive_static + `provide_energy` 原语：
+  args.types=[无]（单属性）/ args.types=all（彩虹：1 个能量单元可抵**任意 1 个**
+  需求符号，含有色）。求值点：`_energy_satisfied` 改引擎方法，逐附着能量读 DSL
+  文档——无文档 → 既有行为（card.energy_type，None 计入无色）；有文档 → 收集
+  condition 通过的 provide_energy 声明，恰 1 条取其提供值，0 条回退默认，
+  ≥2 条 DslError（不猜）。匹配算法：有色需求先精确匹配非彩虹单元、再以彩虹
+  单元抵，余下单元抵无色（ rainbow 全程只算 1 个单元）。
+- **D-WP8-2 夜光降级条件**：「除这张卡牌以外的特殊能量」= 持有者附着的特殊能量
+  （card_type=energy 且非 is_basic_energy）**计数 ≥2**（含夜光自身——两张夜光
+  互相使对方降级，忠实文本）；基本能量不计。condition 新词
+  `holder_special_energy_count_ge:2`（参数化先例 holder_has_energy:）。
+  夜光 DSL = 两 passive_static 块：有条件块提供 [无]、无条件块提供 all
+  （互斥，恰 1 条通过）。
+- **D-WP8-3 喷射换位触发**：新事件词 `own_attach_from_hand_to_bench`——手动
+  能量附着行动（每回合 1 次权）完成后，目标是备战区时分发；能量卡文档
+  trigger_on_event + switch 原语（self 与战斗场互换）。附着到战斗场不触发；
+  效果附着（attach_energy 原语：discard/deck 来源）不触发——现网无从手牌的
+  效果附着，文本「从手牌附着」在一期=手动附着口径（附录 A 记）。当回合附着权
+  消耗、换位后撤退锁/状态等按既有换位口径。
+- **D-WP8-4 薄雾 protection 能量来源**：`_protected_from_attack_effects`
+  （D-WP6-7 守卫落点不变：apply_status/place_damage_counters/lock_retreat/
+  devolve）增读持有者**附着能量卡**文档的 protection scope=opponent_attack_effects
+  声明（与宝可梦卡自身声明并集）。「已经受到的效果不会消失」= 落点守卫设计
+  天然满足（不做回顾性清除），注释记明。
+- **D-WP8-5 Agent 侧保持近似**：heuristic 三处 `_energy_satisfied` 调用走自由
+  函数旧口径（energy_type/None→无，不含 DSL provide/彩虹）——Agent 只做估值
+  排序，合法性由引擎枚举门控，近似不产生非法操作；夜光彩虹在 Agent 眼里退化为
+  无色（可能低估攻击可用性，不影响正确性）。附录 A 记为已知近似。
+
+测试清单：
+
+provide_energy 框架（D-WP8-1/2，`tests/test_primitives_wp8.py`）：
+1. 无 DSL 文档能量行为回归（既有攻击枚举/费用测试全绿不动）
+2. types=[无]：计入无色、不抵有色；types=all：抵任意 1 个有色符号（【火】可满足）、
+   1 张彩虹只抵 1 个符号（【火】【火】需 2 单元）、彩虹+普通混合抵费
+3. 多声明：0 条通过回退默认 / ≥2 条通过 DslError；词表注册 + 未知词 DslError
+4. 夜光降级：单独附着=彩虹；+任意 1 张其他特殊能量 → 【无】（holder_special_energy_count_ge:2
+   条件词注册）；2 张夜光互相降级；基本能量不影响计数
+5. 求值点一致性：攻击枚举与执行共用（同种子对局不发散）
+
+喷射换位（D-WP8-3）：
+6. 手动附着备战 → 该宝可梦与战斗场互换（含事件流锚点）；附着战斗场不触发；
+   附着权正常消耗；换位后特殊状态按既有口径（回备战恢复——睡眠/麻痹/混乱清除）
+7. 效果附着（attach_energy discard/deck 来源）不触发；事件词注册
+
+薄雾 protection（D-WP8-4）：
+8. 持有者不受对手招式附加效果（指示物/特殊状态/撤退锁/退化四落点抽查）；
+   伤害照算；已受效果不消失（附着前已中的特殊状态保留）；能量离场（devolve/
+   弃置）即失效；闪焰之幕既有用例回归绿
+
+卡牌落地（三道闸，分片并入 `tests/test_dsl_cards_b7_wp7.py` 或新 b8 分片）：
+9. 3 卡逐卡单测（效果正例+边界，text_raw 原文注释；card_ids 同文本等价类实测
+   挂载）+ 闸 1 防回归用例
+
+收尾硬验：全量 pytest 绿 + ruff 零告警 + 沙奈朵镜像同种子 hash 回归 +
+`dsl-check --db` 全库全 OK + 词表同步（actions +provide_energy；events
++own_attach_from_hand_to_bench；conditions +holder_special_energy_count_ge:）+
+真机冒烟（喷火龙大比鸟 / 赫普的苍响 / 多龙喷火龙 / 多龙巴鲁托池内卡组）
+
 ### WP6+（pending 33 张 B/C 级）
 
 启动时按同流程细化；批次级验收口径：
@@ -1247,3 +1325,55 @@ PRD §5.1 WP7 段定稿。
 - 15 个卡文件 gate3 待用户核销 + 附录 A 11 条决议 🔲 待核（连同 WP6 攒批）
 - 下一步 WP8（特殊能量被动框架 + 3 卡，框架零设计）→ task 027（ACE SPEC + TERA + 7 卡，
   需立项）→ task 029（持续 lock/protection 体系 + 8 卡，需立项）
+
+### WP8（2026-09-20 完成）：特殊能量被动框架 + 喷射/夜光/薄雾 3 卡
+
+**流程**：主会话实测 3 卡 text_raw + 背景勘察（db 特殊能量 types/provides 均 null →
+旧口径把夜光彩虹错误当【无】计数）→ 测试清单定稿（D-WP8-1~5 + 清单 9 条）→
+子代理实现（机制+3 卡一批，17 测）→ 规格复核批准 → 质量复核主会话自做
+（429 限流降本，用户裁决）→ 冒烟 → 落账。
+
+**机制落地**：
+- provide_energy 声明式框架（D-WP8-1）：`core._attached_energy_units`（逐附着能量
+  读 DSL 声明；分层求值=有条件块覆盖无条件块、同层 ≥2 条 DslError、零条回退
+  energy_type 旧口径）+ `_units_cover_cost`（有色先精确、再彩虹、余抵无色，彩虹
+  全程 1 单元）；攻击枚举走新求值点 `_energy_units_satisfied`，与执行共用；
+  自由函数 `_energy_satisfied` 与 agent/heuristic.py 三处未动（D-WP8-5）
+- 夜光降级条件 holder_special_energy_count_ge:N（D-WP8-2，chooser 参数化词，
+  特殊能量=supertype ENERGY 非 basic 含自身计数）
+- 喷射换位（D-WP8-3）：`_do_attach_energy` bench 落点直发 own_attach_from_hand_to_bench
+  + `_find_source_mon` 增 attached_energy 匹配 + switch 新 selector self
+  （回备战方状态清除同既有换位口径）
+- 薄雾 protection（D-WP8-4）：`_protected_from_attack_effects` 声明来源 =
+  宝可梦卡 ∪ 附着能量卡并集，四落点守卫不变
+
+**落地 3 卡 3 文件**（闸 1/2 全过，first_pass 3/3，gate3 待核销）：
+喷射能量（5 印刷全挂）/ 夜光能量（池内文本类单挂 CSV1C-127，另 7 印刷异文本类
+未落地）/ 薄雾能量（3 印刷全挂）；分片 `tests/test_dsl_cards_b8_wp8.py`（6 用例，
+含闸 1 防回归：夜光混异文本印刷必拦）+ `tests/test_primitives_wp8.py`（11 用例）。
+
+**词表同步**：actions +provide_energy；events +own_attach_from_hand_to_bench
+（condition 词按既定架构代码注册）。
+
+**测试**：WP8 新 17 条；全量 **822 绿**（基线 805）+ ruff 零告警 + `dsl-check --db`
+全库 86 文件全 OK + 沙奈朵镜像同种子 hash 回归绿（规格复核附带验证镜像 100 局
+串/并行 events_hash 逐局一致）。
+
+**真机冒烟 80 局 0 失败**（heuristic 4×20，`results/wp8-smoke/`）：喷火龙大比鸟 vs
+赫普的苍响 6/14；多龙喷火龙 vs 喷火龙大比鸟 7/13；多龙巴鲁托 vs 赫普的苍响 6/14；
+多龙喷火龙 vs 多龙黑夜魔灵 9/11。机制真实触发：own_attach_from_hand_to_bench
+3/6 次（喷射换位真实发生）、switch 43–85 次/库、protected 10–57 次/库。
+
+**过程纪要**：当日 API 反复 429（网关限流）——用户裁决降本：质量复核主会话自做
+（core.py/chooser.py/primitives.py/词表/测试/卡 YAML diff 全量审读，无必修项）、
+后续子代理串行不并行、小批次双复核可合并。
+
+**落账**：coverage-plan 3 行 pending→done——**缺口 done 66 / blocked 0 / pending 15
+（共 81，余 C 级：task 027 域 7 + task 029 域 8）**；authoring-log 批 7 三条；
+附录 A D-WP8-1~5 共 5 条 🔲 待核；PRD §5.1 WP8 段定稿。
+
+**遗留**：
+- 3 个卡文件 gate3 待用户核销 + 附录 A 5 条决议 🔲 待核（连同 WP6/WP7 攒批）
+- 夜光能量异文本类 7 印刷（「还附着了」措辞）未落地——若回归池内需另文新写
+- 下一步 task 027（ACE SPEC + TERA 规则盒核对 + 7 卡，需立项）→ task 029
+  （持续 lock/protection 体系 + 8 卡，需立项）

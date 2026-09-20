@@ -540,6 +540,21 @@ def condition_met(
         return mon is not None and any(
             e.card.energy_type == energy_type for e in mon.attached_energy
         )
+    if condition.startswith("holder_special_energy_count_ge:"):
+        # 参数化条件（task 026 WP8，D-WP8-2 夜光能量降级）：持有者附着的特殊能量
+        # （supertype=energy 且非 is_basic_energy）计数 ≥N——含条件来源卡自身
+        # （两张夜光互相降级，忠实文本）；基本能量不计
+        raw = condition.split(":", 1)[1]
+        try:
+            n = int(raw)
+        except ValueError:
+            raise DslError(
+                f"condition 参数畸形 '{condition}'（holder_special_energy_count_ge 需 int）"
+            ) from None
+        return mon is not None and sum(
+            1 for e in mon.attached_energy
+            if e.card.supertype == Supertype.ENERGY and not e.card.is_basic_energy
+        ) >= n
     if condition.startswith("holder_owner:"):
         # 参数化条件（task 026 WP7 化朗镇/卡比兽/讲究头带）：持有者主人归属
         # （CardDef.owner ← db cards.owner；db 未覆盖的主人组恒不匹配——不猜）

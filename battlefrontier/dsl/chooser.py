@@ -590,6 +590,15 @@ def condition_met(
         except ValueError:
             raise DslError(f"condition 参数畸形 '{condition}'（holder_hp_le 需 int）") from None
         return mon is not None and engine._effective_hp(mon, player) - mon.damage <= n
+    if condition.startswith("holder_stage:"):
+        # 参数化条件（task 027，D-027-4 新冲天能量「如果被附着于【2阶进化】宝可梦
+        # 身上的话」）：持有者栈顶 CardDef.stage == N；mon None（非持有语境）→ False
+        raw = condition.split(":", 1)[1]
+        try:
+            n = int(raw)
+        except ValueError:
+            raise DslError(f"condition 参数畸形 '{condition}'（holder_stage 需 int）") from None
+        return mon is not None and mon.current.card.stage == n
     fn = _CONDITIONS.get(condition)
     if fn is None:
         raise DslError(f"未知 condition 词 '{condition}'（chooser 求值点；扩展请在 dsl/chooser.py 注册）")
@@ -607,6 +616,17 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
     hp_of = lambda m: engine._effective_hp(m, player)
     for node in (*effect.cost, *effect.actions):
         if node.action == "attach_energy" and node.destination == "attach":
+            if node.selector == "own_hand":
+                # task 027（D-027-5 厄诡椪 碧草之舞）：从手牌附着到来源持有者自身
+                # ——target_pool 必须 self（目标恒在场），手牌无匹配能量不可行
+                if node.args.get("target_pool") != "self":
+                    raise DslError(
+                        f"特性可行性门 attach_energy selector='own_hand' 需要 "
+                        f"args.target_pool='self'（收到 {node.args.get('target_pool')!r}，不猜）"
+                    )
+                if not resolve_pool(p, "own_hand", node.filters):
+                    return False
+                continue
             if node.selector != "own_discard":
                 raise DslError(
                     f"特性可行性门未支持 attach_energy selector={node.selector!r}（不猜）"

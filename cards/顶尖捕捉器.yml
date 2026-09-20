@@ -1,0 +1,13 @@
+# 顶尖捕捉器（CSV7C-180，物品，ACE SPEC）
+# text_raw 原文：「选择对手的1只备战宝可梦，将其与战斗宝可梦互换。然后，将自己的战斗宝可梦与备战宝可梦互换。」
+# 两段强制换位按语序执行：对手侧（反击捕捉器先例）+ 己方侧（宝可梦交替先例）；
+# 换入备战区的宝可梦特殊状态清除（rules-manual §7.1）；任一侧无备战宝可梦时
+# 该段不可选（可行性门既有口径，两段各自独立判定）。
+card:
+  name_group: 顶尖捕捉器
+  card_ids: [CSV7C-180, CSV9.5C-168, CSVM2aC-021, CSVM2cC-018]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: switch, selector: opponent_bench, choose: 1}
+      - {action: switch, selector: own_bench, choose: 1}

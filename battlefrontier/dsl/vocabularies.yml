@@ -87,6 +87,7 @@ counters:
   - opponent_taken_prizes          # 对手已拿奖赏张数（=6−对手剩余奖赏；task 026 WP5 月月熊）
   - discarded_this_effect          # 本效果内前序 discard 节点弃置张数（task 026 WP5 ×N 伤害族）
   - flip_heads_count               # 本效果内掷币正面次数（task 026 WP5 until_tails 索财灵）
+  - attached_energy_on_both_actives  # 双方战斗宝可梦附着能量总数（task 027 厄诡椪 万叶阵雨）
 
 # 去向（destination 字段）
 destinations:

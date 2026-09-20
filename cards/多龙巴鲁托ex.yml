@@ -1,0 +1,18 @@
+# 多龙巴鲁托ex（CSV8C-159，2阶，规则盒 ex，太晶）
+# text_raw 原文：「【无】 喷射头击 70
+#
+# 【火】【超】 幻影潜袭 200
+# 将6个伤害指示物，以任意方式放置于对手的备战宝可梦身上。」
+# 喷射头击 70 无效果文，由引擎白板伤害结算，无需 DSL 绑定（多龙奇先例）。
+# 幻影潜袭：200 主战伤害 + place_damage_counters opponent_bench args.distribute
+# （task 027 新形态）——6 个指示物逐只挂起分配（可集中可分散，全部分配完统一
+# 落点 + 判昏厥）；对手备战空则铺伤段 no-op（主战伤害照常）。
+card:
+  name_group: 多龙巴鲁托ex
+  card_ids: [CSV8C-159, CSV8C-229, CSV9.5C-134, CSV9.5C-243, CSVM2bC-007]
+effects:
+  - trigger: on_attack
+    attack: 幻影潜袭
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 200}}
+      - {action: place_damage_counters, selector: opponent_bench, args: {counters: 6, distribute: true}}

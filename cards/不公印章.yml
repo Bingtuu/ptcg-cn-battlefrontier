@@ -1,0 +1,19 @@
+# 不公印章（CSV8C-173，物品，ACE SPEC）
+# text_raw 原文：「这张卡牌，只有在上一个对手的回合，自己的宝可梦【昏厥】时才可使用。
+#
+# 双方玩家，各将所有手牌放回牌库并重洗牌库。然后，自己从牌库上方抽取5张卡牌，对手从牌库上方抽取2张卡牌。」
+# 使用条件：跨回合标记 own_ko_during_opponent_turn（task 026 WP7 既有词，
+# 对手回合己方宝可梦昏厥置位，训练家 on_play 条件门不满足不枚举）。
+# 双方手牌洗回 + 不对称抽牌：裁判结构先例（D-WP7-9），语序先洗回再抽牌
+# （手牌空照常重洗并抽牌）。
+card:
+  name_group: 不公印章
+  card_ids: [CSV8C-173, CSVM2bC-010]
+effects:
+  - trigger: on_play
+    condition: own_ko_during_opponent_turn
+    actions:
+      - {action: shuffle_hand_into_deck, selector: own_hand}
+      - {action: shuffle_hand_into_deck, selector: opponent_hand}
+      - {action: draw, count: 5}
+      - {action: draw, selector: opponent_deck, count: 2}

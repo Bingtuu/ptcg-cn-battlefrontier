@@ -692,8 +692,13 @@ def test_distinct_choose_zero_noop_shuffle():
 
 
 def test_distinct_split_bad_forms_dsl_error():
-    """清单14：distinct 非法值 / split 非法值 / split 无 distinct / split 去向非 hand
-    → DslError（不猜）。"""
+    """清单14：distinct 非法值 / split 非法值 / distinct 无 split 去向非 hand /
+    split 去向非 hand → DslError（不猜）。
+
+    task 027（D-027-3/D-027-7，能量输送PRO）：distinct 无 split + destination=hand
+    转为合法形态（分桶互异枚举、选中全入手），原「distinct 无 split 即非法」
+    断言相应演进为「distinct 无 split 去向非 hand 非法」。
+    """
     bad_distinct = parse_card_doc("""
 card:
   name_group: 测试坏卡
@@ -718,16 +723,16 @@ effects:
     with pytest.raises(DslError, match="split"):
         e2.apply(0, Action(kind="play_trainer", iid=60))
 
-    distinct_only = parse_card_doc("""
+    distinct_no_split_bench = parse_card_doc("""
 card:
   name_group: 测试坏卡
 effects:
   - trigger: on_play
     actions:
-      - {action: search_deck, selector: own_deck, filters: [basic_energy], choose: 2, destination: hand, args: {distinct: energy_type}}
+      - {action: search_deck, selector: own_deck, filters: [basic_energy], choose: 2, destination: bench, args: {distinct: energy_type}}
 """)
-    e3 = play_engine(distinct_only, "测试坏卡")
-    with pytest.raises(DslError, match="split"):
+    e3 = play_engine(distinct_no_split_bench, "测试坏卡")
+    with pytest.raises(DslError, match="distinct"):
         e3.apply(0, Action(kind="play_trainer", iid=60))
 
     split_bench = parse_card_doc("""

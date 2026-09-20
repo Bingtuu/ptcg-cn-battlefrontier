@@ -561,9 +561,22 @@ class GameEngine:
             })
             try:
                 _, _, holder = self._find_in_play(self.state.players[tp], tiid)
+                source = holder.current
             except IllegalActionError:
-                continue  # 来源已不在场上：离场即失效，跳过
-            if self._fire_trigger_on_event(tp, holder.current, holder, tevent):
+                # task 027（D-WP8-3 归正）：来源可为该玩家场上宝可梦的附着能量
+                # （喷射能量经效果附着 own_hand 来源入队）——按 iid 在全场附着
+                # 能量中找回；附着对象离场（能量随之进弃牌区）→ 离场即失效，跳过
+                source = None
+                holder = None
+                p = self.state.players[tp]
+                for m in ([p.active] if p.active else []) + list(p.bench):
+                    hit = next((x for x in m.attached_energy if x.iid == tiid), None)
+                    if hit is not None:
+                        source, holder = hit, m
+                        break
+                if source is None:
+                    continue  # 来源已不在场上：离场即失效，跳过
+            if self._fire_trigger_on_event(tp, source, holder, tevent):
                 return True
         while self.state.pending_ko_triggers:
             tp, tiid, tattacker = self.state.pending_ko_triggers[0]
@@ -670,11 +683,12 @@ class GameEngine:
     def _do_attach_energy(self, player: int, action: Action) -> None:
         """【规则书·能量】每回合限 1 张，从手牌附着到场上宝可梦。
 
-        trigger_on_event 分发（task 026 WP8，D-WP8-3）：手动附着完成且目标为
-        备战区时直发 own_attach_from_hand_to_bench（喷射能量：该宝可梦与战斗
-        宝可梦互换）——附着到战斗场不触发；效果附着（attach_energy 原语，
-        discard/deck 来源）不经本行动，天然不触发（文本「从手牌附着」在一期 =
-        手动附着口径，附录 A 记）。
+        trigger_on_event 分发（task 026 WP8，D-WP8-3；task 027 归正）：「从手牌
+        附着」= 手动附着行动（本行动）与效果附着（attach_energy 原语 own_hand
+        来源）同口径，目标为备战区时分发 own_attach_from_hand_to_bench（喷射能量：
+        该宝可梦与战斗宝可梦互换）；附着到战斗场不触发；discard/deck 来源的
+        效果附着不经「从手牌」路径，不触发。手动路径直发（行动层），原语路径
+        入队 pending_event_triggers 效果完成后排水。
         """
         p, card = self._take_from_hand(self.state.players[player], action.iid)  # type: ignore[arg-type]
         slot, idx, target = self._find_in_play(p, action.target_iid)  # type: ignore[arg-type]
@@ -1275,6 +1289,8 @@ class GameEngine:
         互斥由本分层保证）；同层 ≥2 条 = DslError（不猜）；两层均 0 条 → 回退默认。
         args.types：["无"]（单属性，1 单元抵 1 个同色需求或充无色）/ "all"（彩虹，
         1 单元可抵任意 1 个需求符号，含有色）；缺失/多属性/未知值 = DslError。
+        args.count（task 027 新冲天能量，D-027-4）：单元份数，缺省 1；正 int，
+        0/负/非 int = DslError（2 彩虹单元可抵 2 个任意符号）。
         单元随能量离场即失效（求值点实时读声明，天然满足）。
         """
         from battlefrontier.dsl.chooser import condition_met
@@ -1313,14 +1329,20 @@ class GameEngine:
             if picked is None:
                 units.append((False, e.card.energy_type))
                 continue
+            count = picked.args.get("count", 1)
+            if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+                raise DslError(
+                    f"{e.card.name}: provide_energy 的 args.count 须为正 int"
+                    f"（收到 {count!r}；不猜）"
+                )
             types = picked.args.get("types")
             if types == "all":
-                units.append((True, None))
+                units.extend([(True, None)] * count)
             elif (
                 isinstance(types, list) and len(types) == 1
                 and isinstance(types[0], str)
             ):
-                units.append((False, types[0]))
+                units.extend([(False, types[0])] * count)
             else:
                 raise DslError(
                     f"{e.card.name}: provide_energy 的 args.types 须为 [属性]（单属性）"

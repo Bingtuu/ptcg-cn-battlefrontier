@@ -80,21 +80,21 @@ V-UNION 缺口 0（一期不做，无冲突）。
 | 赫普的讲究头带 | trainer | damage_boost,modifier | 赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP7：I 标 CSV10C-201 唯一印刷，道具 modify_damage +30 + modify_attack_cost -1【无】（_effective_attack_cost 新增道具分支）+ holder_owner：赫普；闸1/2 过，first_pass=true，gate3 待核销） |
 | 野餐篮 | trainer | heal | 赛富豪 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标 4 印刷，heal 新 selector all_pokemon_both 双方全场各 30；闸1/2 过，first_pass=true，gate3 待核销） |
 | 雪妖女 | pokemon | spread | 玛俐长毛巨魔雪妖女 | B | 小原语批（task 025/026） | done（task 026 WP7：H 标「冻结帷幕」等价类 10 印刷，宝可梦检查阶段 + pokemon_check 事件 + has_ability 数据管道/场上过滤器 + not_name + all_pokemon_both；闸1/2 过，first_pass=true，gate3 待核销） |
-| 不公印章 | trainer | draw,hand_disrupt,bounce | 多龙黑夜魔灵/多龙喷火龙 | C | ACE SPEC 机制（task 027） | pending |
-| 厄诡椪 碧草面具ex | pokemon | draw,energy_accel | 猛雷鼓厄诡椪 | C | TERA 规则盒结算核对（task 027） | pending |
+| 不公印章 | trainer | draw,hand_disrupt,bounce | 多龙黑夜魔灵/多龙喷火龙 | C | ACE SPEC 机制（task 027） | done（task 027：ACE 物品 2 印刷，宽口径 own_ko_during_opponent_turn 条件门 + 双方手牌回库重洗 + 自抽5/对手抽2（D-027-3）；闸1/2 过，first_pass=true，gate3 待核销） |
+| 厄诡椪 碧草面具ex | pokemon | draw,energy_accel | 猛雷鼓厄诡椪 | C | TERA 规则盒结算核对（task 027） | done（task 027：TERA 10 印刷，碧草之舞 attach_energy own_hand→self + 抽1（D-027-5，D-WP8-3 归正触发喷射换位）+ 30+双方战斗场能量总数×30；闸1/2 过，first_pass=true，gate3 待核销） |
 | 含羞苞 | pokemon | lock | 多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女/多龙巴鲁托 | C | 持续 lock/protection 体系（task 029） | pending |
 | 喷射能量 | energy | modifier | 喷火龙大比鸟/赫普的苍响 | C | 特殊能量被动框架（task 026） | done（task 026 WP8：G 标等价类 5 印刷全挂，provide_energy [无] 声明式框架 + own_attach_from_hand_to_bench 手动附着备战触发 + switch self 换位（D-WP8-1/3）；闸1/2 过，first_pass=true，gate3 待核销） |
-| 多龙巴鲁托ex | pokemon | spread | 多龙黑夜魔灵/多龙喷火龙/多龙巴鲁托 | C | TERA 规则盒结算核对（task 027） | pending |
+| 多龙巴鲁托ex | pokemon | spread | 多龙黑夜魔灵/多龙喷火龙/多龙巴鲁托 | C | TERA 规则盒结算核对（task 027） | done（task 027：TERA 2阶 5 印刷，幻影潜袭 200 + place_damage_counters distribute 6 指示物任意分配（D-027-6，备战太晶不挡指示物）+ 喷射头击 70；闸1/2 过，first_pass=true，gate3 待核销） |
 | 夜光能量 | energy | modifier | 多龙喷火龙/多龙巴鲁托 | C | 特殊能量被动框架（task 026） | done（task 026 WP8：池内文本类单挂 CSV1C-127（另 7 印刷异文本类按严格拆分未落地），provide_energy all 彩虹 + holder_special_energy_count_ge:2 降级【无】（D-WP8-1/2）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 巨钳螳螂 | pokemon | damage_boost,protection,evolution | 赛富豪 | C | 持续 lock/protection 体系（task 029） | pending |
-| 新冲天能量 | energy | modifier | 多龙巴鲁托 | C | ACE SPEC 机制（task 027） | pending |
+| 新冲天能量 | energy | modifier | 多龙巴鲁托 | C | ACE SPEC 机制（task 027） | done（task 027：ACE 能量 2 印刷，provide_energy args.count=2 + types=all 彩虹双单元 + holder_stage:2 条件（D-027-4，非 2 阶回退 1【无】）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 旋转洛托姆 | pokemon | spread,lock,modifier | 猛雷鼓厄诡椪 | C | 持续 lock/protection 体系（task 029） | pending |
-| 极限腰带 | trainer | damage_boost | 喷火龙大比鸟 | C | ACE SPEC 机制（task 027） | pending |
+| 极限腰带 | trainer | damage_boost | 喷火龙大比鸟 | C | ACE SPEC 机制（task 027） | done（task 027：ACE 道具 2 印刷，道具 modify_damage +50 + target_rule_box:ex（WP7 机制复用，离场失效）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 火箭队的监视塔 | trainer | lock | 多龙巴鲁托 | C | 持续 lock/protection 体系（task 029） | pending |
 | 玛俐的长毛巨魔ex | pokemon | search,spread,energy_accel,lock,evolution | 玛俐长毛巨魔雪妖女 | C | 持续 lock/protection 体系（task 029） | pending |
-| 能量输送PRO | trainer | search | 赛富豪 | C | ACE SPEC 机制（task 027） | pending |
+| 能量输送PRO | trainer | search | 赛富豪 | C | ACE SPEC 机制（task 027） | done（task 027：ACE 物品 1 印刷，search_deck any_count up-to all + distinct=energy_type 属性互斥 + reveal→手牌→重洗（D-027-7）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 薄雾能量 | energy | protection,modifier | 喷火龙大比鸟 | C | 特殊能量被动框架（task 026） | done（task 026 WP8：H 标等价类 3 印刷全挂，provide_energy [无] + protection opponent_attack_effects 能量来源并集（D-WP8-4，「已经受到的效果不会消失」=落点守卫天然满足）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 赫普的苍响ex | pokemon | spread,lock,cooldown | 赫普的苍响 | C | 持续 lock/protection 体系（task 029） | pending |
 | 阻碍之塔 | trainer | lock | 喷火龙大比鸟/猛雷鼓厄诡椪/多龙喷火龙/多龙巴鲁托 | C | 持续 lock/protection 体系（task 029） | pending |
-| 顶尖捕捉器 | trainer | gust,switch | 猛雷鼓厄诡椪/赫普的苍响 | C | ACE SPEC 机制（task 027） | pending |
+| 顶尖捕捉器 | trainer | gust,switch | 猛雷鼓厄诡椪/赫普的苍响 | C | ACE SPEC 机制（task 027） | done（task 027：ACE 物品 4 印刷，switch opponent_bench → switch own_bench 顺序两节点；双侧备战门维持现状进附录 A 候选条目；闸1/2 过，first_pass=true，gate3 待核销） |
 | 黑夜魔灵 | pokemon | lock,modifier | 喷火龙大比鸟/多龙黑夜魔灵 | C | 持续 lock/protection 体系（task 029） | pending |

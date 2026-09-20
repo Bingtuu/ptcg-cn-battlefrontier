@@ -4,10 +4,11 @@
 # 当将这张卡牌从手牌附着于备战宝可梦身上时，将该宝可梦与战斗宝可梦互换。」
 # 视作1个【无】：provide_energy types=[无]（task 026 WP8，D-WP8-1 声明式提供值，
 # 引擎求值点读声明，解释器不执行）。
-# 换位：own_attach_from_hand_to_bench（D-WP8-3）——手动能量附着行动（每回合 1 次权）
-# 完成且目标为备战区时分发；附着战斗场 / 效果附着（attach_energy 原语）不触发
-# （「从手牌附着」一期 = 手动附着口径）。switch self = 持有者与战斗宝可梦互换，
-# 回备战方特殊状态清除按既有换位口径（rules-manual §7.1）。
+# 换位：own_attach_from_hand_to_bench（D-WP8-3，task 027 归正）——「从手牌附着」
+# = 手动附着行动（每回合 1 次权）与效果附着（attach_energy 原语 own_hand 来源）
+# 同口径，完成且目标为备战区时分发；附着战斗场 / discard、deck 来源的效果附着
+# 不触发。switch self = 持有者与战斗宝可梦互换，回备战方特殊状态清除按既有
+# 换位口径（rules-manual §7.1）。
 card:
   name_group: 喷射能量
   card_ids: [CSV4C-129, CSV8C-263, CSV9.5C-206, CSVE2C-203, CSVH3C-061]

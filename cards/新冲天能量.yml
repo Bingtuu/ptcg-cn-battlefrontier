@@ -1,0 +1,19 @@
+# 新冲天能量（CSV7C-203，特殊能量，ACE SPEC）
+# text_raw 原文：「只要这张卡牌，被附着于宝可梦身上，就被视作1个【无】能量。
+#
+# 如果被附着于【2阶进化】宝可梦身上的话，则被视作2个所有属性的能量。」
+# 基础提供值 1 个【无】；升级：持有者 stage=2（条件词 holder_stage:N，
+# task 027 新词，读栈顶 CardDef.stage）时视作 2 个所有属性能量
+# （provide_energy args.count=2，task 027 新参——2 彩虹单元可抵 2 个任意符号）。
+# 求值点分层同夜光能量（D-WP8-2）：有条件块覆盖无条件块，恰 1 条生效。
+card:
+  name_group: 新冲天能量
+  card_ids: [CSV7C-203, CSVM2bC-033]
+effects:
+  - trigger: passive_static
+    condition: holder_stage:2
+    actions:
+      - {action: provide_energy, args: {types: all, count: 2}}
+  - trigger: passive_static
+    actions:
+      - {action: provide_energy, args: {types: [无]}}

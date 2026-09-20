@@ -204,9 +204,25 @@ all 彩虹（1 单元抵任意 1 个需求符号含有色）；分层求值（�
 Agent 侧保持旧口径近似——D-WP8-5 已知近似，合法性由枚举门控）。夜光能量降级
 = 参数化条件 `holder_special_energy_count_ge:N`（特殊能量计数含自身——两张
 夜光互相降级）；喷射能量换位 = 新事件 `own_attach_from_hand_to_bench`（手动
-附着行动 bench 落点直发，效果附着不触发）+ switch selector self；薄雾能量
+附着行动 bench 落点直发；task 027 归正扩为含效果附着 own_hand 来源，见下段）+ switch selector self；薄雾能量
 = protection 声明来源扩为宝可梦卡 ∪ 附着能量卡并集（守卫落点不变，
 「已经受到的效果不会消失」由落点拦截天然满足）。
+
+**ACE SPEC / TERA 与效果附着归正（task 027 补充）**：**TERA 规则盒**（卡面
+原文「只要这只宝可梦，处于备战区，就不会受到招式的伤害。」）落引擎规则骨架
+（对齐 PRIZE_BY_RULE_BOX 先例）——备战区 is_tera 宝可梦不受双方招式伤害
+（守卫与 D-WP7-5 谢米同点不同源；指示物/效果不受影响），太晶不改奖赏数。
+**ACE SPEC 每卡组限 1** 由 db 侧 `validate_deck` 承担，引擎零新增，测试钉住。
+**D-WP8-3 归正**：喷射能量「从手牌附着」触发面扩为手动附着行动 + 效果附着
+（attach_energy own_hand 来源）均触发——厄诡椪 碧草之舞（attach_energy 新
+selector own_hand 目标=self）落地后原「无效果附着来源」前提被打破；discard/
+deck 来源仍不触发。小扩展一批：`provide_energy` args.count（多单元彩虹，
+新冲天能量）+ 条件词 `holder_stage:N`；计数词
+`attached_energy_on_both_actives`（双方战斗场附着能量总数）；
+`place_damage_counters` args.distribute（多龙巴鲁托 幻影潜袭 N 指示物任意
+分配）；search_deck any_count + distinct 无拆分去向（能量输送PRO，全部入手）。
+不公印章按宽口径 own_ko_during_opponent_turn 条件门（与 D-WP7-7 古玉鱼
+精确口径区分）；顶尖捕捉器双侧备战门维持现状，进附录 A 候选条目待核。
 
 ### 5.3 覆盖策略：原语先行，逐卡落地
 

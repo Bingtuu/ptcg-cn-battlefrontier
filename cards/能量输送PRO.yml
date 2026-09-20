@@ -1,0 +1,18 @@
+# 能量输送PRO（CSV9C-176，物品，ACE SPEC）
+# text_raw 原文：「从自己牌库中，选择任意数量的属性各不相同的基本能量，在给对手看过之后，加入手牌，并重洗牌库。」
+# 「任意数量」= args.any_count（task 027 新形态：min_choose=0，上限=属性分桶数，
+# 与 choose 互斥）；「属性各不相同」= distinct: energy_type 分桶互异枚举
+# （无 split 时全入手——task 027 扩展，赤松 distinct+split 既有形态不动）；
+# 「给对手看过」= reveal own_hand（超级能量回收先例）；重洗由后续 shuffle_deck
+# 节点表达（DSL 纪律）。
+card:
+  name_group: 能量输送PRO
+  card_ids: [CSV9C-176]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, destination: hand, filters: [basic_energy], args: {distinct: energy_type, any_count: true}}
+      - {action: reveal, selector: own_hand, filters: [basic_energy]}
+      - {action: shuffle_deck}

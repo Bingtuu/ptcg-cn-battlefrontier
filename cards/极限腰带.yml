@@ -1,0 +1,12 @@
+# 极限腰带（CSV7C-189，宝可梦道具，ACE SPEC）
+# text_raw 原文：「身上放有这张卡牌的宝可梦所使用的招式，给对手战斗场上的「宝可梦【ex】」造成的伤害「+50」。」
+# 声明式常驻修正（D-WP7-3 挂载面，task 026 WP7 既有）：引擎 _effective_damage_modifier
+# 求值点读道具声明，args.target_rule_box=ex 校验防守方规则盒（对非 ex 不加）；
+# 仅「给对手战斗宝可梦」落点接入，备战落点不加。
+card:
+  name_group: 极限腰带
+  card_ids: [CSV7C-189, CSV9.5C-179]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_damage, args: {amount: 50, target_rule_box: ex}}

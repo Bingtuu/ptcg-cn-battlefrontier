@@ -4,8 +4,8 @@
 
 ## 当前
 
-**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：**done 63 / blocked 0 / pending 18（全 C 级）**。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张 first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，WP2 已根治落地）；批 2–4 累计 25 张全部核销通过；批 5（WP6）9 文件 first_pass 9/9、批 6（WP7）15 文件 first_pass 15/15、批 7（WP8）3 文件 first_pass 3/3，gate3 攒批待核销。
-M1–M4 已达成。**task 026 进行中（`tasks/task 026.md`）**：WP0 ✅（CardLibrary card_id 挂载 + dsl-check --db + 审计拆分）、WP1 ✅（filters/conditions 高频项 + CardDef 数据管道 + 招式失败钩子）、WP2 ✅（trigger_on_event 分发 + place_damage_counters + ko_self + promote_queue 换上队列机制）、WP3 ✅（recover bench/hand up-to 去向 + search top_n 检视 + attach 多目标各附1 + own_evolve_from_hand 事件 + reveal 原语，2026-09-14）、**WP4 ✅（top_n rest=shuffle + attach bench-only/up-to + modify_retreat_cost + cost 弃置排除 + lock_attack 冷却，2026-09-14）**；WP4 新写 7 卡（米立龙揽客 / 宝可装置3.0 / 怒鹦哥ex / 飞天螳螂辅助斩 / 紧急滑板 / 拉帝亚斯ex / 超级能量回收），闸 1/2 全过 first_pass 5/7，gate3 已核销（2026-09-14）；**WP5 ✅（discard any_count×N + attached_energy_on_target + modify_attack_cost + prize_bonus + until_tails + bounce 附着回手 + transform，2026-09-14）**，新写 8 卡（赛富豪ex / 猛雷鼓ex / 猛雷鼓 / 月月熊 赫月ex / 白蕾雅 / 索财灵-连掷硬币 / 牡丹 / 百变怪-变身启动），闸 1/2 全过 first_pass 8/8，gate3 已核销（2026-09-14）；**WP6 ✅（blocked 8 张全清：hand_disrupt + bench_size 覆写/失效缩减 + choose_groups 二选一 + distinct 拆分去向 + deck_top 有序 + own_ko_by_attack/lock_retreat + protection + devolve，2026-09-19）**，新写 8 卡 9 文件（火恐龙同名多文本拆两文件），闸 1/2 全过 first_pass 9/9，gate3 待核销；**WP7 ✅（B 级 15 张全清：宝可梦检查阶段 + 特殊状态结算补全 + 常驻伤害修正四来源泛化 + 费用读道具 + protection 伤害免疫 scope + 8 项小原语，2026-09-20）**，新写 15 卡 15 文件，闸 1/2 全过 first_pass 15/15，gate3 待核销；定义库 86 文件；**缺口 done 66 / blocked 0 / pending 15（共 81，余 C 级：task 027 域 7 + task 029 域 8）**；**WP7 ✅（B 级 15 张，2026-09-20）、WP8 ✅（特殊能量被动框架 + 喷射/夜光/薄雾 3 卡，2026-09-20）**；下一步 task 027（ACE SPEC + TERA 规则盒核对 + 7 卡，需立项）→ task 029（持续 lock/protection 体系 + 8 卡，需立项）。
+**M5 进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：**done 63 / blocked 0 / pending 18（全 C 级）**。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张 first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，WP2 已根治落地）；批 2–4 累计 25 张全部核销通过；批 5（WP6）9 文件 first_pass 9/9、批 6（WP7）15 文件 first_pass 15/15、批 7（WP8）3 文件 first_pass 3/3、批 8（task 027）7 文件 first_pass 7/7，gate3 攒批待核销。
+M1–M4 已达成。**task 026 ✅（WP0–WP8 全清，2026-09-20）**。**task 027 ✅（ACE SPEC 核对 + TERA 规则盒 + C 级 7 卡，2026-09-20）**：TERA 备战免伤落规则骨架（D-027-1）、ACE SPEC 限 1 由 db validate_deck 承担引擎零新增（D-027-2）、provide_energy count/holder_stage:N、attach own_hand→self、attached_energy_on_both_actives、place_damage_counters distribute、search any_count+distinct 无拆分；D-WP8-3 归正（效果手牌附着也触发喷射换位）；定义库 93 文件；**缺口 done 73 / blocked 0 / pending 8（共 81，余 C 级 task 029 域 8 张）**；下一步 task 029（持续 lock/protection 体系 + 8 卡，需立项）→ M5 收口 → M6。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -18,6 +18,18 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
+
+### 2026-09-20 task 027：ACE SPEC 核对 + TERA 规则盒 + C 级 7 卡 ✅
+
+- **机制骨架**：①**TERA 规则盒备战免伤落引擎规则骨架**（卡面原文「只要这只宝可梦，处于备战区，就不会受到招式的伤害。」，52poke 词条 + EN 规则书交叉核实——备战区 is_tera 不受**双方**招式伤害，指示物/效果不受影响；守卫落点 = 招式伤害 bench 分支，与 D-WP7-5 谢米同点不同源；对齐 PRIZE_BY_RULE_BOX 先例非 DSL 声明）；②**ACE SPEC 每卡组限 1 确认由 db 侧 `validate_deck` 承担**（deck.py:4 契约），引擎零新增——测试钉住（含 2 张 ACE 构筑装载必抛错 + 池内 9 套回归）；③rules-manual §1.4 补太晶条目（太晶不改奖赏数）
+- **DSL 小扩展**：`provide_energy` args.count（新冲天能量 2 彩虹单元）+ 条件词 `holder_stage:N`（读栈顶 stage）；`attach_energy` selector own_hand 目标=self + 可行性门（厄诡椪 碧草之舞：手牌草能量附自身 + 抽 1）；计数词 `attached_energy_on_both_actives`（招式 30+×30）；`place_damage_counters` args.distribute（多龙巴鲁托 幻影潜袭 6 指示物任意分配，备战太晶不挡指示物）；search_deck any_count + distinct 无拆分去向仅 hand（能量输送PRO，D-WP5-1/D-WP6-4 组合）
+- **D-WP8-3 归正**：喷射能量「从手牌附着」触发面扩为手动附着 + 效果附着（attach_energy own_hand 来源）均触发（厄诡椪落地打破原「无效果附着来源」前提）；`_drain_event_triggers` 能量来源从弃牌堆找回；附录 A 原条目已修订；既有测试唯一修改 = test_primitives_wp6.py distinct-no-split 断言演进（规格正名，主会话批准）
+- **新卡 7 张（闸 1/2 全过，first_pass 7/7，gate3 待核销）**：不公印章（ACE 2 印刷，宽口径 own_ko_during_opponent_turn 条件门 + 双方回库重洗 + 自抽5/对手抽2）/ 极限腰带（ACE 2 印刷，道具 +50 仅对 ex）/ 顶尖捕捉器（ACE 4 印刷，gust+自换顺序两节点；双侧备战门维持现状进附录 A 候选）/ 能量输送PRO（ACE 1 印刷）/ 新冲天能量（ACE 2 印刷）/ 厄诡椪 碧草面具ex（TERA 10 印刷）/ 多龙巴鲁托ex（TERA 2阶 5 印刷）——共 26 印刷，等价类经合并复核全量对账无漏挂多挂
+- **合并复核（主会话自做，用户降本裁决）**：规格+质量一闸完成——必修项 0 遗留（D-WP8-3 归正返工已完成、顶尖捕捉器门控裁决维持现状）；发现 3–5 无需返工（WP8 docstring 同步正常 / 不公印章「效果致昏厥」卡级 stub 标记位（引擎层已间接钉住）/ 能量输送PRO reveal 口径=手牌全部基本能量超集（D-WP3-4 既有口径））
+- **测试**：task 027 新 30 条（primitives_t27 13 + dsl_cards_t27 17）；**全量 852 绿（基线 822）+ ruff 零告警 + dsl-check --db 全库 93 文件全 OK**
+- **真机冒烟 80 局 0 失败**（heuristic 4×20，`results/t27-smoke/`）：多龙巴鲁托 vs 猛雷鼓厄诡椪 15/5；多龙喷火龙 vs 喷火龙大比鸟 10/8/平2；赛富豪 vs 多龙喷火龙 2/18；赫普的苍响 vs 猛雷鼓厄诡椪 13/7。机制真实触发：幻影潜袭 distribute、不公印章、顶尖捕捉器、protected 落点均有事件计数验证
+- **落账**：coverage-plan 7 行 pending→done——**缺口 done 73 / blocked 0 / pending 8（共 81，余 task 029 域）**；authoring-log 批 8 七条；附录 A D-027-1~7 + 顶尖捕捉器候选共 8 条 🔲 待核（D-WP8-3 条目同步修订）；PRD §5.1 task 027 段；定义库 86→93 文件
+- **遗留**：7 个卡文件 gate3 待用户核销（攒批 34 个：WP6 9 + WP7 15 + WP8 3 + t027 7）+ 附录 A 待核决议攒批（WP6 8 + WP7 11 + WP8 5 + t027 8 条）；下一步 task 029（持续 lock/protection 体系 + 8 卡：含羞苞/巨钳螳螂/旋转洛托姆/火箭队的监视塔/玛俐的长毛巨魔ex/赫普的苍响ex/阻碍之塔/黑夜魔灵，需立项）
 
 ### 2026-09-20 task 026 WP8：特殊能量被动框架 + 喷射/夜光/薄雾 3 卡 ✅
 

@@ -10,8 +10,9 @@
   余下单元抵无色（彩虹全程只算 1 个单元）。
 - D-WP8-2 夜光降级：holder_special_energy_count_ge:2（含自身；特殊能量 =
   supertype=energy 且非 is_basic_energy；基本能量不计）。
-- D-WP8-3 喷射换位：own_attach_from_hand_to_bench 仅手动附着行动（每回合 1 次权）
-  目标为备战区时分发；附着战斗场/效果附着（attach_energy 原语）不触发。
+- D-WP8-3 喷射换位：own_attach_from_hand_to_bench 目标为备战区时分发——手动
+  附着行动（每回合 1 次权）直发；效果附着中 discard/deck 来源不触发（清单 7），
+  own_hand 来源触发（task 027 归正，见 tests/test_primitives_t27.py）。
 - D-WP8-4 薄雾 protection：_protected_from_attack_effects 并集读取持有者附着
   能量卡文档的 scope=opponent_attack_effects 声明；「已经受到的效果不会消失」
   = 落点守卫天然满足（不做回顾性清除）。
@@ -425,7 +426,8 @@ def test_jet_attach_to_active_no_trigger() -> None:
 
 def test_effect_attach_does_not_trigger_jet() -> None:
     """清单7：效果附着（attach_energy 原语，牌库来源）不触发
-    own_attach_from_hand_to_bench（「从手牌附着」一期=手动附着口径）。"""
+    own_attach_from_hand_to_bench（task 027 归正后口径：discard/deck 来源仍不触发，
+    own_hand 来源触发——见 test_primitives_t27.py）。"""
     ramp_doc = parse_card_doc("""
 card:
   name_group: 测试附能

@@ -1,0 +1,26 @@
+# 厄诡椪 碧草面具ex（CSV8C-028，基础，规则盒 ex，太晶，特性：碧草之舞）
+# text_raw 原文：「特性: 碧草之舞
+# 在自己的回合可以使用1次。选择自己手牌中的1张「基本【草】能量」，附着于这只宝可梦身上。然后，从自己牌库上方抽取1张卡牌。
+#
+# 【草】【草】【草】 万叶阵雨 30+
+# 追加造成双方战斗宝可梦身上附着的能量数量×30伤害。」
+# 碧草之舞：attach_energy selector=own_hand + args.target_pool=self（task 027
+# 新形态——从手牌的效果附着，目标固定来源持有者自身，无段2 目标选择）；
+# 手牌无基本【草】能量时特性不可用（ability_feasible 门控）。
+# 万叶阵雨：count=attached_energy_on_both_actives（task 027 新计数词，
+# 双方战斗宝可梦附着能量总数），30+n×30。
+card:
+  name_group: 厄诡椪 碧草面具ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全 10 印刷
+  card_ids: [CSV8C-028, CSV8C-214, CSV8C-242, CSV8C-256, CSV9.5C-021, CSV9.5C-222,
+             CSV9.5C-256, CSVM2aC-001, CSVNC-011, CSVNC-043]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    actions:
+      - {action: attach_energy, selector: own_hand, choose: 1, destination: attach, filters: [basic_energy, energy_草], args: {target_pool: self}}
+      - {action: draw, count: 1}
+  - trigger: on_attack
+    attack: 万叶阵雨
+    actions:
+      - {action: damage, selector: opponent_active, count: attached_energy_on_both_actives, args: {base: 30, per: 30, op: "+"}}

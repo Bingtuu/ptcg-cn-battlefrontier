@@ -1,0 +1,30 @@
+# 喷火龙ex（CSV5C-075，2阶，规则盒 ex，特性：烈炎支配）——「烈炎支配/燃烧黑暗」
+# G 标文本类（同名多文本拆分：151C-006 等「领导/爆裂进攻」类另文，见 task 026 WP7
+# 范围纪律）
+# text_raw 原文：「特性: 烈炎支配
+# 在自己的回合，当将这张卡牌从手牌使出并进行进化时，可使用1次。选择自己牌库中最多3张「基本【火】能量」，以任意方式附着于自己的宝可梦身上。并重洗牌库。
+#
+# 【火】【火】 燃烧黑暗 180+
+# 追加造成对手已经获得的奖赏卡张数×30伤害。」
+# 烈炎支配（task 026 WP7，D-WP7-8）：trigger_on_event own_evolve_from_hand
+# （猫头夜鹰先例）；attach_energy own_deck up-to 3（段1 min_choose=0）基本火能量，
+# 「以任意方式」= 逐张挂起选目标自由分配（可全给 1 只）；选牌后先统一重洗再逐张
+# 摘下附着（重洗原语内建，不写 shuffle_deck 节点——重复洗牌 = 种子消耗差异）。
+# 「可使用」的放弃选项不建模（D-WP2-3）。
+# 燃烧黑暗 180+：追加 = opponent_taken_prizes ×30（月月熊 血月同计数词先例）。
+card:
+  name_group: 喷火龙ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：10 印刷
+  card_ids: [CSV5C-075, CSV5C-145, CSV5C-155, CSV5C-162, CSVL2C-044, CSVL2C-122,
+             CSVL2C-128, CSVM1aC-006, SVP-089, SVP-353]
+effects:
+  - trigger: trigger_on_event
+    event: own_evolve_from_hand
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: attach_energy, selector: own_deck, filters: [basic_energy, energy_火], choose: 3, destination: attach}
+  - trigger: on_attack
+    attack: 燃烧黑暗
+    actions:
+      - {action: damage, selector: opponent_active, count: opponent_taken_prizes, args: {base: 180, op: "+", per: 30}}

@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 data/
+!battlefrontier/data/
 dist/
 config/*.local.yml
 .pytest_cache/

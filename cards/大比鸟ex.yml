@@ -1,0 +1,27 @@
+# 大比鸟ex（CSV4C-101，2阶，规则盒 ex，特性：音速搜索）
+# text_raw 原文：「特性: 音速搜索
+# 在自己的回合可以使用1次。选择自己牌库中任意1张卡牌，加入手牌。并重洗牌库。在这个回合，如果已经使用了其他的「音速搜索」的话，则无法使用这个特性。
+#
+# 【无】【无】 狂风呼啸 120
+# 若希望，可将场上的竞技场放于弃牌区。」
+# 音速搜索：「已经使用了其他的「音速搜索」」= limit once_per_turn_shared（同名共享锁，
+# 引擎按卡名记账）；任意 1 张 = 无过滤器检索（up-to 纪律 min_choose=0）+ 重洗。
+# 狂风呼啸 120 + discard_stadium（task 026 WP7，D-WP7-6）：「若希望」的放弃选项
+# 不建模——有竞技场即弃（对齐 D-WP2-3 触发式不建模放弃先例），入其持有者弃牌区。
+card:
+  name_group: 大比鸟ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全 6 印刷
+  card_ids: [CSV4C-101, CSV4C-146, CSV4C-157, CSVL2C-048, CSVL2C-124, CSVM1aC-010]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn_shared
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, choose: 1, destination: hand}
+      - {action: shuffle_deck}
+  - trigger: on_attack
+    attack: 狂风呼啸
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 120}}
+      - {action: discard_stadium}

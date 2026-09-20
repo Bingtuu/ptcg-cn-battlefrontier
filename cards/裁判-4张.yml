@@ -1,0 +1,23 @@
+# 裁判（CSVH1C-051，支援者）——「各抽4张」文本类
+# （同名多文本拆分：30thDC-037 异文本类另文，见 task 026 WP7 范围纪律）
+# text_raw 原文：「双方玩家，各将所有手牌放回牌库并重洗牌库。然后，各从牌库上方抽取4张卡牌。」
+# 双方手牌洗回（task 026 WP7，D-WP7-9）：shuffle_hand_into_deck ×2（回库重洗——
+# 不是库底，hand_to_deck_bottom 语义不动）；随后各抽 4（对手侧抽牌走
+# draw selector=opponent_deck，奇树结构先例）。语序：先洗回再抽牌
+# （手牌空照常重洗并抽 4）。
+card:
+  name_group: 裁判
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：31 印刷全收
+  card_ids: [CS2DaC-048, CS3DC-154, CS3DC-178, CS4DaC-398, CS5DC-141, CSM1DC-284,
+             CSM2DC-304, CSM2DC-346, CSMPaC-019, CSMPbC-021, CSMPcC-021, CSMPeC-019,
+             CSMPfC-018, CSMPgC-018, CSOC-014, CSV10C-206, CSV10C-254, CSV2C-123,
+             CSV2C-150, CSVE1C-148, CSVE2C-179, CSVH1C-051, CSVH2C-052, CSVH3C-053,
+             CSVH4C-048, CSVH5C-049, CSVM1cC-022, CSVM2aC-027, CSVSC-059, CSXC-017,
+             SVP-418]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: shuffle_hand_into_deck, selector: own_hand}
+      - {action: shuffle_hand_into_deck, selector: opponent_hand}
+      - {action: draw, count: 4}
+      - {action: draw, selector: opponent_deck, count: 4}

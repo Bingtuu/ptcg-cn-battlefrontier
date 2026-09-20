@@ -1,0 +1,16 @@
+# 火箭队的惊吓炸弹（CSV10C-198，物品）
+# text_raw 原文：「抛掷1次硬币，如果为正面，则给对手的1只宝可梦身上放置2个伤害指示物。如果为反面，则给自己的战斗宝可梦身上放置2个伤害指示物。」
+# 掷币分支（task 026 WP7，D-WP7-10①）：coin_flip → 节点级门控 if_flip_heads /
+# if_flip_tails（捕获香氛先例）；正面分支 choose=1 挂起时掷币结果经
+# PendingChoice.flip_result 冻结穿透（task 025）。伤害指示物不是伤害
+# （rules-manual §6）：不结算弱点/抗性，不受谢米 花之纱幔伤害免疫影响
+# （D-WP7-5 指示物不受保护）。
+card:
+  name_group: 火箭队的惊吓炸弹
+  card_ids: [CSV10C-198]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: coin_flip}
+      - {action: place_damage_counters, selector: opponent_pokemon_any, choose: 1, args: {counters: 2}, condition: if_flip_heads}
+      - {action: place_damage_counters, selector: own_active, args: {counters: 2}, condition: if_flip_tails}

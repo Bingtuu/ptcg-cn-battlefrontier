@@ -1,0 +1,14 @@
+# 化朗镇（CSV10C-218，竞技场）
+# text_raw 原文：「双方「赫普的宝可梦」所使用的招式给对手战斗宝可梦造成的伤害「+30」。」
+# 竞技场来源伤害修正（task 026 WP7，D-WP7-3 挂载面②）：passive_static 声明式，
+# 引擎 _effective_damage_modifier 求值点读；condition holder_owner:赫普 对攻击方
+# 持有者求值（双方攻击者均生效）；「给对手战斗宝可梦」落点限定由求值点口径保证
+# （备战落点不加）；竞技场离场即失效（求值点实时读声明）。
+card:
+  name_group: 化朗镇
+  card_ids: [CSV10C-218]
+effects:
+  - trigger: passive_static
+    condition: holder_owner:赫普
+    actions:
+      - {action: modify_damage, args: {amount: 30}}

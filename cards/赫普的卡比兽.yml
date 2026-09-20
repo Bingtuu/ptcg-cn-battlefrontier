@@ -1,0 +1,25 @@
+# 赫普的卡比兽（CSV10C-175，基础，特性：慷慨）
+# text_raw 原文：「特性: 慷慨
+# 只要这只宝可梦在场上，自己「赫普的宝可梦」所使用的招式给对手战斗宝可梦造成的伤害「+30」。无论拥有这个特性的宝可梦有多少只，这个效果都不会重复。
+#
+# 【无】【无】【无】 强劲压制 140
+# 给这只宝可梦也造成80伤害。」
+# 慷慨（task 026 WP7，D-WP7-3 挂载面③ 宝可梦 aura）：modify_damage scope=own_field
+# 声明式，condition holder_owner:赫普 对攻击方持有者求值（含卡比兽自身）；
+# 「无论…多少只…不会重复」= 引擎同名来源卡去重只加一次；离场即失效
+# （求值点实时扫场）。
+# 强劲压制 140：自伤 80 走 damage self（D-WP7-10② 固定值直接放置，不吃弱点/抗性/
+# 增伤修正）。
+card:
+  name_group: 赫普的卡比兽
+  card_ids: [CSV10C-175]
+effects:
+  - trigger: passive_static
+    condition: holder_owner:赫普
+    actions:
+      - {action: modify_damage, args: {amount: 30, scope: own_field}}
+  - trigger: on_attack
+    attack: 强劲压制
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 140}}
+      - {action: damage, selector: self, args: {amount: 80}}

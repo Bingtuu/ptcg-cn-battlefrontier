@@ -1,0 +1,20 @@
+# 谢米（CSV10C-007，基础，特性：花之纱幔）——「花之纱幔/踢飞」I 标文本类
+# （同名多文本拆分：CSV7C-021 / CSV9.5C-150 / CSVM2cC-001 等 10 个异文本类另文，
+# 见 task 026 WP7 范围纪律）
+# text_raw 原文：「特性: 花之纱幔
+# 只要这只宝可梦在场上，自己所有备战宝可梦（除「拥有规则的宝可梦」外）不会受到对手招式的伤害。
+#
+# 【无】【无】 踢飞 30」
+# 花之纱幔（task 026 WP7，D-WP7-5）：protection scope=opponent_attack_damage_to_bench
+# ——伤害免疫（区别于 D-WP6-7 的效果免疫），作用面=自己备战区、来源限对手招式；
+# args.target_filters=[no_rule_box] 对受保护目标收敛（「除拥有规则的宝可梦外」）；
+# 伤害指示物放置不是伤害、不受此保护；谢米离场即失效（求值点实时扫场）。
+# 踢飞 30 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 谢米
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：I 标 2 印刷
+  card_ids: [CSV10C-007, SVP-343]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: protection, args: {scope: opponent_attack_damage_to_bench, target_filters: [no_rule_box]}}

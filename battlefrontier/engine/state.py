@@ -78,6 +78,9 @@ class CardDef(FrozenModel):
     owner: str | None = None
     # 机制特质标签（对齐 db effect_tags.labels：古代/未来/一击/连击等，db PRD v1.23 契约键）
     labels: tuple[str, ...] = ()
+    # 特性存在标记（对齐 db cards.abilities 非空，task 026 WP7 雪妖女 冻结帷幕：
+    # 「拥有特性」过滤用——db 是否有特性条目的物化投影，引擎不解析特性内容）
+    has_ability: bool = False
 
 
 class CardInstance(FrozenModel):
@@ -103,6 +106,10 @@ class InPlayPokemon(FrozenModel):
     # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：被锁目标下个自己回合无法撤退
     # （回合结束 core._on_turn_end 解除；进化/离场清除）
     retreat_lock: bool = False
+    # 麻痹施加标记（task 026 WP7，D-WP7-2）=（施加时 turn, 施加方 current_player）：
+    # 检查阶段恢复条件 = 持有者回合结束 且 (turn, current) != 标记（施加当回合不恢复）；
+    # None（如直接构造入场）= 持有者回合结束即恢复；恢复后清回 None
+    paralyzed_mark: tuple[int, int] | None = None
 
     @property
     def current(self) -> CardInstance:
@@ -188,6 +195,14 @@ class PlayerState(FrozenModel):
     # 回合级奖赏加成标记（task 026 WP5 白蕾雅，D-WP5-2 🔲 待核）：本回合自己太晶
     # 宝可梦招式伤害致对手战斗场昏厥时多拿 1 张奖赏；回合结束 _on_turn_end 清除
     extra_prize_tera_ko: bool = False
+    # 回合级伤害修正标记（task 026 WP7 空手道王的修炼，D-WP7-3）：on_play 的
+    # modify_damage 写入——元素 = (增减值, 目标规则盒限定 | None)，与道具/竞技场/
+    # aura 三来源求和；自己回合结束（_on_turn_end / 检查阶段入口）清除
+    turn_damage_mods: tuple[tuple[int, str | None], ...] = ()
+    # 精确口径昏厥标记（task 026 WP7 古玉鱼 嫉妒业火，D-WP7-7）：「上一个对手的回合」
+    # 内我方宝可梦因对手招式伤害被昏厥（宽口径 own_ko_during_opponent_turn 不含
+    # 伤害来源判别）；_knockout_one 在招式上下文置位，我方回合结束清除
+    own_ko_by_attack_during_opponent_turn: bool = False
 
     @model_validator(mode="after")
     def _zone_limits(self) -> PlayerState:
@@ -294,6 +309,10 @@ class GameState(FrozenModel):
     bench_shrink_resume: tuple[int, str] | None = None
     # 竞技场放置方（task 017：旧竞技场被替换时进其放置方弃牌区，rules-manual §5）
     stadium_owner: int | None = None
+    # 宝可梦检查进行中标记（task 026 WP7，D-WP7-1）：非 None = 检查阶段处理中，
+    # 值 = 检查全部结束后开回合的玩家；检查内的换上/缩减恢复路径据此跳过重入，
+    # _begin_turn / _game_over 清零
+    pokemon_check_next: int | None = None
 
     def visible_state(self, player: int) -> VisibleGameState:
         own = self.players[player]

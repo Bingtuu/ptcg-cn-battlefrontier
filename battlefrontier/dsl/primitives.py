@@ -10,6 +10,7 @@ from __future__ import annotations
 from battlefrontier.dsl.chooser import (
     NeedChoice,
     matches,
+    matches_in_play,
     resolve_in_play_pool,
     resolve_pool,
 )
@@ -559,6 +560,82 @@ def _recover_from_discard(ctx: ExecutionContext, node: ActionNode, choice: tuple
     return {"found": len(picked), "iids": list(choice), "destination": node.destination}
 
 
+def _attach_energy_from_deck(
+    ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None,
+) -> dict[str, object] | NeedChoice:
+    """attach_energy selector=own_deck（task 026 WP7，D-WP7-8 喷火龙ex 烈炎支配）：牌库检索能量附着。
+
+    段1 牌库池 up-to N（min 0；池空/选 0 → 仅重洗完成）；选 K>0 → 先重洗，
+    再逐张挂起选目标（pool=own_pokemon_in_play，args.target_filters 过滤），
+    每张从牌库按 iid 摘下附着（任意分配、可全给 1 只）；能量在选目标前不离
+    牌库。multi_target/energy_up_to/damage_counters 与 own_deck 组合语义冲突
+    → DslError（不猜）。
+    """
+    if node.args.get("multi_target") or node.args.get("energy_up_to"):
+        raise DslError(
+            "attach_energy selector=own_deck 不支持 multi_target/energy_up_to"
+            "（语义冲突，不猜）"
+        )
+    if node.args.get("damage_counters"):
+        raise DslError(
+            "attach_energy selector=own_deck 不支持 damage_counters（不猜）"
+        )
+    engine = ctx.engine
+    target_filters = tuple(node.args.get("target_filters", ()))
+    if choice is None:
+        # 段1：选能量（牌库池空 → 仅重洗，不挂起）
+        if not resolve_pool(ctx.player_state, "own_deck", node.filters):
+            p = ctx.player_state
+            ctx.set_player_state(p.model_copy(update={
+                "deck": engine.rng.shuffle(p.deck),
+            }))
+            return {"attached": 0, "iids": [], "destination": "attach",
+                    "shuffled": True, "reason": "no_match"}
+        return NeedChoice(
+            pool="own_deck", filters=node.filters,
+            min_choose=0, max_choose=node.choose, destination="attach",
+        )
+    if not ctx.carry:
+        # 段1 恢复：先统一重洗；选 0 张 → 仅重洗完成，不进目标选择
+        p = ctx.player_state
+        ctx.set_player_state(p.model_copy(update={
+            "deck": engine.rng.shuffle(p.deck),
+        }))
+        if not choice:
+            return {"attached": 0, "iids": [], "destination": "attach",
+                    "shuffled": True}
+        # 逐张挂起选目标：carry = 待附着能量 iids（选择顺序 FIFO）
+        return NeedChoice(
+            pool="own_pokemon_in_play", filters=target_filters,
+            min_choose=1, max_choose=1, destination="attach", carry=tuple(choice),
+        )
+    # 恢复完成：carry = 全部已选能量 iids（选择顺序 FIFO 全程保留，不逐张收缩
+    # ——复核 m1：事件载荷报全量 iids）；附着进度 = carry 中仍在牌库的首个
+    # （已附着者已按 iid 离库）
+    p = ctx.player_state
+    deck_iids = {c.iid for c in p.deck}
+    remaining = tuple(i for i in ctx.carry if i in deck_iids)
+    energy_iid = remaining[0]
+    target_iid = choice[0]
+    energy_card = next(c for c in p.deck if c.iid == energy_iid)
+    p = p.model_copy(update={
+        "deck": tuple(c for c in p.deck if c.iid != energy_iid),
+    })
+    slot, idx, mon = engine._find_in_play(p, target_iid)
+    ctx.set_player_state(engine._replace_in_play(p, slot, idx, mon.model_copy(
+        update={"attached_energy": mon.attached_energy + (energy_card,)},
+    )))
+    if len(remaining) > 1:
+        return NeedChoice(
+            pool="own_pokemon_in_play", filters=target_filters,
+            min_choose=1, max_choose=1, destination="attach", carry=ctx.carry,
+        )
+    return {
+        "attached": len(ctx.carry), "energy_iids": sorted(ctx.carry),
+        "destination": "attach", "shuffled": True,
+    }
+
+
 @register("attach_energy")
 def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
     """效果附着能量（不受每回合 1 次限制）：selector 区域 → 自己场上宝可梦。
@@ -582,8 +659,10 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
     """
     if node.destination != "attach":
         raise DslError(f"attach_energy 暂仅支持 destination=attach（收到 {node.destination!r}）")
-    if node.selector != "own_discard":
-        raise DslError(f"attach_energy 暂仅支持 selector=own_discard（收到 {node.selector!r}）")
+    if node.selector not in ("own_discard", "own_deck"):
+        raise DslError(f"attach_energy 暂仅支持 selector=own_discard/own_deck（收到 {node.selector!r}）")
+    if node.selector == "own_deck":
+        return _attach_energy_from_deck(ctx, node, choice)
     if node.choose is None:
         raise DslError("attach_energy 需要 choose=N（附着必须经 chooser 交互选择）")
     target_filters = tuple(node.args.get("target_filters", ()))
@@ -807,6 +886,36 @@ def _resolve_damage_amount(ctx: ExecutionContext, node: ActionNode, target: InPl
     raise DslError(f"damage 公式的 op 须为 + 或 ×（收到 {op!r}）")
 
 
+def _damage_self(ctx: ExecutionContext, node: ActionNode) -> dict[str, object]:
+    """damage selector=self（task 026 WP7 爬地翅 烫伤怒涛，D-WP7-10②）：「这只宝可梦
+    也受到 N 伤害」——固定值直接放置，不吃弱点/抗性/增伤修正（自身伤害非对
+    对手战斗场落点，§6 修正链不接）；致昏厥走正常 check_knockouts（§8）。
+    仅 args.amount 固定值；计数公式等形式 DslError（不猜）。
+    """
+    _require_no_choose(node, "damage")
+    if "amount" not in node.args:
+        raise DslError(
+            "damage self 暂仅支持 args.amount 固定值（计数公式等形式不猜）"
+        )
+    amount = _resolve_damage_amount(ctx, node, None)
+    engine = ctx.engine
+    source_mon = _find_source_mon(ctx)
+    if source_mon is None:
+        raise DslError("damage self：来源宝可梦不在场上")
+    p = engine.state.players[ctx.player]
+    slot, idx, target = engine._find_in_play(p, source_mon.current.iid)
+    engine._set_player(ctx.player, engine._replace_in_play(
+        p, slot, idx, target.model_copy(update={"damage": target.damage + amount}),
+    ))
+    engine.check_knockouts()
+    return {
+        "amount": amount, "damage_mod": 0, "final": amount,
+        "target_iid": target.current.iid,
+        "target": target.current.card.name, "to_bench": slot == "bench",
+        "protected": False,  # 自伤不经保护守卫（键位对齐 damage 对手分支）
+    }
+
+
 @register("damage")
 def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
     """造成伤害：selector=opponent_active（自动目标）/ opponent_pokemon_any（choose=1 挂起选目标）。
@@ -818,9 +927,11 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     """
     from battlefrontier.engine.core import _weakness_resistance
 
-    if node.selector not in ("opponent_active", "opponent_pokemon_any"):
-        raise DslError(f"damage 暂仅支持 opponent_active / opponent_pokemon_any（收到 {node.selector!r}）")
+    if node.selector not in ("opponent_active", "opponent_pokemon_any", "self"):
+        raise DslError(f"damage 暂仅支持 opponent_active / opponent_pokemon_any / self（收到 {node.selector!r}）")
     engine = ctx.engine
+    if node.selector == "self":
+        return _damage_self(ctx, node)
     defender_idx = 1 - ctx.player
     d = engine.state.players[defender_idx]
 
@@ -842,20 +953,34 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     if slot == "active" and ctx.trigger == "on_attack":
         attacker = _find_source_mon(ctx)
         if attacker is not None:
-            mod = engine._effective_damage_modifier(attacker, ctx.player)
-    # 弱点/抗性仅对战斗场目标（rules-manual §6）
-    final = (
-        _weakness_resistance(ctx.source.card, target, amount + mod,
-                             weakness=ctx.engine._effective_weakness(ctx.player, target))
-        if slot == "active" else amount
+            mod = engine._effective_damage_modifier(
+                attacker, ctx.player,
+                target_rule_box=target.current.card.rule_box)
+    # 谢米（task 026 WP7，D-WP7-5）：招式伤害落点对手备战区且受 protection
+    # scope=opponent_attack_damage_to_bench 保护 → 伤害归零（指示物不受此保护）
+    protected = (
+        slot == "bench" and ctx.trigger == "on_attack"
+        and engine._protected_bench_from_attack_damage(target, defender_idx)
     )
+    # 弱点/抗性仅对战斗场目标（rules-manual §6）
+    if protected:
+        final = 0
+    elif slot == "active":
+        final = _weakness_resistance(
+            ctx.source.card, target, amount + mod,
+            weakness=ctx.engine._effective_weakness(ctx.player, target))
+    else:
+        final = amount
     engine._set_player(defender_idx, engine._replace_in_play(
         d, slot, idx, target.model_copy(update={"damage": target.damage + final}),
     ))
-    # 白蕾雅奖赏加成（task 026 WP5，D-WP5-2）：招式伤害（on_attack）落点对手战斗场
-    # 且 final>0 → 置瞬时记录（攻方, 攻方是否太晶），check_knockouts 取走并清空；
-    # 备战落点/效果触发/0 伤害永不置位
-    if slot == "active" and ctx.trigger == "on_attack" and final > 0:
+    # 招式伤害瞬时记录（task 026 WP5 白蕾雅 D-WP5-2 / WP7 古玉鱼 D-WP7-7 + F1 归正）：
+    # on_attack 伤害落点（战斗场或备战）且 final>0 → 置记录，check_knockouts 取走并
+    # 清空；效果触发（非 on_attack）/指示物/0 伤害（含谢米保护归零）永不置位。
+    # 白蕾雅奖赏加成与 own_ko_by_attack 触发器仍只在战斗场昏厥读取（_knockout_one
+    # 的 active_ko 门）；古玉鱼精确标记战斗场/备战昏厥均置位（F1：卡面无战斗场限定）
+    if ctx.trigger == "on_attack" and final > 0:
+        attacker = _find_source_mon(ctx)  # 备战落点不经上方修正块，此处重新定位
         engine._attack_damage_active = (
             ctx.player, attacker is not None and attacker.current.card.is_tera,
             attacker.current.iid if attacker is not None else None,
@@ -865,6 +990,7 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
         "amount": amount, "damage_mod": mod, "final": final,
         "target_iid": target.current.iid,
         "target": target.current.card.name, "to_bench": slot == "bench",
+        "protected": protected,
     }
 
 
@@ -889,7 +1015,10 @@ def _clear_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
     slot, idx, mon = ctx.engine._find_in_play(p, ctx.source.iid)
     cleared = sorted(mon.conditions)
     ctx.set_player_state(ctx.engine._replace_in_play(
-        p, slot, idx, mon.model_copy(update={"conditions": frozenset()}),
+        # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+        p, slot, idx, mon.model_copy(update={
+            "conditions": frozenset(), "paralyzed_mark": None,
+        }),
     ))
     return {"cleared": cleared}
 
@@ -923,9 +1052,16 @@ def _apply_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
         # 闪焰之幕（task 026 WP6，D-WP6-7）：对手招式施加的特殊状态不适用
         # （伤害本体不免疫——damage 节点不经本判定；训练家卡效果不受保护）
         return {"applied": None, "reason": "protected"}
+    # 麻痹施加标记（task 026 WP7，D-WP7-2）=（施加时 turn, 施加方）：检查阶段
+    # 据此判定「持有者下一个自己回合结束才恢复」（施加当回合不恢复）
+    mark = (
+        (engine.state.turn, engine.state.current_player)
+        if status == SpecialCondition.PARALYZED else d.active.paralyzed_mark
+    )
     engine._set_player(defender_idx, d.model_copy(update={
         "active": d.active.model_copy(update={
             "conditions": d.active.conditions | {status},
+            "paralyzed_mark": mark,
         }),
     }))
     return {"applied": str(status_word), "target": d.active.current.card.name}
@@ -959,7 +1095,11 @@ def _switch(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
         raise DslError("switch：战斗场为空，无法互换")
     idx = next(i for i, b in enumerate(o.bench) if b.current.iid == choice[0])
     promoted = o.bench[idx]
-    retreated = o.active.model_copy(update={"conditions": frozenset()})
+    retreated = o.active.model_copy(update={
+        "conditions": frozenset(),
+        # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+        "paralyzed_mark": None,
+    })
     bench = o.bench[:idx] + (retreated,) + o.bench[idx + 1:]
     engine._set_player(side_idx, o.model_copy(update={"active": promoted, "bench": bench}))
     return {"switched": True, "into": promoted.current.card.name,
@@ -1031,6 +1171,8 @@ def _apply_evolution(ctx: ExecutionContext, card_iid: int, target_iid: int, zone
     evolved = target.model_copy(update={
         "stack": target.stack + (card,),
         "conditions": frozenset(),
+        # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+        "paralyzed_mark": None,
     })
     p = engine._replace_in_play(p, slot, idx, evolved)
     ctx.set_player_state(p.model_copy(update={
@@ -1279,7 +1421,9 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     dmg = _attack_damage(attack, ctx.source.card, d.active,
                          weakness=engine._effective_weakness(ctx.player, d.active),
                          damage_mod=(
-                             engine._effective_damage_modifier(attacker, ctx.player)
+                             engine._effective_damage_modifier(
+                                 attacker, ctx.player,
+                                 target_rule_box=d.active.current.card.rule_box)
                              if attacker is not None else 0
                          ))
     engine._set_player(opp_idx, d.model_copy(update={
@@ -1361,7 +1505,28 @@ def _heal(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | Non
             return NeedChoice(pool="own_pokemon_in_play", filters=node.filters,
                               min_choose=1, max_choose=1)
         return apply_heal(ctx.player_state, choice[0])
-    raise DslError(f"heal 暂仅支持 selector=own_active/own_pokemon_in_play（收到 {node.selector!r}）")
+    if node.selector == "all_pokemon_both":
+        # 野餐篮（task 026 WP7，D-WP7-10）：双方全场各恢复 N（无 choose；
+        # 满血 no-op 照常，healed 按实际恢复量求和）
+        _require_no_choose(node, "heal")
+        total = 0
+        for who in (ctx.player, 1 - ctx.player):
+            p = ctx.engine.state.players[who]
+            positions = ([("active", -1)] if p.active else []) + [
+                ("bench", i) for i in range(len(p.bench))
+            ]
+            for slot, idx in positions:
+                p = ctx.engine.state.players[who]
+                mon = p.active if slot == "active" else p.bench[idx]
+                healed = min(amount, mon.damage)
+                total += healed
+                if healed:
+                    ctx.engine._set_player(who, ctx.engine._replace_in_play(
+                        p, slot, idx,
+                        mon.model_copy(update={"damage": mon.damage - healed}),
+                    ))
+        return {"healed": total}
+    raise DslError(f"heal 暂仅支持 selector=own_active/own_pokemon_in_play/all_pokemon_both（收到 {node.selector!r}）")
 
 
 @register("coin_flip")
@@ -1522,10 +1687,13 @@ def _place_damage_counters(ctx: ExecutionContext, node: ActionNode, choice: tupl
     check_knockouts（§8）。「可使用」的放弃选项不建模、满足即自动发动
     （D-WP2-3）：池不足 min_choose 收缩至池大小，池空 no-op 不挂起。
     """
-    if node.selector not in ("opponent_pokemon_any", "opponent_bench", "opponent_attacker"):
+    if node.selector not in (
+        "opponent_pokemon_any", "opponent_bench", "opponent_attacker",
+        "own_active", "all_pokemon_both",
+    ):
         raise DslError(
             f"place_damage_counters 暂仅支持 opponent_pokemon_any/opponent_bench/"
-            f"opponent_attacker（收到 {node.selector!r}）"
+            f"opponent_attacker/own_active/all_pokemon_both（收到 {node.selector!r}）"
         )
     counters = node.args.get("counters")
     if not isinstance(counters, int) or isinstance(counters, bool) or counters <= 0:
@@ -1557,6 +1725,69 @@ def _place_damage_counters(ctx: ExecutionContext, node: ActionNode, choice: tupl
         engine.check_knockouts()
         return {"placed": 1, "counters_each": counters,
                 "target_iids": [ctx.attacker_iid]}
+    if node.selector == "own_active":
+        # 惊吓炸弹反面（task 026 WP7，D-WP7-10①）：自己战斗场放 N 个指示物，无 choose
+        if node.choose is not None:
+            raise DslError(
+                "place_damage_counters own_active 不支持 choose"
+                f"（收到 choose={node.choose}；目标唯一=自己战斗场）"
+            )
+        p = engine.state.players[ctx.player]
+        if p.active is None:
+            raise DslError("place_damage_counters own_active：自己战斗场为空")
+        engine._set_player(ctx.player, p.model_copy(update={
+            "active": p.active.model_copy(update={
+                "damage": p.active.damage + counters * 10,
+            }),
+        }))
+        engine.check_knockouts()
+        return {"placed": 1, "counters_each": counters,
+                "target_iids": [p.active.current.iid]}
+    if node.selector == "all_pokemon_both":
+        # 雪妖女 冻结帷幕（task 026 WP7，D-WP7-11）：双方全场逐只各放 N 个
+        # （无 choose；filters 对双方场上逐只收敛，如 has_ability/not_name:X）；
+        # on_attack 时逐目标过闪焰之幕效果免疫守卫（D-WP6-7 口径延伸）——
+        # 守卫只判定防守方目标（复核 m4：「对手招式效果」不保护攻击方自己的宝可梦）
+        if node.choose is not None:
+            raise DslError(
+                "place_damage_counters all_pokemon_both 不支持 choose"
+                f"（收到 choose={node.choose}；双方全场逐只无选择）"
+            )
+        placed_all = 0
+        skipped_all: list[int] = []
+        target_iids_all: list[int] = []
+        for who in (ctx.player, 1 - ctx.player):
+            p = engine.state.players[who]
+            positions = ([("active", -1)] if p.active else []) + [
+                ("bench", i) for i in range(len(p.bench))
+            ]
+            for slot, idx in positions:
+                p = engine.state.players[who]
+                mon = p.active if slot == "active" else p.bench[idx]
+                if node.filters and not matches_in_play(mon, node.filters):
+                    continue
+                if (
+                    who == 1 - ctx.player
+                    and ctx.trigger == "on_attack"
+                    and engine._protected_from_attack_effects(mon, who)
+                ):
+                    skipped_all.append(mon.current.iid)
+                    continue
+                engine._set_player(who, engine._replace_in_play(
+                    p, slot, idx, mon.model_copy(update={
+                        "damage": mon.damage + counters * 10,
+                    }),
+                ))
+                placed_all += 1
+                target_iids_all.append(mon.current.iid)
+        engine.check_knockouts()
+        result_all: dict[str, object] = {
+            "placed": placed_all, "counters_each": counters,
+            "target_iids": target_iids_all,
+        }
+        if skipped_all:
+            result_all["skipped_protected"] = skipped_all
+        return result_all
     if node.choose is None:
         raise DslError("place_damage_counters 需要 choose=N（目标经 chooser 交互选择）")
     if node.selector == "opponent_pokemon_any" and node.choose != 1:
@@ -1824,6 +2055,8 @@ def _devolve(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | 
         returned.append(mon.stack[-1])
         return mon.model_copy(update={
             "stack": mon.stack[:-1], "conditions": frozenset(),
+            # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+            "paralyzed_mark": None,
         })
 
     active = devolve_mon(o.active) if o.active is not None else None
@@ -1840,3 +2073,107 @@ def _devolve(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | 
     if skipped:
         result["skipped_protected"] = skipped
     return result
+
+
+
+# ── task 026 WP7：小原语批（D-WP7-3/6/9/10④）──────────────────────────────────
+
+
+@register("modify_damage")
+def _modify_damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """回合级伤害修正标记（task 026 WP7 空手道王的修炼，D-WP7-3）：on_play 解释
+    执行——写 PlayerState.turn_damage_mods（(增减值, 目标规则盒限定 | None)），
+    持有方回合结束清除（core._on_turn_end / 检查阶段入口双清）；求和与
+    target_rule_box 过滤在引擎 _effective_damage_modifier 求值点。
+    passive_static 挂载（道具/竞技场/aura）是声明式，不经本原语。
+    """
+    _require_no_choose(node, "modify_damage")
+    if ctx.trigger != "on_play":
+        raise DslError(
+            f"modify_damage 解释执行仅支持 on_play（收到 trigger={ctx.trigger!r}；"
+            f"passive_static 为声明式挂载，引擎读声明）"
+        )
+    if "scope" in node.args:
+        raise DslError(
+            f"on_play modify_damage 不支持 args.scope（收到 {node.args['scope']!r}；"
+            f"aura 是 passive_static 声明，不猜）"
+        )
+    amount = node.args.get("amount")
+    if not isinstance(amount, int) or isinstance(amount, bool):
+        raise DslError(f"modify_damage 需要 args.amount int（收到 {amount!r}）")
+    target_rule_box = node.args.get("target_rule_box")
+    p = ctx.player_state
+    ctx.set_player_state(p.model_copy(update={
+        "turn_damage_mods": p.turn_damage_mods + ((amount, target_rule_box),),
+    }))
+    return {"amount": amount, "target_rule_box": target_rule_box}
+
+
+@register("discard_stadium")
+def _discard_stadium(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """弃置竞技场（task 026 WP7，D-WP7-6）：公共场进其放置方（stadium_owner）
+    弃牌区 + 状态清理；无竞技场 no-op。备战区失效缩减由引擎完成路径
+    _check_bench_shrink 复查承接（D-WP6-2 触点）。无 selector/choose/count
+    参数（带则 DslError 不猜）。
+    """
+    _require_no_choose(node, "discard_stadium")
+    if node.selector is not None:
+        raise DslError(f"discard_stadium 不支持 selector（收到 {node.selector!r}）")
+    if node.count is not None:
+        raise DslError(f"discard_stadium 不支持 count（收到 {node.count!r}）")
+    engine = ctx.engine
+    stadium, owner = engine.state.stadium, engine.state.stadium_owner
+    if stadium is None:
+        return {"discarded": None}
+    engine.state = engine.state.model_copy(update={
+        "stadium": None, "stadium_owner": None,
+    })
+    if owner is not None:
+        p = engine.state.players[owner]
+        engine._set_player(owner, p.model_copy(update={
+            "discard": p.discard + (stadium,),
+        }))
+    return {"discarded": stadium.card.name}
+
+
+@register("shuffle_hand_into_deck")
+def _shuffle_hand_into_deck(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """手牌洗回牌库（task 026 WP7 裁判，D-WP7-9）：selector=own_hand/
+    opponent_hand——该方手牌全部回库后重洗（单一随机源 rng.shuffle，
+    种子确定性硬规矩）；手牌空照常重洗（裁判语序：先洗回再抽牌）。
+    """
+    _require_no_choose(node, "shuffle_hand_into_deck")
+    if node.selector not in ("own_hand", "opponent_hand"):
+        raise DslError(
+            f"shuffle_hand_into_deck 暂仅支持 own_hand/opponent_hand"
+            f"（收到 {node.selector!r}）"
+        )
+    engine = ctx.engine
+    who = ctx.player if node.selector == "own_hand" else 1 - ctx.player
+    p = engine.state.players[who]
+    engine._set_player(who, p.model_copy(update={
+        "deck": engine.rng.shuffle(p.deck + p.hand), "hand": (),
+    }))
+    return {"shuffled": len(p.hand), "player": who}
+
+
+@register("mill")
+def _mill(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """磨牌（task 026 WP7，D-WP7-10④）：对手牌库顶 N 张 → 对手弃牌区（保序）；
+    牌库不足收缩（全磨），空库 no-op；效果磨光牌库不判负——判负只在回合
+    开始抽牌（rules-manual §8 胜利条件，core._begin_turn 单一判定点）。
+    """
+    _require_no_choose(node, "mill")
+    if node.selector != "opponent_deck":
+        raise DslError(f"mill 暂仅支持 selector=opponent_deck（收到 {node.selector!r}）")
+    count = node.count
+    if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+        raise DslError(f"mill 需要 count 正 int（收到 {count!r}）")
+    engine = ctx.engine
+    opp_idx = 1 - ctx.player
+    o = engine.state.players[opp_idx]
+    milled = o.deck[:count]
+    engine._set_player(opp_idx, o.model_copy(update={
+        "deck": o.deck[len(milled):], "discard": o.discard + milled,
+    }))
+    return {"milled": len(milled), "iids": [c.iid for c in milled]}

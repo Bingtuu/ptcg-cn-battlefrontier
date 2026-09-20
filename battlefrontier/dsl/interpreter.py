@@ -111,7 +111,12 @@ def flatten_steps(effect: Effect) -> list[tuple[str, ActionNode]]:
 # 词表文件不含 condition 段。if_flip_* 求值读 ctx.last_flip（最近一次 coin_flip 结果）；
 # if_self_active（task 026 WP5 赛富豪ex 嘉奖硬币「战斗场则额外抽1」）读来源卡是否
 # 在操控方战斗场，无需前置掷币。
-_NODE_CONDITIONS = ("if_flip_heads", "if_flip_tails", "if_self_active")
+# if_own_ko_by_attack_during_opponent_turn（task 026 WP7 古玉鱼 嫉妒业火）读
+# PlayerState.own_ko_by_attack_during_opponent_turn（精确口径跨回合标记），无需掷币。
+_NODE_CONDITIONS = (
+    "if_flip_heads", "if_flip_tails", "if_self_active",
+    "if_own_ko_by_attack_during_opponent_turn",
+)
 
 
 def _node_condition_met(ctx: ExecutionContext, condition: str) -> bool:
@@ -123,6 +128,8 @@ def _node_condition_met(ctx: ExecutionContext, condition: str) -> bool:
     if condition == "if_self_active":
         active = ctx.engine.state.players[ctx.player].active
         return active is not None and active.current.iid == ctx.source.iid
+    if condition == "if_own_ko_by_attack_during_opponent_turn":
+        return ctx.engine.state.players[ctx.player].own_ko_by_attack_during_opponent_turn
     if ctx.last_flip is None:
         raise DslError(
             f"节点 condition {condition!r} 需要本效果内前置 coin_flip"

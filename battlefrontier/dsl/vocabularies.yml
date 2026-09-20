@@ -28,7 +28,7 @@ actions:
   - coin_flip               # 掷币（结果存 ExecutionContext，节点级门控 if_flip_* 读取）
   - heal                    # 恢复 HP（去伤害指示物，不超过已有伤害）
   - bounce                  # 放回手牌（场上宝可梦整叠回手，附着能量/道具进弃牌区）
-  - modify_damage           # 声明式：招式伤害修正（道具 passive_static，如不服输头带；引擎读声明）
+  - modify_damage           # 招式伤害修正（task 026 WP7 四来源求和）：声明式挂载 = 道具/竞技场/宝可梦 aura（passive_static，引擎读声明）；on_play 解释执行 = 回合级标记（空手道王的修炼，turn_damage_mods）
   - ko_self                 # 自我昏厥（这只宝可梦整叠弃置，对手拿奖赏；咒怨炸弹）
   - modify_retreat_cost     # 声明式：撤退费用修正（task 026 WP4：道具/特性 passive_static，引擎读声明，解释器不执行）
   - lock_attack             # 招式冷却锁（task 026 WP4 裁决 2：on_attack 内锁定本招式名，下个自己回合不可使用）
@@ -40,6 +40,9 @@ actions:
   - lock_retreat            # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍：目标下个自己回合无法撤退）
   - protection              # 声明式：效果免疫（task 026 WP6 火恐龙 闪焰之幕：不受对手招式效果影响；引擎读声明）
   - devolve                 # 退化（task 026 WP6 招式学习器 退化：移除进化卡放回手牌）
+  - mill                    # 磨牌（task 026 WP7：对手牌库顶 N 张 → 对手弃牌区）
+  - discard_stadium         # 弃置竞技场（task 026 WP7：公共场入其持有者弃牌区）
+  - shuffle_hand_into_deck  # 手牌洗回牌库（task 026 WP7 裁判：own_hand/opponent_hand 各自回库重洗）
 
 # 选择器（作用对象）
 selectors:
@@ -59,6 +62,7 @@ selectors:
   - opponent_deck           # 对手的牌库（奇树：对手抽牌）
   - opponent_attacker       # 使用了招式的对手宝可梦（task 026 WP6 沙铃仙人掌 炸裂针刺：昏厥事件上下文）
   - opponent_pokemon_all    # 对手全部宝可梦（task 026 WP6 招式学习器 退化：逐只处理，无 choose）
+  - all_pokemon_both        # 双方全部在场宝可梦（task 026 WP7 雪妖女 冻结帷幕 / 野餐篮：逐只处理，无 choose）
 
 # 触发器（区分主动发动与被动监听）
 triggers:
@@ -104,3 +108,4 @@ events:
   - own_play_from_hand_to_bench  # 自己的回合，从手牌使出放于备战区时（摔角鹰人 飞身入场）
   - own_evolve_from_hand         # 自己的回合，从手牌使出并进行进化时（猫头夜鹰 寻找宝石，task 026 WP3）
   - own_ko_by_attack             # 在战斗场受到对手招式伤害而昏厥时（task 026 WP6 沙铃仙人掌 炸裂针刺）
+  - pokemon_check                # 每次宝可梦检查时（task 026 WP7 雪妖女 冻结帷幕：双方回合结束后的检查阶段统一触发）

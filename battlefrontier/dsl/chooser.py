@@ -182,6 +182,15 @@ def _match_in_play(
     if filter_word == "has_damage_counters":
         # 身上有伤害指示物（亢奋脑力转放来源）
         return mon.damage > 0
+    if filter_word == "has_ability":
+        # 拥有特性（task 026 WP7 雪妖女 冻结帷幕；CardDef.has_ability ← db abilities 非空）
+        return top.has_ability
+    if filter_word.startswith("not_name:"):
+        # 场上维度的按卡名排除（task 026 WP7：「（除「雪妖女」外）」式，栈顶卡名比对）
+        return top.name != filter_word.split(":", 1)[1]
+    if filter_word == "no_rule_box":
+        # 无规则盒（task 026 WP7 谢米：受保护目标收敛「除拥有规则的宝可梦外」）
+        return top.rule_box is None
     raise DslError(f"未知 in-play filter 词 '{filter_word}'（chooser 求值点；扩展请在 dsl/chooser.py 注册）")
 
 
@@ -530,6 +539,13 @@ def condition_met(
         energy_type = condition.split(":", 1)[1]
         return mon is not None and any(
             e.card.energy_type == energy_type for e in mon.attached_energy
+        )
+    if condition.startswith("holder_owner:"):
+        # 参数化条件（task 026 WP7 化朗镇/卡比兽/讲究头带）：持有者主人归属
+        # （CardDef.owner ← db cards.owner；db 未覆盖的主人组恒不匹配——不猜）
+        return (
+            mon is not None
+            and mon.current.card.owner == condition.split(":", 1)[1]
         )
     if condition.startswith("opponent_prizes_eq:"):
         # 参数化条件（task 026 WP1）：「对手的剩余奖赏卡张数为 N 张」（白蕾雅）

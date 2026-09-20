@@ -1,0 +1,27 @@
+# 爬地翅（CSV6C-082，基础，斗属性，古代）——「踏平/烫伤怒涛」G 标文本类
+# （同名多文本拆分：CSV8C-119 / CSV9.5C-098 异文本类另文，见 task 026 WP7 范围纪律）
+# text_raw 原文：「【斗】 踏平
+# 将对手牌库上方1张卡牌放于弃牌区。
+#
+# 【斗】【斗】 烫伤怒涛 120
+# 给这只宝可梦也造成90伤害。令对手的战斗宝可梦陷入【灼伤】状态。」
+# 踏平（task 026 WP7，D-WP7-10④）：mill 对手牌库顶 1 张 → 对手弃牌区（牌库不足
+# 收缩、空库 no-op；磨光不判负——判负只在回合开始抽牌，rules-manual §8）。
+# 烫伤怒涛 120：自伤 90 走 damage self（D-WP7-10② 固定值直接放置，不吃弱点/抗性/
+# 增伤修正）；灼伤 apply_status（检查阶段结算走 D-WP7-1/2 宝可梦检查：
+# 放 2 指示物后持有者掷币，正面恢复反面保持）。
+card:
+  name_group: 爬地翅
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：G 标 3 印刷
+  card_ids: [CSV6C-082, CSV6C-133, CSVM2aC-004]
+effects:
+  - trigger: on_attack
+    attack: 踏平
+    actions:
+      - {action: mill, selector: opponent_deck, count: 1}
+  - trigger: on_attack
+    attack: 烫伤怒涛
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 120}}
+      - {action: damage, selector: self, args: {amount: 90}}
+      - {action: apply_status, selector: opponent_active, args: {status: burned}}

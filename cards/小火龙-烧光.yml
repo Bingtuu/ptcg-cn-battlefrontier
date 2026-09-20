@@ -1,0 +1,19 @@
+# 小火龙（151C-004，基础，火属性）——「烧光/吐火」G 标文本类
+# （同名多文本拆分：CSV5C-014 / SVP-067 / 30thP-002 等 8 个异文本类另文，
+# 见 task 026 WP7 范围纪律）
+# text_raw 原文：「【火】 烧光
+# 将场上的竞技场放于弃牌区。
+#
+# 【火】【火】 吐火 30」
+# 烧光（task 026 WP7，D-WP7-6）：discard_stadium——公共场进其持有者弃牌区 +
+# 状态清理；无竞技场 no-op；无「若希望」措辞（强制执行）。
+# 吐火 30 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 小火龙
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：G 标 5 印刷
+  card_ids: [151C-004, 151C-152, CSVE1C-012, CSVL1C-090, CSVM1aC-001]
+effects:
+  - trigger: on_attack
+    attack: 烧光
+    actions:
+      - {action: discard_stadium}

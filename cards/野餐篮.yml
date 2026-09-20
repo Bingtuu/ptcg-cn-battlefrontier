@@ -1,0 +1,12 @@
+# 野餐篮（CSV3C-117，物品）
+# text_raw 原文：「将双方所有宝可梦的HP，各回复「30」。」
+# heal all_pokemon_both（task 026 WP7，D-WP7-10③）：双方全场各恢复 30
+# （恢复 = 去伤害指示物，不超过已有伤害，rules-manual §6/§7.1；满血 no-op 照常）。
+card:
+  name_group: 野餐篮
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全 4 印刷
+  card_ids: [CSV3C-117, CSVH4aC-011, CSVM2aC-020, CSVM2cC-017]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: heal, selector: all_pokemon_both, args: {amount: 30}}

@@ -1,0 +1,26 @@
+# 古玉鱼（CSV5C-022，基础，火属性）——「闪焰生成/嫉妒业火」G 标文本类
+# （同名多文本拆分：CSV7C-050 异文本类另文，见 task 026 WP7 范围纪律）
+# text_raw 原文：「【火】 闪焰生成
+# 选择自己弃牌区中最多2张「基本【火】能量」，附着于自己的1只宝可梦身上。
+#
+# 【火】【火】 嫉妒业火 50+
+# 在上一个对手的回合，如果因为招式的伤害，而导致自己的宝可梦【昏厥】的话，则追加造成90伤害。」
+# 闪焰生成：attach_energy own_discard up-to 2（args.energy_up_to，段1 min_choose=0，
+# 沙奈朵ex 精神拥抱同区域先例）→ 段2 选 1 只目标（「附着于自己的1只宝可梦身上」
+# = 单目标全附）。
+# 嫉妒业火 50+（task 026 WP7，D-WP7-7）：基准 50 无条件照打；追加 90 走节点级门控
+# if_own_ko_by_attack_during_opponent_turn（仅招式伤害致昏厥置位，持有者回合结束清除）。
+card:
+  name_group: 古玉鱼
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：4 印刷
+  card_ids: [CSV5C-022, CSV9.5C-028, CSVH3C-006, CSVH5C-009]
+effects:
+  - trigger: on_attack
+    attack: 闪焰生成
+    actions:
+      - {action: attach_energy, selector: own_discard, filters: [basic_energy, energy_火], choose: 2, destination: attach, args: {energy_up_to: true}}
+  - trigger: on_attack
+    attack: 嫉妒业火
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 50}}
+      - {action: damage, selector: opponent_active, args: {amount: 90}, condition: if_own_ko_by_attack_during_opponent_turn}

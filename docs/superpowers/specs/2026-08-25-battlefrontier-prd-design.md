@@ -175,6 +175,27 @@ damage 节点引用；计数词新增 `attached_energy_on_target`（目标附着
 对手全场进化宝可梦各退栈顶 1 张回手，伤害指示物保留、特殊状态恢复、HP 超限
 昏厥结算——附录 A 决议）。
 
+**宝可梦检查与持续修正泛化（task 026 WP7 补充）**：引擎新增**宝可梦检查阶段**
+（rules-manual §7.2：每回合结束对双方全场结算中毒/灼伤/睡眠/麻痹——麻痹按
+持有者回合窗口恢复，处理顺序固定为回合持有者方先、毒→灼→眠→麻→事件触发，
+全部结束后统一判昏厥拿奖赏），特殊状态结算由此补全（此前仅混乱在招式时结算）；
+检查阶段触发面以事件词 `pokemon_check` 开放（雪妖女 冻结帷幕），配套
+CardDef.has_ability 数据管道（db abilities 非空）与场上过滤器 has_ability /
+not_name / no_rule_box。常驻伤害修正 `_effective_damage_modifier` 泛化为四来源
+求和——持有者道具（既有）/ 场上竞技场（化朗镇，双方生效）/ 宝可梦 aura
+（慷慨：scope=own_field 同名去重）/ 回合级标记（空手道王：on_play 落标记、
+target_rule_box:ex 目标过滤、回合结束清除），condition 一律对攻击方持有者
+求值（新词 holder_owner:X）；`_effective_attack_cost` 增读持有者道具分支
+（讲究头带 -1【无】）；protection 新增 scope `opponent_attack_damage_to_bench`
+（谢米：伤害本体免疫、备战面、no_rule_box 作用于受保护目标——与 D-WP6-7
+效果免疫各管各的）。小原语一批：`discard_stadium`（「若希望」不建模放弃）、
+`shuffle_hand_into_deck`（裁判：回库重洗非库底）、`mill`（对手库顶→弃牌区）、
+attach_energy selector own_deck（喷火龙ex：up-to 任意分配+重洗）、damage
+selector self（自伤固定值不吃弱点抗性修正）、heal/place_damage_counters
+selector all_pokemon_both、place_damage_counters +own_active、跨回合精确
+标记 own_ko_by_attack_during_opponent_turn（古玉鱼：仅招式伤害、含备战落点）
++ 节点门控 if_own_ko_by_attack_during_opponent_turn。
+
 ### 5.3 覆盖策略：原语先行，逐卡落地
 
 从真实卡组反向驱动：取当前 G/H/I 环境 WUR 前 N 套卡组 → 列出涉及全部卡 → 归并所需原语 → 原语实现一个、解锁一批卡。第一批原语只做到覆盖这批卡组为止（YAGNI），不为长尾冷僻效果提前设计。

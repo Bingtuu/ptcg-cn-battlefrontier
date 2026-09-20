@@ -1,0 +1,16 @@
+# 赫普的讲究头带（CSV10C-201，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的「赫普的宝可梦」使用招式所需能量减少1个【无】能量，所使用的招式给对手战斗宝可梦造成的伤害「+30」。」
+# 道具双声明（task 026 WP7，D-WP7-3 挂载面① / D-WP7-4）：passive_static 挂载，
+# condition holder_owner:赫普 对持有者求值——modify_damage +30（引擎
+# _effective_damage_modifier 道具分支，仅「对对手战斗宝可梦」落点）+
+# modify_attack_cost value=1（引擎 _effective_attack_cost 道具分支，只减【无】
+# 部分、clamp ≥0；attack 缺省 = 全招式）。道具离场即失效（求值点实时读声明）。
+card:
+  name_group: 赫普的讲究头带
+  card_ids: [CSV10C-201]
+effects:
+  - trigger: passive_static
+    condition: holder_owner:赫普
+    actions:
+      - {action: modify_damage, args: {amount: 30}}
+      - {action: modify_attack_cost, args: {value: 1}}

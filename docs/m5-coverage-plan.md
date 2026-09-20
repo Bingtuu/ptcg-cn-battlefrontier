@@ -64,22 +64,22 @@ V-UNION 缺口 0（一期不做，无冲突）。
 | 零之大空洞 | trainer | modifier | 猛雷鼓厄诡椪 | A | 现有原语 | done（task 026 WP6：全赛制合法 5 印刷，bench_size 声明式覆写 5→8（own_tera_in_play 逐玩家求值）+ bench_shrink 失效缩减自选弃置（非昏厥无奖赏、双方同缩持有者先）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 飞天螳螂 | pokemon | energy_accel | 赛富豪 | A | 现有原语 | done（task 026 WP4：辅助斩 G 标 151C-123 类，attach bench-only choose=1 energy_草；闸1/2 过，first_pass=true，gate3 已核销 2026-09-14） |
 | 不服输头带 | trainer | damage_boost | 玛俐长毛巨魔雪妖女 | B | modify_damage 结算（task 025 已接入） | done（task 025 代表卡，gate3 已核销 2026-09-06） |
-| 化朗镇 | trainer | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | pending |
-| 古玉鱼 | pokemon | mill,energy_accel | 喷火龙大比鸟 | B | 小原语批（task 025/026） | pending |
-| 咕咕 | pokemon | gust | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | pending |
-| 喷火龙ex | pokemon | damage_boost | 喷火龙大比鸟/多龙喷火龙 | B | 小原语批（task 025/026） | pending |
-| 大比鸟ex | pokemon | search,removal | 喷火龙大比鸟 | B | 小原语批（task 025/026） | pending |
-| 小火龙 | pokemon | removal | 喷火龙大比鸟/多龙喷火龙 | B | 小原语批（task 025/026） | pending |
-| 火箭队的惊吓炸弹 | trainer | spread | 赫普的苍响 | B | 小原语批（task 025/026） | pending |
-| 爬地翅 | pokemon | mill,status | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | pending |
-| 空手道王的修炼 | trainer | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | pending |
+| 化朗镇 | trainer | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP7：I 标 CSV10C-218 唯一印刷，竞技场来源常驻 modify_damage（挂载面泛化四来源之一）+ holder_owner：赫普 对攻击方求值、双方生效；闸1/2 过，first_pass=true，gate3 待核销） |
+| 古玉鱼 | pokemon | mill,energy_accel | 喷火龙大比鸟 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标「嫉妒业火」等价类 4 印刷，attach own_discard 火能 up-to 2 + 节点门控 if_own_ko_by_attack_during_opponent_turn 追加 90（精确标记含备战狙击 F1 归正）；闸1/2 过，first_pass=true，gate3 待核销） |
+| 咕咕 | pokemon | gust | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | done（task 026 WP7：H 标「三刺击」等价类 2 印刷，coin_flip times:3 × flip_heads_count 既有原语组合直写；闸1/2 过，first_pass=true，gate3 待核销） |
+| 喷火龙ex | pokemon | damage_boost | 喷火龙大比鸟/多龙喷火龙 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标「烈炎支配」等价类 10 印刷，own_evolve_from_hand + attach_energy own_deck（up-to 3 基本火任意分配+重洗）+ opponent_taken_prizes×30；闸1/2 过，first_pass=true，gate3 待核销） |
+| 大比鸟ex | pokemon | search,removal | 喷火龙大比鸟 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标 6 印刷全收，音速搜索 once_per_turn_shared 同名锁 + discard_stadium 新原语（「若希望」不建模放弃，D-WP7-6）；闸1/2 过，first_pass=true，gate3 待核销） |
+| 小火龙 | pokemon | removal | 喷火龙大比鸟/多龙喷火龙 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标「烧光」等价类 5 印刷，discard_stadium + 吐火白板；闸1/2 过，first_pass=true，gate3 待核销） |
+| 火箭队的惊吓炸弹 | trainer | spread | 赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP7：I 标 CSV10C-198 唯一印刷，掷币正反分支 + place_damage_counters 新 selector own_active；闸1/2 过，first_pass=true，gate3 待核销） |
+| 爬地翅 | pokemon | mill,status | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标「烫伤怒涛」等价类 3 印刷，mill 新原语 + damage self 90（固定值不吃修正）+ apply_status burned（宝可梦检查阶段灼伤结算）；闸1/2 过，first_pass=true，gate3 待核销） |
+| 空手道王的修炼 | trainer | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP7：H 标 7 印刷全收，on_play modify_damage 回合级标记 + target_rule_box:ex（求值点校验）；闸1/2 过，first_pass=true，gate3 待核销） |
 | 老大的指令 | trainer | gust | 喷火龙大比鸟/猛雷鼓厄诡椪/多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女/赛富豪/多龙巴鲁托/赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP1 闸1/2 过，gate3 已核销 2026-09-07；gust 无门控版，38 印刷同文本全挂载） |
-| 裁判 | trainer | draw,hand_disrupt,bounce | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | pending |
-| 谢米 | pokemon | heal,bounce | 多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女 | B | 小原语批（task 025/026） | pending |
-| 赫普的卡比兽 | pokemon | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | pending |
-| 赫普的讲究头带 | trainer | damage_boost,modifier | 赫普的苍响 | B | 小原语批（task 025/026） | pending |
-| 野餐篮 | trainer | heal | 赛富豪 | B | 小原语批（task 025/026） | pending |
-| 雪妖女 | pokemon | spread | 玛俐长毛巨魔雪妖女 | B | 小原语批（task 025/026） | pending |
+| 裁判 | trainer | draw,hand_disrupt,bounce | 猛雷鼓厄诡椪 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标「4张」等价类 31 印刷，shuffle_hand_into_deck 新原语（双方手牌回库重洗非库底）+ 各抽 4；闸1/2 过，first_pass=true，gate3 待核销） |
+| 谢米 | pokemon | heal,bounce | 多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女 | B | 小原语批（task 025/026） | done（task 026 WP7：I 标「花之纱幔」等价类 2 印刷，protection 新 scope opponent_attack_damage_to_bench（伤害免疫备战面）+ no_rule_box 作用于受保护目标；闸1/2 过，first_pass=true，gate3 待核销） |
+| 赫普的卡比兽 | pokemon | damage_boost | 赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP7：I 标 CSV10C-175 唯一印刷，宝可梦 aura 来源 modify_damage scope=own_field（同名去重不叠加）+ holder_owner：赫普 + damage self 80；闸1/2 过，first_pass=true，gate3 待核销） |
+| 赫普的讲究头带 | trainer | damage_boost,modifier | 赫普的苍响 | B | 小原语批（task 025/026） | done（task 026 WP7：I 标 CSV10C-201 唯一印刷，道具 modify_damage +30 + modify_attack_cost -1【无】（_effective_attack_cost 新增道具分支）+ holder_owner：赫普；闸1/2 过，first_pass=true，gate3 待核销） |
+| 野餐篮 | trainer | heal | 赛富豪 | B | 小原语批（task 025/026） | done（task 026 WP7：G 标 4 印刷，heal 新 selector all_pokemon_both 双方全场各 30；闸1/2 过，first_pass=true，gate3 待核销） |
+| 雪妖女 | pokemon | spread | 玛俐长毛巨魔雪妖女 | B | 小原语批（task 025/026） | done（task 026 WP7：H 标「冻结帷幕」等价类 10 印刷，宝可梦检查阶段 + pokemon_check 事件 + has_ability 数据管道/场上过滤器 + not_name + all_pokemon_both；闸1/2 过，first_pass=true，gate3 待核销） |
 | 不公印章 | trainer | draw,hand_disrupt,bounce | 多龙黑夜魔灵/多龙喷火龙 | C | ACE SPEC 机制（task 027） | pending |
 | 厄诡椪 碧草面具ex | pokemon | draw,energy_accel | 猛雷鼓厄诡椪 | C | TERA 规则盒结算核对（task 027） | pending |
 | 含羞苞 | pokemon | lock | 多龙黑夜魔灵/多龙喷火龙/玛俐长毛巨魔雪妖女/多龙巴鲁托 | C | 持续 lock/protection 体系（task 029） | pending |

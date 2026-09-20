@@ -1,0 +1,15 @@
+# 空手道王的修炼（CSVH4eC-044，支援者）
+# text_raw 原文：「在这个回合，自己宝可梦所使用的招式，给对手战斗场上的「宝可梦【ex】」造成的伤害「+40」。」
+# 回合级伤害修正标记（task 026 WP7，D-WP7-3 挂载面④）：on_play 解释执行写
+# PlayerState.turn_damage_mods，持有者回合结束清除（_on_turn_end / 检查阶段入口
+# 双清）；求和与 target_rule_box=ex 过滤在引擎 _effective_damage_modifier 求值点
+# （仅「对对手战斗宝可梦」落点）。
+card:
+  name_group: 空手道王的修炼
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全 7 印刷
+  card_ids: [CSV9.5C-188, CSVH4eC-044, CSVH4eC-045, CSVH4eC-046, CSVH5eC-044,
+             CSVH5eC-045, CSVH5eC-046]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: modify_damage, args: {amount: 40, target_rule_box: ex}}

@@ -575,6 +575,165 @@ protection 最小版 + own_attached_energy choose=1（火恐龙两文件）：
 /+devolve；bench_size / distinct / deck_top 按落点归段）+ 真机冒烟（玛俐雪妖女 /
 多龙巴鲁托 / 喷火龙大比鸟 / 赛富豪 / 猛雷鼓厄诡椪 / 赫普的苍响 / 多龙黑夜魔灵池内卡组）
 
+### WP7（B 级 15 张：宝可梦检查阶段 + 常驻伤害修正挂载面扩展 + 8 项小原语）——测试清单定稿（2026-09-19）
+
+范围 = coverage-plan B 级 pending 15 张（池内印刷已逐卡实测 deck_cards + db text_raw，
+2026-09-19；均为池内单一印刷，同文本等价类印刷随闸 1 实测挂载）：
+
+- 化朗镇（I 标 CSV10C-218，竞技场，赫普的苍响）：双方「赫普的宝可梦」招式对对手战斗场 +30
+- 古玉鱼（G 标 CSV5C-022，喷火龙大比鸟）：①闪焰生成（弃牌区最多2基本火能量附着1只）
+  ②嫉妒业火 50+（上一对手回合自己宝可梦因招式伤害昏厥 → +90）
+- 咕咕（H 标 CSV9C-154，猛雷鼓厄诡椪）：三刺击 10×（掷币3次×正面数）
+- 喷火龙ex（G 标 CSV5C-075，喷火龙大比鸟/多龙喷火龙）：烈炎支配（手牌进化触发：
+  牌库最多3基本火能量任意附着+重洗）+ 燃烧黑暗 180+（对手已拿奖赏×30）
+- 大比鸟ex（G 标 CSV4C-101，喷火龙大比鸟）：音速搜索（回合1次任意检索1张，同名共享锁）
+  + 狂风呼啸 120（若希望弃场上竞技场）
+- 小火龙（G 标 151C-004，喷火龙大比鸟/多龙喷火龙）：烧光（弃场上竞技场）+ 吐火 30 白板
+- 火箭队的惊吓炸弹（I 标 CSV10C-198，物品，赫普的苍响）：掷币——正面对手1只放2指示物，
+  反面自己战斗场放2指示物
+- 爬地翅（G 标 CSV6C-082，古代，猛雷鼓厄诡椪）：踏平（对手牌库顶1张→弃牌区）+
+  烫伤怒涛 120（自伤90+对手战斗场灼伤）
+- 空手道王的修炼（H 标 CSVH4eC-044，支援者，赫普的苍响）：本回合自己宝可梦招式
+  对对手战斗场 ex +40
+- 裁判（G 标 CSVH1C-051，支援者，猛雷鼓厄诡椪）：双方手牌洗回牌库，各抽4
+- 谢米（I 标 CSV10C-007，多龙黑夜魔灵/多龙喷火龙/玛俐雪妖女）：花之纱幔（在场期间
+  自己备战宝可梦（除规则盒）不受对手招式伤害）+ 踢飞 30 白板
+- 赫普的卡比兽（I 标 CSV10C-175，赫普的苍响）：慷慨（在场期间自己赫普宝可梦 +30，
+  同名不叠加）+ 强劲压制 140（自伤80）
+- 赫普的讲究头带（I 标 CSV10C-201，道具，赫普的苍响）：持有者（赫普的）招式费用 -1【无】
+  + 对对手战斗场 +30
+- 野餐篮（G 标 CSV3C-117，物品，赛富豪）：双方所有宝可梦各回复30
+- 雪妖女（H 标 CSV7C-059，玛俐雪妖女）：冻结帷幕（每当宝可梦检查时，双方所有拥有特性的
+  宝可梦（除雪妖女）各放1指示物）+ 冰霜粉碎 60 白板
+
+设计决议（主会话定稿 2026-09-19；随落地进附录 A 🔲，gate3 核销后翻 ✅）：
+
+- **D-WP7-1 宝可梦检查阶段**（rules-manual §7.2，出处 basic_rules07）：每回合结束时
+  新增检查阶段，对双方全场宝可梦结算——①中毒放1指示物 ②灼伤放2指示物后持有者掷币
+  正面恢复 ③睡眠持有者掷币正面恢复 ④麻痹在**其持有者下一个自己回合结束后**的检查
+  直接恢复（需记录麻痹施加方/回合标记，施加当回合结束不恢复）⑤检查触发的特性/训练家
+  效果（pokemon_check 事件）。§7.2 注「处理顺序可由玩家自行决定」→ 引擎确定性暂定
+  口径：回合持有者方先、状态按 中毒→灼伤→睡眠→麻痹 固定序、随后事件触发；掷币走
+  单一随机源。**全部处理结束后**统一 check_knockouts + 奖赏（§7.2 末注：检查结束后、
+  下一回合开始前判昏厥），再进入下一回合。
+- **D-WP7-2 特殊状态结算补齐**：引擎 SpecialCondition 此前仅混乱（招式时掷币）有结算，
+  本批按 §7.2/§7.3 补中毒/灼伤/睡眠/麻痹的检查阶段结算与行动限制（睡眠/麻痹不可
+  撤退、麻痹/睡眠不可用招式的枚举门控若已有则接通、无则补）。现网 cards/ 无卡施加
+  毒/眠/麻（grep 实证：仅 愿增猿 apply_status confused），沙奈朵镜像无状态卡——
+  hash 回归预期不变；**若镜像 hash 变动 → 停下上报主会话，不擅自更新基准**。
+- **D-WP7-3 常驻伤害修正挂载面泛化**：`_effective_damage_modifier` 由「仅持有者道具」
+  扩为多来源求和——①持有者道具（既有口径不变）②场上竞技场卡（化朗镇：双方攻击者
+  均生效，condition 对攻击方持有者求值）③自己场上宝可梦卡 aura（慷慨：
+  modify_damage args.scope=own_field，condition 对攻击方持有者求值，**同名来源卡
+  去重不叠加**）④回合级标记（空手道王：支援者 on_play 落 modify_damage 标记于
+  PlayerState 回合字段，回合结束清除——走 prize_bonus 同模式）。目标侧过滤走
+  args.target_rule_box（空手道王 ex：求值点校验对手战斗场 rule_box）。结算顺序位不变
+  （§6 顺序 2：基准后、弱点抗性前）；仅「对对手战斗宝可梦」落点（备战落点不加）。
+  新 condition 词 `holder_owner:X`（对持有者求值，读 CardDef.owner）。
+- **D-WP7-4 攻击费用修正读道具**：`_effective_attack_cost` 增读持有者道具
+  passive_static modify_attack_cost 分支（仿 _effective_retreat_cost 道具扫描），
+  condition 对持有者求值（讲究头带 holder_owner：赫普，-1【无】，clamp ≥0）。
+- **D-WP7-5 谢米 花之纱幔**：protection 新 scope `opponent_attack_damage_to_bench`
+  ——**伤害**免疫（区别于 D-WP6-7 的效果免疫）、作用面 = 自己备战区、来源限对手招式；
+  「除拥有规则的宝可梦外」= 新场上过滤器 `no_rule_box` 作用于**受保护目标**（非来源）。
+  守卫落点 = 招式伤害对备战宝可梦的施加路径（含 damage 原语 bench 目标与引擎直接
+  路径）；指示物放置不是伤害、不受此保护（雪妖女 vs 谢米 不互动）。
+- **D-WP7-6 discard_stadium 原语**（大比鸟ex/小火龙共用）：公共场竞技场弃入其持有者
+  弃牌区 + stadium 状态清理（复用 _do_play_stadium 旧场处理路径）。「若希望」的放弃
+  选项不建模——满足即执行（对齐 D-WP2-3 触发式特性不建模放弃选项先例）。
+- **D-WP7-7 古玉鱼 嫉妒业火**：跨回合精确口径新标记
+  `own_ko_by_attack_during_opponent_turn`（仅**招式伤害**致昏厥置位，对齐 WP6
+  own_ko_by_attack 精确口径；效果/指示物致昏厥不置位；置位/清除时点仿现有
+  own_ko_during_opponent_turn——宽口径标记不动，既有卡不受影响）。新节点级
+  condition 词 `if_own_ko_by_attack_during_opponent_turn` 门控追加 90 节点
+  （基准 50 无条件照打）。
+- **D-WP7-8 喷火龙ex 烈炎支配**：attach_energy 新 selector `own_deck`（牌库来源
+  附着）：filters basic_energy + energy_火，up-to 3（min 0），multi_target 任意分配
+  （目标自己场上宝可梦，每只张数自由），结算后重洗牌库。触发 own_evolve_from_hand
+  既有（猫头夜鹰先例）。「以任意方式」= 张数在目标间自由分配。
+- **D-WP7-9 裁判**：新原语 `shuffle_hand_into_deck`（selector own_hand /
+  opponent_hand 各一节点实现「双方」，手牌回库+重洗——**不是库底**，
+  hand_to_deck_bottom 语义不动），随后 draw 4 + draw opponent_deck 4
+  （奇树结构先例）。
+- **D-WP7-10 小件四项**：①place_damage_counters selector +own_active（惊吓炸弹
+  反面）；②damage selector +self（爬地翅 90 / 卡比兽 80 自伤——效果文伤害：
+  固定值直接放置，**不吃弱点/抗性/增伤修正**（§6 伤害计算仅适用于招式基准值链路），
+  致昏厥走正常 check_knockouts）；③heal selector +all_pokemon_both（野餐篮：
+  双方全场各 30，无 choose，满血 no-op 照常）；④新原语 `mill`（对手牌库顶 N 张
+  → 对手弃牌区，牌库不足收缩，牌库空 no-op）。
+- **D-WP7-11 雪妖女 冻结帷幕**：新事件词 `pokemon_check`（D-WP7-1 第⑤步触发，
+  双方回合结束均触发）；CardDef 新字段 `has_ability`←db abilities JSON 非空
+  （WP1 数据管道同路径）；场上过滤器 +has_ability / +not_name:X；放置 selector
+  +all_pokemon_both（filters 收敛目标池）。多只雪妖女在场各触发各结算（无同名锁，
+  原文无「不重复」注——对照慷慨有注，从字面）。
+
+测试清单：
+
+宝可梦检查阶段 + 特殊状态（D-WP7-1/2，`tests/test_primitives_wp7.py` 或新分片）：
+1. 中毒：检查阶段放 1 指示物（双方在场中毒宝可梦各结算）；持续多回合累计
+2. 灼伤：放 2 指示物 + 掷币——正面恢复（不再放下一轮）/ 反面保持下轮再放；
+   种子确定性（同种子两次运行序列一致）
+3. 睡眠：掷币正面恢复反面保持；睡眠/麻痹 撤退枚举门控与不可用招式门控接通
+4. 麻痹：施加当回合结束**不恢复**；持有者下一个自己回合结束后的检查恢复
+5. 检查全部结束后统一判昏厥 + 拿奖赏（灼伤指示物致昏厥：对方拿奖赏、换上流程）；
+   检查阶段昏厥的战斗场宝可梦换下后再进入下一回合
+6. 处理顺序确定性：回合持有者方先、毒→灼→眠→麻→事件触发（同种子重放一致）；
+   混乱不在检查阶段结算（§7.3）
+7. 词表同步 + 参数校验未知词 DslError；**沙奈朵镜像同种子 hash 回归不变**
+
+常驻伤害修正泛化（D-WP7-3/4）：
+8. 道具来源回归：不服输头带既有用例全绿（挂载面重构不回归）
+9. 竞技场来源：化朗镇在场，双方「赫普的宝可梦」攻击 +30；非赫普宝可梦不加；
+   竞技场离场即失效；备战落点不加
+10. 宝可梦 aura 来源：卡比兽在场，自己赫普宝可梦（含卡比兽自身）+30；两只卡比兽
+    同名去重只加一次；卡比兽离场即失效；非赫普不加
+11. 回合级标记：空手道王打出后本回合对对手战斗场 ex +40、对非 ex 不加；
+    回合结束清除（下回合不加）；多来源求和叠加（道具+竞技场+回合标记）
+12. target_rule_box 求值点校验 + holder_owner 条件词注册/未知词 DslError
+13. 费用读道具：讲究头带持有者（赫普）招式费用 -1【无】（clamp ≥0）；非赫普持有者
+    不减；道具离场即失效；月月熊自身卡来源 modify_attack_cost 回归绿
+
+protection 伤害免疫（D-WP7-5）：
+14. 谢米在场：对手招式对自己备战宝可梦的伤害归零；战斗场不保护；规则盒备战宝可梦
+    （如 ex）不保护；对手招式的**效果**（指示物/状态）不受此 scope 影响
+    （D-WP6-7 各管各的）；谢米离场即失效；己方招式误伤不保护（来源限对手）
+15. no_rule_box 场上过滤器注册 + 未知词 DslError；闪焰之幕既有用例回归绿
+
+小原语（D-WP7-6/7/8/9/10）：
+16. discard_stadium：公共场弃置入持有者弃牌区 + 状态清理；无竞技场 no-op；
+    词表 +discard_stadium
+17. 古玉鱼标记：自己宝可梦在对手回合因招式伤害昏厥 → 次回合标记生效；
+    效果/指示物致昏厥不置位；自己回合结束清除；宽口径 own_ko_during_opponent_turn
+    既有用例回归绿
+18. attach_energy own_deck：牌库选 up-to 3 基本火能量任意分配附着 + 重洗；
+    牌库不足收缩；选 0 仅重洗；目标满场自由分配（可全给 1 只）
+19. shuffle_hand_into_deck：双方手牌各回库重洗 + 各抽 4（裁判全流）；手牌空
+    照常抽 4；种子确定性
+20. place_damage_counters own_active / damage self（固定值不吃弱点抗性增伤）/
+    heal all_pokemon_both（满血 no-op）/ mill（牌库不足收缩、空库 no-op）——
+    各正例 + 边界 + 词表注册 + DslError
+21. 咕咕 三刺击：coin_flip times:3 × flip_heads_count（既有原语组合，卡测试覆盖）
+22. 大比鸟ex 音速搜索：once_per_turn_shared 同名锁（两只大比鸟ex 当回合只能用 1 次）
+    ——同名锁机制既有（WP 前已落地），卡测试覆盖
+23. 雪妖女 冻结帷幕：每次宝可梦检查双方拥有特性的宝可梦（除雪妖女）各 +1 指示物；
+    无特性宝可梦不放；多只雪妖女各触发；雪妖女离场不触发；has_ability 数据管道
+    映射单测（db abilities 非空 → True）+ not_name/has_ability 场上过滤器注册
+
+卡牌落地（三道闸，分片 `tests/test_dsl_cards_b7_wp7.py`；card_ids 以装配池内实际
+印刷 + db 同文本等价类实测为准）：
+24. 15 卡逐卡单测（效果正例 + 关键边界 + 事件流锚点），引用 text_raw 原文注释；
+    闸 1  schema + 同文本归一校验，闸 2 单卡测试，gate3 攒批待核销
+25. 装配校验：故意取错印刷用例被闸 1 拦下（防回归）
+
+收尾硬验：全量 pytest 绿 + ruff 零告警 + 沙奈朵镜像同种子 hash 回归（预期不变，
+变动即停）+ `dsl-check --db` 全库全 OK + 词表同步（actions +mill/+discard_stadium/
++shuffle_hand_into_deck；selectors +self/+own_active（place_damage_counters）/
++all_pokemon_both/+own_deck（attach_energy）；events +pokemon_check；conditions
++holder_owner:/+if_own_ko_by_attack_during_opponent_turn；filters +has_ability/
++not_name（场上）/+no_rule_box（场上）；protection scope +opponent_attack_damage_to_bench；
+modify_damage scope +own_field + target_rule_box）+ 真机冒烟（赫普的苍响 / 喷火龙大比鸟 /
+猛雷鼓厄诡椪 / 玛俐雪妖女 / 多龙黑夜魔灵 / 赛富豪 池内卡组）
+
 ### WP6+（pending 33 张 B/C 级）
 
 启动时按同流程细化；批次级验收口径：
@@ -1021,3 +1180,70 @@ WP6 段红阶段已定稿。
 - 9 个卡文件 gate3 待用户核销 + 附录 A D-WP6-1~8 待核
 - WP6+ = pending 33 张 B/C 级按「解锁卡数 + 机制通用性」排序续批（C 级含 TERA 规则盒核对
   task 027 / ACE SPEC task 027 / 持续 lock 体系 task 029 依赖项）
+
+### WP7（2026-09-20 完成）：B 级 15 张全清——宝可梦检查阶段 + 伤害修正四来源泛化 + 8 项小原语
+
+**流程**：主会话逐卡实测 db text_raw（15 卡池内均单一印刷，初判复核：直写 1 / 小扩展 8 /
+新机制 5）→ 测试清单定稿（D-WP7-1~11 + 清单 25 条）→ WP7a 机制批（子代理 TDD 红→绿，
+31 测）→ 规格复核 + 质量复核双闸 → 返工 → WP7b 卡牌批（零机制新增）→ 卡牌规格复核
+批准 → F1 返工 → 冒烟 → 落账。
+
+**机制落地**：
+- 宝可梦检查阶段（D-WP7-1/2，rules-manual §7.2）：`core._start_pokemon_check` /
+  `_settle_conditions` / `_advance_pokemon_check`——毒 1 / 灼 2+掷币 / 眠掷币 /
+  麻按 paralyzed_mark 持有者回合窗口恢复，固定序（回合持有者方先、毒→灼→眠→麻→事件），
+  全部结束后统一 check_knockouts + 奖赏；接入 _do_end_turn / _do_attack / _do_promote /
+  _run_or_suspend 全路径；睡眠/麻痹撤退与招式门控接通
+- `_effective_damage_modifier` 四来源泛化（D-WP7-3）：道具 / 竞技场 / 宝可梦 aura
+  （scope=own_field 强制否则 DslError、同名来源卡去重）/ 回合标记 turn_damage_mods
+  （modify_damage on_play 解释执行形态，回合结束清除）；condition 对攻击方持有者求值
+  （新词 holder_owner:X）；args.target_rule_box 求值点校验
+- `_effective_attack_cost` 读道具分支（D-WP7-4，clamp 0）
+- protection 新 scope opponent_attack_damage_to_bench + 场上过滤器 no_rule_box
+  （D-WP7-5，no_rule_box 作用于受保护目标）
+- 小原语：discard_stadium（D-WP7-6「若希望」不建模放弃）/ shuffle_hand_into_deck
+  （D-WP7-9 非库底）/ mill / attach_energy own_deck（up-to 任意分配+重洗，D-WP7-8）/
+  damage self（固定值不吃弱点抗性增伤，D-WP7-10②）/ heal+place_damage_counters
+  all_pokemon_both / place_damage_counters own_active / attach_energy own_deck
+  事件载荷全量 iids
+- 古玉鱼精确标记 own_ko_by_attack_during_opponent_turn（D-WP7-7 + F1：战斗场与备战
+  狙击均置位；指示物/检查阶段灼伤不置位）+ 节点门控 if_own_ko_by_attack_during_opponent_turn
+- CardDef.has_ability ← db abilities 非空 + 场上过滤器 has_ability/not_name:X +
+  事件 pokemon_check（D-WP7-11）
+
+**双闸复核与返工**：规格复核 D-WP7-1~11 逐条符合、自主裁决①（攻击方自爆/自伤昏厥
+换上后回合权归对手）规则正确批准；质量复核 M1（攻击致昏厥→换上路径漏 _on_turn_end
+完整清理的既存结构洞——_start_pokemon_check 入口统一调 _on_turn_end，幂等 + 回归
+测试）/ M2（检查阶段×挂起选择测试 + 连锁修 choice 恢复后阶段拨回 + _advance 防卫）；
+Minor 9 项全修。**backlog 待核**：aura 去重键粒度（同名异特性文本场景，当前池安全）/
+§7.1 睡眠-麻痹-混乱互替未实现（WP7 池不可达）。
+
+**落地 15 卡 15 文件**（闸 1/2 全过，first_pass 15/15，gate3 待核销）：
+化朗镇 / 古玉鱼-嫉妒业火（4 印刷）/ 咕咕-三刺击（2）/ 喷火龙ex-烈炎支配（10）/
+大比鸟ex（6）/ 小火龙-烧光（5）/ 火箭队的惊吓炸弹 / 爬地翅-烫伤怒涛（3）/
+空手道王的修炼（7）/ 裁判-4张（31）/ 谢米-花之纱幔（2）/ 赫普的卡比兽 /
+赫普的讲究头带 / 野餐篮（4）/ 雪妖女-冻结帷幕（10）；同名多文本全按等价类拆分/收窄；
+分片 `tests/test_dsl_cards_b7_wp7.py`（42 用例，含闸 1 防回归）。
+
+**词表同步**：actions +mill/+discard_stadium/+shuffle_hand_into_deck；selectors
++all_pokemon_both；events +pokemon_check（conditions/filters 按既定架构代码注册）。
+
+**测试**：WP7 新 78 条；全量 **805 绿**（基线 727）+ ruff 零告警 + `dsl-check --db`
+全库 83 文件全 OK + 沙奈朵镜像同种子 hash 回归绿。
+
+**真机冒烟 80 局 0 失败**（heuristic 4×20，`results/wp7-smoke/`）：赫普的苍响 vs
+喷火龙大比鸟 13/7；玛俐雪妖女 vs 猛雷鼓厄诡椪 15/5；喷火龙大比鸟 vs 多龙黑夜魔灵 9/11；
+赛富豪 vs 多龙喷火龙 6/14。机制真实触发：pokemon_check 303–1092 次/库、discard_stadium
+4–31 次、mill 15、burned 6、shuffle_hand 14、heal all_pokemon_both 17。
+
+**仓库卫生**：`.gitignore` 顶层 `data/` 误吞 `battlefrontier/data/` 源码包（WP1 数据
+管道从未进版本控制）——加 `!battlefrontier/data/` 反忽略一并纳入（存量 ruff TRY004 已修）。
+
+**落账**：coverage-plan 15 行 pending→done——**缺口 done 63 / blocked 0 / pending 18
+（共 81，余全 C 级）**；authoring-log 批 6 十五条；附录 A D-WP7-1~11 共 11 条 🔲 待核；
+PRD §5.1 WP7 段定稿。
+
+**遗留**：
+- 15 个卡文件 gate3 待用户核销 + 附录 A 11 条决议 🔲 待核（连同 WP6 攒批）
+- 下一步 WP8（特殊能量被动框架 + 3 卡，框架零设计）→ task 027（ACE SPEC + TERA + 7 卡，
+  需立项）→ task 029（持续 lock/protection 体系 + 8 卡，需立项）

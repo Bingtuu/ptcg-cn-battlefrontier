@@ -1,0 +1,18 @@
+# 咕咕（CSV9C-154，基础，无属性）——「三刺击」H 标文本类
+# （同名多文本拆分：CSV7C-159 / CSV9.5C-141 / CS1.5C-032 / CS5aC-094 等 4 个异文本类
+# 另文，见 task 026 WP7 范围纪律）
+# text_raw 原文：「【无】 三刺击 10×
+# 抛掷3次硬币，造成正面次数×10伤害。」
+# 三刺击 10×（task 026 WP7，清单 21）：coin_flip times:3（逐次走引擎单一随机源，
+# 种子确定性不变）→ 正面次数经 flip_heads_count 计数词 ×10 结算
+# （索财灵 连掷硬币同计数词先例）。
+card:
+  name_group: 咕咕
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：H 标 2 印刷
+  card_ids: [CSV9C-154, CSVM2aC-010]
+effects:
+  - trigger: on_attack
+    attack: 三刺击
+    actions:
+      - {action: coin_flip, args: {times: 3}}
+      - {action: damage, selector: opponent_active, count: flip_heads_count, args: {op: "×", per: 10}}

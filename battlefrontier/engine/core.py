@@ -134,7 +134,8 @@ class GameEngine:
         # 只入 promote_queue 不翻阶段（换上推迟到效果完成后由完成路径统一进行，D-WP2-1）
         self._in_effect = False
         # 招式伤害落点瞬时记录（task 026 WP5 白蕾雅，D-WP5-2；WP6 扩为三元组）：
-        # (攻方, 攻方是否太晶, 攻方栈顶 iid)，由攻击伤害路径在 check_knockouts 前置位；
+        # (攻方, 攻方是否太晶, 攻方栈顶 iid)，由攻击伤害路径（on_attack 的 damage
+        # 节点，战斗场/备战落点均置位——WP7 F1 归正）在 check_knockouts 前置位；
         # check_knockouts 进入即取走并清空（consume-on-read，防残留串到后续非招式伤害
         # 路径）；iid 供 own_ko_by_attack 触发解析攻击方（task 026 WP6，D-WP6-6）
         self._attack_damage_active: tuple[int, bool, int | None] | None = None
@@ -304,10 +305,15 @@ class GameEngine:
 
         # 撤退：每回合 1 次机会（pokemon.cn basic_rules05）；弃撤退费用数量的能量，与备战区对换；
         # 有效撤退费含常驻修正（task 026 WP4，_effective_retreat_cost 读 DSL 声明）；
-        # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：被锁战斗宝可梦不枚举撤退
+        # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：被锁战斗宝可梦不枚举撤退；
+        # 睡眠/麻痹不可撤退（task 026 WP7，D-WP7-2，rules-manual §7.2；混乱不影响撤退）
         if (
             p.active
             and not p.active.retreat_lock
+            and not (
+                p.active.conditions
+                & {SpecialCondition.ASLEEP, SpecialCondition.PARALYZED}
+            )
             and p.bench
             and not p.retreated_this_turn
             and len(p.active.attached_energy) >= self._effective_retreat_cost(p.active, player)
@@ -318,10 +324,15 @@ class GameEngine:
         # 攻击：能量满足 且（有伤害 或 有 on_attack DSL 绑定）的招式各一条行动
         # （rules-manual §6 能量需求；纯效果招式经 DSL 结算，task 012）；
         # 先攻方第一回合不能攻击（规则书·回合的进行）。
+        # 睡眠/麻痹不可用招式（task 026 WP7，D-WP7-2，rules-manual §7.2；
+        # 混乱照常枚举——攻击时掷币判定，D1 决议）。
         # 授予招式（task 016）：attached_tool 的招式接在自身招式后枚举，能量由持有者
         # 附着能量支付，DSL 绑定取道具文档；无绑定的授予招式不枚举（task 015 纪律）。
         first_turn_ban = s.turn == 1 and player == s.first_player
-        if p.active and not first_turn_ban:
+        status_ban = p.active is not None and bool(
+            p.active.conditions & {SpecialCondition.ASLEEP, SpecialCondition.PARALYZED}
+        )
+        if p.active and not first_turn_ban and not status_ban:
             own_attacks = p.active.current.card.attacks
             own_doc = effect_doc(self.card_effects, p.active.current.card)
             tool = p.active.attached_tool
@@ -617,6 +628,8 @@ class GameEngine:
             "conditions": frozenset(),
             # 撤退锁随进化解除（task 026 WP6，D-WP6-6）
             "retreat_lock": False,
+            # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+            "paralyzed_mark": None,
         })
         p = self._replace_in_play(p, slot, idx, evolved)
         self._set_player(player, p.model_copy(update={
@@ -724,7 +737,8 @@ class GameEngine:
         + 跨回合 KO 标记清除（task 017 化危为吉「上一个对手的回合」语义：
         标记只保留到自己回合结束）+ 回合级奖赏加成标记清除（task 026 WP5 白蕾雅，
         D-WP5-2 turn scoped）+ 撤退锁解除（task 026 WP6 穷追不舍「下个对手的回合」，
-        D-WP6-6：被锁目标自己的回合结束解除）。"""
+        D-WP6-6：被锁目标自己的回合结束解除）+ 回合级伤害修正标记与精确口径昏厥
+        标记清除（task 026 WP7，D-WP7-3/D-WP7-7）。"""
         self._discard_turn_end_tools(player)
         p = self.state.players[player]
         if any(m.retreat_lock for m in ([p.active] if p.active else []) + list(p.bench)):
@@ -741,8 +755,156 @@ class GameEngine:
             update["own_ko_during_opponent_turn"] = False
         if p.extra_prize_tera_ko:
             update["extra_prize_tera_ko"] = False
+        # task 026 WP7：回合级伤害修正标记（D-WP7-3 空手道王的修炼）与精确口径
+        # 昏厥标记（D-WP7-7 古玉鱼）同样在持有者回合结束清除
+        if p.turn_damage_mods:
+            update["turn_damage_mods"] = ()
+        if p.own_ko_by_attack_during_opponent_turn:
+            update["own_ko_by_attack_during_opponent_turn"] = False
         if update:
             self._set_player(player, p.model_copy(update=update))
+
+    # ── 宝可梦检查（task 026 WP7，D-WP7-1/2；rules-manual §7.2）──────────────
+
+    # 检查阶段状态结算固定序（D-WP7-1）：毒→灼→眠→麻；混乱不在本阶段结算
+    # （攻击时掷币，D1 决议 task 013）
+    _CHECK_STATUS_ORDER = (
+        SpecialCondition.POISONED, SpecialCondition.BURNED,
+        SpecialCondition.ASLEEP, SpecialCondition.PARALYZED,
+    )
+
+    def _start_pokemon_check(self, ended_player: int) -> None:
+        """宝可梦检查（task 026 WP7，D-WP7-1；rules-manual §7.2）：所有回合结束路径
+        统一接入（end_turn / 攻击结算完毕 / 攻击致昏厥换上后）。
+
+        同步结算（无选择）：回合持有者方先、双方场上宝可梦各按固定序——毒 +10；
+        灼 +20 后持有者掷币，正面恢复反面保持；眠掷币正面恢复反面保持；麻按施加
+        标记恢复（D-WP7-2：持有者回合结束且非施加当回合才恢复）。随后分发现场
+        pokemon_check 事件触发（雪妖女 冻结帷幕；离场即失效由排水点语义保证），
+        全部处理结束后统一 check_knockouts + 奖赏 + 换上（§7.2 末注），再开下一回合。
+        """
+        # 回合结束统一收尾（task 026 WP7 复核 M1）：攻击致昏厥→换上路径不经
+        # _on_turn_end——检查入口统一补调（retreat_lock / extra_prize_tera_ko /
+        # own_ko_during_opponent_turn / discard_at_turn_end 道具自弃四项防陈旧
+        # 泄漏）；end_turn / 攻击完成路径已调过一次，四处职责幂等，重复调用无害
+        self._on_turn_end(ended_player)
+        nxt = 1 - ended_player
+        self.state = self.state.model_copy(update={
+            "phase": "pokemon_check", "pokemon_check_next": nxt,
+        })
+        self._emit("pokemon_check", None, next_player=nxt)
+        for owner in (ended_player, nxt):  # 回合持有者方先
+            self._settle_conditions(owner, holder_turn_ended=owner == ended_player)
+        # pokemon_check 事件触发入队（双方场上声明该事件的宝可梦；FIFO 排水）
+        for owner in (ended_player, nxt):
+            pl = self.state.players[owner]
+            for mon in ([pl.active] if pl.active else []) + list(pl.bench):
+                doc = effect_doc(self.card_effects, mon.current.card)
+                if doc is not None and any(
+                    e.trigger == "trigger_on_event" and e.event == "pokemon_check"
+                    for e in doc.effects
+                ):
+                    self._queue_event_trigger(owner, mon.current.iid, "pokemon_check")
+        self._advance_pokemon_check()
+
+    def _settle_conditions(self, owner: int, *, holder_turn_ended: bool) -> None:
+        """单方场上宝可梦的检查阶段状态结算（毒→灼→眠→麻固定序；逐只发 check_status）。"""
+        p = self.state.players[owner]
+        positions = ([("active", -1)] if p.active else []) + [
+            ("bench", i) for i in range(len(p.bench))
+        ]
+        for slot, idx in positions:
+            for status in self._CHECK_STATUS_ORDER:
+                p = self.state.players[owner]
+                mon = p.active if slot == "active" else p.bench[idx]
+                if status not in mon.conditions:
+                    continue
+                name = mon.current.card.name
+                if status == SpecialCondition.POISONED:
+                    # 中毒：放 1 个伤害指示物（不自动恢复，rules-manual §7.2）
+                    mon = mon.model_copy(update={"damage": mon.damage + 10})
+                    self._set_player(owner, self._replace_in_play(p, slot, idx, mon))
+                    self._emit("check_status", owner, name=name,
+                               status="poisoned", damage=10)
+                elif status == SpecialCondition.BURNED:
+                    # 灼伤：放 2 个指示物后掷币，正面恢复反面保持（§7.2）
+                    heads = self.rng.flip_coin()
+                    update: dict[str, object] = {"damage": mon.damage + 20}
+                    if heads:
+                        update["conditions"] = mon.conditions - {status}
+                    mon = mon.model_copy(update=update)
+                    self._set_player(owner, self._replace_in_play(p, slot, idx, mon))
+                    self._emit("check_status", owner, name=name, status="burned",
+                               damage=20, flip="heads" if heads else "tails",
+                               recovered=heads)
+                elif status == SpecialCondition.ASLEEP:
+                    # 睡眠：掷币正面恢复反面保持（§7.2；不放伤害指示物）
+                    heads = self.rng.flip_coin()
+                    if heads:
+                        mon = mon.model_copy(update={
+                            "conditions": mon.conditions - {status},
+                        })
+                        self._set_player(owner, self._replace_in_play(p, slot, idx, mon))
+                    self._emit("check_status", owner, name=name, status="asleep",
+                               flip="heads" if heads else "tails", recovered=heads)
+                else:
+                    # 麻痹：持有者回合结束且非施加当回合才恢复（D-WP7-2 施加标记）；
+                    # 无标记（直接构造入场等）= 持有者回合结束即恢复
+                    recover = holder_turn_ended and (
+                        mon.paralyzed_mark is None
+                        or mon.paralyzed_mark != (self.state.turn, owner)
+                    )
+                    if recover:
+                        mon = mon.model_copy(update={
+                            "conditions": mon.conditions - {status},
+                            "paralyzed_mark": None,
+                        })
+                        self._set_player(owner, self._replace_in_play(p, slot, idx, mon))
+                    self._emit("check_status", owner, name=name,
+                               status="paralyzed", recovered=recover)
+
+    def _advance_pokemon_check(self) -> None:
+        """检查推进（D-WP7-1）：事件触发排水（挂起时交棒——恢复后经
+        _run_or_suspend 完成路径的检查拦截回本函数）→ 统一 check_knockouts +
+        奖赏（§7.2 末注）→ 战斗场昏厥换上（预置 turn_after_promote=检查后回合方）
+        → 失效缩减复查 → 开下一回合。"""
+        if self.state.phase == "game_over":
+            return
+        if self._drain_event_triggers():
+            return  # 交棒被触发效果；其完成路径回本函数继续推进
+        self.check_knockouts()
+        if self.state.phase == "game_over":
+            return
+        nxt = self.state.pokemon_check_next
+        assert nxt is not None  # 仅检查进行中进入本函数
+        if self.state.phase == "choice":
+            # 防卫（task 026 WP7 复核 m2）：check_knockouts 内排水昏厥触发器
+            # （own_ko_by_attack）可能挂起选择——不得穿透到 _begin_turn；
+            # 恢复后经 _run_or_suspend 完成路径的检查拦截回本函数
+            return
+        if self.state.phase == "promote":
+            # 战斗场昏厥换上完成后进检查后回合（换上路径 _proceed_after_turn_end
+            # 读 pokemon_check_next 直接开回合，不重入检查）
+            self.state = self.state.model_copy(update={"turn_after_promote": nxt})
+            return
+        # 失效缩减复查（承接原攻击完成路径的 D-WP6-2 触点：检查内触发的离场
+        # 效果同样可能造成超容；缩减完成后经 _proceed_after_turn_end 开回合）
+        if self._check_bench_shrink(first=None, resume=(nxt, "begin_turn")):
+            return
+        self.state = self.state.model_copy(update={"pokemon_check_next": None})
+        self._begin_turn(nxt)
+
+    def _proceed_after_turn_end(self, next_player: int) -> None:
+        """回合权交接统一出口（task 026 WP7）：换上/缩减完成后的回合推进——
+        检查进行中（pokemon_check_next 非 None = 检查收尾的换上/缩减路径）直接
+        开检查后回合（防重入）；否则插入宝可梦检查（D-WP7-1：所有回合结束路径
+        必经）。next_player = 常规回合权归属（=检查后开回合方，ended=1−该值）。"""
+        pending = self.state.pokemon_check_next
+        if pending is not None:
+            self.state = self.state.model_copy(update={"pokemon_check_next": None})
+            self._begin_turn(pending)
+            return
+        self._start_pokemon_check(1 - next_player)
 
     def _do_retreat(self, player: int, action: Action) -> None:
         """【规则书·撤退】弃撤退费用数量的能量，与备战区对换，撤退方特殊状态恢复。
@@ -757,6 +919,8 @@ class GameEngine:
             # 攻击冷却锁随撤退清除（task 026 WP4 裁决 2，同特殊状态恢复口径）
             "attack_locks": (),
             "attack_lock_turn": None,
+            # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
+            "paralyzed_mark": None,
         })
         new_active = p.bench[action.bench_index]  # type: ignore[index]
         bench = list(p.bench)
@@ -776,6 +940,8 @@ class GameEngine:
         招式有 on_attack DSL 绑定时（task 012）：伤害与附加效果全部由 DSL 结算
         （damage 原语负责伤害与目标，AttackDef.damage 不重复结算），可挂起（chooser），
         完成且无昏厥分支时推进对手回合（completion="attack"）。
+        回合结束统一进宝可梦检查（task 026 WP7，D-WP7-1：_start_pokemon_check），
+        检查完毕才开下一回合。
         """
         s = self.state
         atk = s.players[player].active
@@ -814,7 +980,7 @@ class GameEngine:
                     })
                     return
                 self._on_turn_end(player)
-                self._begin_turn(1 - player)
+                self._start_pokemon_check(player)
                 return
             # 正面：继续正常结算（混乱不解除）
         effect_index = next(
@@ -834,7 +1000,7 @@ class GameEngine:
                                attack=attack.name, failed=True,
                                condition=effect.condition)
                     self._on_turn_end(player)
-                    self._begin_turn(1 - player)
+                    self._start_pokemon_check(player)
                     return
             self._emit("attack", player, name=atk.current.card.name, attack=attack.name)
             self._run_or_suspend(player, source, effect_index, start=0,
@@ -844,7 +1010,9 @@ class GameEngine:
         d = s.players[defender]
         dmg = _attack_damage(attack, atk.current.card, d.active,
                              weakness=self._effective_weakness(player, d.active),
-                             damage_mod=self._effective_damage_modifier(atk, player))
+                             damage_mod=self._effective_damage_modifier(
+                                 atk, player,
+                                 target_rule_box=d.active.current.card.rule_box))
         target = d.active.model_copy(update={"damage": d.active.damage + dmg})
         self._set_player(defender, d.model_copy(update={"active": target}))
         self._emit("attack", player, name=atk.current.card.name, attack=attack.name,
@@ -860,7 +1028,7 @@ class GameEngine:
             # ——挂起的选择属于被触发效果，其恢复路径自行收尾，本层不推进回合）
             return
         self._on_turn_end(player)
-        self._begin_turn(defender)
+        self._start_pokemon_check(player)
 
     def _effective_hp(self, mon: InPlayPokemon, player: int) -> int:
         """最大 HP 含道具常驻修正（rules-manual §8 昏厥判定的 HP 基准）。
@@ -892,31 +1060,94 @@ class GameEngine:
                     hp += node.args["amount"]
         return hp
 
-    def _effective_damage_modifier(self, mon: InPlayPokemon, player: int) -> int:
-        """攻方招式伤害修正求和（task 025 不服输头带；仿 _effective_hp 声明式模式）。
+    def _effective_damage_modifier(
+        self, mon: InPlayPokemon, player: int, target_rule_box: str | None = None
+    ) -> int:
+        """攻方招式伤害修正求和（task 025 不服输头带；task 026 WP7 泛化四来源，D-WP7-3）。
 
-        引擎对卡牌内容零硬编码：修正值读持有者道具 DSL 文档 passive_static 的
-        modify_damage 声明（condition 如 own_prizes_more_than_opponent 在求值点判定；
-        道具离场即无声明可读、进化换栈顶即按新持有者判定——失效由求值点语义保证）。
-        仅由调用方在「给对手的战斗宝可梦造成的伤害」落点接入（卡面口径）。
+        引擎对卡牌内容零硬编码：修正值读 DSL 声明——
+        ① 持有者道具 passive_static modify_damage（既有口径；scope 须无）；
+        ② 场上竞技场 passive_static modify_damage（scope 须无；化朗镇）；
+        ③ 自己全场宝可梦 aura（args.scope="own_field" 必须，否则 DslError 不猜；
+        同名来源卡去重只加一次；卡比兽）；
+        ④ 回合级标记 PlayerState.turn_damage_mods（on_play modify_damage 写入，
+        如空手道王的修炼；回合结束清除）。
+        所有来源的 condition 一律对攻击方持有者（mon）求值；节点
+        args.target_rule_box 非 None 且不等于 target_rule_box（防守方规则盒）
+        则跳过。仅由调用方在「给对手的战斗宝可梦造成的伤害」落点接入（卡面口径）。
+        来源离场 / 道具被弃 / 竞技场被顶即失效（求值点实时读声明，天然满足）。
         """
-        tool = mon.attached_tool
-        if tool is None:
-            return 0
-        doc = effect_doc(self.card_effects, tool.card)
-        if doc is None:
-            return 0
         from battlefrontier.dsl.chooser import condition_met
 
         mod = 0
-        for effect in doc.effects:
-            if effect.trigger != "passive_static":
+
+        def scan(doc, *, source_kind: str) -> None:
+            nonlocal mod
+            for effect in doc.effects:
+                if effect.trigger != "passive_static":
+                    continue
+                nodes = [n for n in effect.actions if n.action == "modify_damage"]
+                if not nodes:
+                    continue
+                if not condition_met(effect.condition, self, player, mon):
+                    continue
+                for node in nodes:
+                    trb = node.args.get("target_rule_box")
+                    if trb is not None and trb != target_rule_box:
+                        continue
+                    scope = node.args.get("scope")
+                    if source_kind == "aura":
+                        if scope != "own_field":
+                            raise DslError(
+                                f"宝可梦 aura modify_damage 的 args.scope 须为 own_field"
+                                f"（收到 {scope!r}；不猜）"
+                            )
+                    elif scope is not None:
+                        raise DslError(
+                            f"{source_kind}挂载的 modify_damage 不支持 scope"
+                            f"（收到 {scope!r}；aura 请挂宝可梦卡并声明 own_field）"
+                        )
+                    amount = node.args.get("amount")
+                    if not isinstance(amount, int) or isinstance(amount, bool):
+                        raise DslError(
+                            f"modify_damage 的 amount 须为 int（收到 {amount!r}）"
+                        )
+                    mod += amount
+
+        # ① 持有者道具
+        tool = mon.attached_tool
+        if tool is not None:
+            doc = effect_doc(self.card_effects, tool.card)
+            if doc is not None:
+                scan(doc, source_kind="道具")
+        # ② 场上竞技场
+        stadium = self.state.stadium
+        if stadium is not None:
+            doc = effect_doc(self.card_effects, stadium.card)
+            if doc is not None:
+                scan(doc, source_kind="竞技场")
+        # ③ 自己全场宝可梦 aura（scope=own_field；同名来源卡去重）
+        p = self.state.players[player]
+        seen: set[str] = set()
+        for m in ([p.active] if p.active else []) + list(p.bench):
+            if m.current.card.name in seen:
                 continue
-            if not condition_met(effect.condition, self, player, mon):
+            doc = effect_doc(self.card_effects, m.current.card)
+            if doc is None:
                 continue
-            for node in effect.actions:
-                if node.action == "modify_damage":
-                    mod += node.args["amount"]
+            if not any(
+                node.action == "modify_damage" and node.args.get("scope") is not None
+                for effect in doc.effects
+                if effect.trigger == "passive_static"
+                for node in effect.actions
+            ):
+                continue  # 无 aura 声明的卡文档不逐节点校验（同撤退费口径）
+            seen.add(m.current.card.name)
+            scan(doc, source_kind="aura")
+        # ④ 回合级标记（on_play modify_damage 写入；target_rule_box 过滤在求和点）
+        for amount, trb in p.turn_damage_mods:
+            if trb is None or trb == target_rule_box:
+                mod += amount
         return mod
 
     def _effective_retreat_cost(self, mon: InPlayPokemon, player: int) -> int:
@@ -997,9 +1228,11 @@ class GameEngine:
     ) -> tuple[str, ...]:
         """招式有效费用含常驻修正（task 026 WP5，D-WP5-4，🔲 待核；仿 _effective_retreat_cost）。
 
-        引擎对卡牌内容零硬编码：修正读持有者自身卡文档 passive_static 的
-        modify_attack_cost 声明（月月熊 赫月ex 老练招式「血月费用减对手已拿奖赏数
-        ×【无】」；condition 在求值点判定）。args：attack=招式名（只作用该招式）、
+        引擎对卡牌内容零硬编码：修正读 DSL 声明——① 持有者自身卡文档
+        passive_static modify_attack_cost（月月熊 赫月ex 老练招式「血月费用减对手
+        已拿奖赏数×【无】」；attack=招式名必填严格匹配）；② 持有者道具文档同原语
+        （task 026 WP7 赫普的讲究头带，D-WP7-4；attack 可缺省=全招式）。
+        condition 在求值点判定。args：attack=招式名、
         value=非负 int 或 counters 计数词（如 opponent_taken_prizes，求值走
         interpreter._eval_counter 单一点）。
         规约：只减【无】部分、下限 0（费用不可为负，减免超过无色部分 clamp）；
@@ -1009,45 +1242,63 @@ class GameEngine:
         from battlefrontier.dsl.chooser import condition_met
 
         cost = list(attack.cost)
-        doc = effect_doc(self.card_effects, mon.current.card)
-        if doc is None:
-            return tuple(cost)
-        for effect in doc.effects:
-            if effect.trigger != "passive_static":
-                continue
-            nodes = [n for n in effect.actions if n.action == "modify_attack_cost"]
-            if not nodes:
-                continue
-            if not condition_met(effect.condition, self, player, mon):
-                continue
-            for node in nodes:
-                if node.args.get("attack") != attack.name:
-                    continue
-                v = node.args.get("value")
-                if isinstance(v, bool):
-                    raise DslError(
-                        f"modify_attack_cost 的 value 须为非负 int 或计数表达式"
-                        f"（收到 {v!r}）"
-                    )
-                if isinstance(v, str):
-                    from battlefrontier.dsl.primitives import _eval_counter
 
-                    ctx = ExecutionContext(
-                        engine=self, player=player, source=mon.current,
-                        effect_id="passive:modify_attack_cost", trigger="passive_static",
-                    )
-                    reduce_n = _eval_counter(ctx, v)
-                elif isinstance(v, int) and v >= 0:
-                    reduce_n = v
-                else:
-                    raise DslError(
-                        f"modify_attack_cost 的 value 须为非负 int 或计数表达式"
-                        f"（收到 {v!r}）"
-                    )
-                # 只减【无】部分，clamp 下限 0（D-WP5-4）
-                remove = min(reduce_n, cost.count("无"))
-                for _ in range(remove):
-                    cost.remove("无")
+        def apply_node(node, *, attack_required: bool) -> None:
+            declared = node.args.get("attack")
+            if attack_required:
+                # 自身卡分支保持严格：attack 必须显式匹配招式名（月月熊口径）
+                if declared != attack.name:
+                    return
+            elif declared is not None and declared != attack.name:
+                return  # 道具分支：attack 可缺省（=全招式），声明则须匹配
+            v = node.args.get("value")
+            if isinstance(v, bool):
+                raise DslError(
+                    f"modify_attack_cost 的 value 须为非负 int 或计数表达式"
+                    f"（收到 {v!r}）"
+                )
+            if isinstance(v, str):
+                from battlefrontier.dsl.primitives import _eval_counter
+
+                ctx = ExecutionContext(
+                    engine=self, player=player, source=mon.current,
+                    effect_id="passive:modify_attack_cost", trigger="passive_static",
+                )
+                reduce_n = _eval_counter(ctx, v)
+            elif isinstance(v, int) and v >= 0:
+                reduce_n = v
+            else:
+                raise DslError(
+                    f"modify_attack_cost 的 value 须为非负 int 或计数表达式"
+                    f"（收到 {v!r}）"
+                )
+            # 只减【无】部分，clamp 下限 0（D-WP5-4）
+            remove = min(reduce_n, cost.count("无"))
+            for _ in range(remove):
+                cost.remove("无")
+
+        def scan(doc, *, attack_required: bool) -> None:
+            for effect in doc.effects:
+                if effect.trigger != "passive_static":
+                    continue
+                nodes = [n for n in effect.actions if n.action == "modify_attack_cost"]
+                if not nodes:
+                    continue
+                if not condition_met(effect.condition, self, player, mon):
+                    continue
+                for node in nodes:
+                    apply_node(node, attack_required=attack_required)
+
+        doc = effect_doc(self.card_effects, mon.current.card)
+        if doc is not None:
+            scan(doc, attack_required=True)
+        # 道具分支（task 026 WP7 赫普的讲究头带，D-WP7-4）：attached_tool 文档的
+        # passive_static modify_attack_cost，condition 对持有者求值；道具离场即失效
+        tool = mon.attached_tool
+        if tool is not None:
+            tdoc = effect_doc(self.card_effects, tool.card)
+            if tdoc is not None:
+                scan(tdoc, attack_required=False)
         return tuple(cost)
 
     def _effective_weakness(self, attacker: int, defender: InPlayPokemon) -> str | None:
@@ -1157,7 +1408,8 @@ class GameEngine:
         assert resume is not None  # 进入 bench_shrink 阶段时必已设置
         self.state = self.state.model_copy(update={"bench_shrink_resume": None})
         if resume[1] == "begin_turn":
-            self._begin_turn(resume[0])
+            # task 026 WP7：检查进行中直接开检查后回合，否则插入宝可梦检查
+            self._proceed_after_turn_end(resume[0])
         else:
             self.state = self.state.model_copy(update={
                 "phase": "main", "current_player": resume[0],
@@ -1171,6 +1423,8 @@ class GameEngine:
         condition 在求值点判定。由效果落点（place_damage_counters / apply_status）
         在 ctx.trigger == "on_attack" 时调用——训练家卡效果不经本判定（不受保护），
         伤害本体也不经本判定（不免疫）。
+        scope=opponent_attack_damage_to_bench（task 026 WP7 谢米，D-WP7-5）是
+        伤害免疫，不归本守卫管——跳过（求值点 = _protected_bench_from_attack_damage）。
         一期守卫落点清单：apply_status / place_damage_counters / lock_retreat /
         devolve——新增攻击效果落点须显式评估是否接入本守卫（不接 = 不受保护，不猜）。
         """
@@ -1188,15 +1442,53 @@ class GameEngine:
                 continue
             for node in nodes:
                 scope = node.args.get("scope")
+                if scope == "opponent_attack_damage_to_bench":
+                    continue  # 伤害免疫 scope：非本守卫职责（D-WP7-5）
                 if scope != "opponent_attack_effects":
                     raise DslError(
-                        f"protection 的 scope 暂仅支持 opponent_attack_effects"
-                        f"（收到 {scope!r}；不猜）"
+                        f"protection 的 scope 暂仅支持 opponent_attack_effects/"
+                        f"opponent_attack_damage_to_bench（收到 {scope!r}；不猜）"
                     )
             if not condition_met(effect.condition, self, owner, mon):
                 continue
             declared = True
         return declared
+
+    def _protected_bench_from_attack_damage(self, mon: InPlayPokemon, owner: int) -> bool:
+        """备战伤害免疫判定（task 026 WP7 谢米，D-WP7-5，🔲 待核）：「对手的招式
+        对自己备战区宝可梦的伤害」免疫。
+
+        引擎对卡牌内容零硬编码：扫 owner 全场宝可梦卡文档 passive_static 的
+        protection scope=opponent_attack_damage_to_bench 声明；args.target_filters
+        （如 no_rule_box）对受保护目标（mon）求值收敛保护面；condition 对来源
+        持有者求值。来源离场即失效（求值点实时扫场，天然满足）。
+        接入点 = damage 原语的备战落点且 ctx.trigger=="on_attack"（招式伤害才免疫；
+        训练家卡伤害与伤害指示物不受此保护——指示物不是伤害，rules-manual §6）。
+        """
+        from battlefrontier.dsl.chooser import condition_met, matches_in_play
+
+        p = self.state.players[owner]
+        for m in ([p.active] if p.active else []) + list(p.bench):
+            doc = effect_doc(self.card_effects, m.current.card)
+            if doc is None:
+                continue
+            for effect in doc.effects:
+                if effect.trigger != "passive_static":
+                    continue
+                nodes = [
+                    n for n in effect.actions
+                    if n.action == "protection"
+                    and n.args.get("scope") == "opponent_attack_damage_to_bench"
+                ]
+                if not nodes:
+                    continue
+                if not condition_met(effect.condition, self, owner, m):
+                    continue
+                for node in nodes:
+                    target_filters = tuple(node.args.get("target_filters", ()))
+                    if matches_in_play(mon, target_filters):
+                        return True
+        return False
 
 
     def check_knockouts(self) -> None:
@@ -1217,11 +1509,13 @@ class GameEngine:
         self._attack_damage_active = None
         for player in (0, 1):
             p = self.state.players[player]
-            # 备战区昏厥
+            # 备战区昏厥（attack_ctx 同样传入：古玉鱼精确标记 F1 归正——备战被招式
+            # 伤害昏厥也置位；白蕾雅加成 / own_ko_by_attack 触发器在 _knockout_one
+            # 内由 active_ko 门拦截，不受备战落点影响）
             kept = []
             for b in p.bench:
                 if b.damage >= self._effective_hp(b, player):
-                    if self._knockout_one(player, b):
+                    if self._knockout_one(player, b, attack_ctx=attack_ctx):
                         self.state = self.state.model_copy(update={"promote_queue": ()})
                         return  # 对手拿完奖赏，立即获胜
                 else:
@@ -1309,6 +1603,20 @@ class GameEngine:
             self._set_player(player, owner.model_copy(update={
                 "own_ko_during_opponent_turn": True,
             }))
+        # 精确口径标记（task 026 WP7 古玉鱼 嫉妒业火，D-WP7-7 + F1 复核归正）：
+        # 仅「因对手招式伤害」昏厥才置位（attack_ctx 非空 = 本次扫描有对手招式伤害
+        # 落点记录；效果/指示物致昏厥不置位）——战斗场与备战区昏厥均置位
+        # （F1：卡面「自己的宝可梦【昏厥】」无战斗场限定，备战狙击致昏厥同属）；
+        # 清除口径同宽标记（_on_turn_end / 检查阶段入口双清）
+        if (
+            attack_ctx is not None
+            and attack_ctx[0] == 1 - player
+            and player != self.state.current_player
+        ):
+            owner = self.state.players[player]
+            self._set_player(player, owner.model_copy(update={
+                "own_ko_by_attack_during_opponent_turn": True,
+            }))
         taker_idx = 1 - player
         taker = self.state.players[taker_idx]
         n = PRIZE_BY_RULE_BOX.get(knocked_mon.current.card.rule_box or "", 1)
@@ -1371,12 +1679,14 @@ class GameEngine:
         # 超容方按 shrink_bench 阶段逐个弃置，全部完成后才开回合（D-WP6-2）
         if self._check_bench_shrink(first=None, resume=(target, "begin_turn")):
             return
-        self._begin_turn(target)
+        # 回合权交接（task 026 WP7）：检查进行中直接开检查后回合，否则插入宝可梦检查
+        self._proceed_after_turn_end(target)
 
     def _do_end_turn(self, player: int, action: Action) -> None:
         self._emit("end_turn", player)
         self._on_turn_end(player)
-        self._begin_turn(1 - player)
+        # 宝可梦检查（task 026 WP7，D-WP7-1）：回合结束统一插入，检查完毕后开下一回合
+        self._start_pokemon_check(player)
 
     def _do_play_trainer(self, player: int, action: Action) -> None:
         """【规则书·训练家卡】物品/支援者从手牌使用，效果经 DSL 解释器结算后放于弃牌区。
@@ -1446,6 +1756,10 @@ class GameEngine:
         ctx.cost_discarded_iids（同 flip 口径，嵌套帧不穿透）。
         discarded_count（task 026 WP5）：挂起冻结的前序弃置张数，恢复时穿透进
         ctx.discarded_this_effect（同 flip 口径，嵌套帧不穿透）。
+        宝可梦检查（task 026 WP7，D-WP7-1）：完成路径在排水后、promote/main 恢复
+        逻辑前检查拦截——pokemon_check_next 非 None 且 phase 为 pokemon_check/
+        choice 时回 _advance_pokemon_check 继续检查推进（检查触发的效果完成不
+        直接开回合/回主阶段）。
         """
         from battlefrontier.dsl.chooser import build_pending
 
@@ -1517,9 +1831,23 @@ class GameEngine:
         # 路径递归排剩余队列 / 翻 promote / 回主阶段，本层不再执行后续收尾）
         if self.state.phase != "game_over" and self._drain_event_triggers():
             return
+        # 宝可梦检查内拦截（task 026 WP7，D-WP7-1）：检查阶段触发的效果
+        # （雪妖女 冻结帷幕等）完成/挂起恢复后回到检查推进（排水→统一昏厥结算
+        # →下一回合），不走下方 promote/main 恢复逻辑
+        if (
+            self.state.pokemon_check_next is not None
+            and self.state.phase in ("pokemon_check", "choice")
+        ):
+            self.state = self.state.model_copy(update={
+                "pending_choice": None, "phase": "pokemon_check",
+            })
+            self._advance_pokemon_check()
+            return
         # 效果内昏厥的推迟换上（task 026 WP2，D-WP2-1/2）：队列非空 → 统一进 promote
         # 阶段；ability/trainer/stadium 完成后回效果方主阶段（resume_after_promotes），
-        # attack 不设（换上后默认 begin_turn(换上方)=防守方回合开始，与现行为一致）
+        # attack 不设 resume——置 turn_after_promote=防守方（攻击已消耗回合；
+        # 普通昏厥换上=防守方与默认口径一致；自我昏厥换上后回合权归对手——
+        # 2026-09-19 主会话复核批准口径，无独立 D 编号）
         if self.state.phase != "game_over" and self.state.promote_queue:
             update: dict[str, object] = {
                 "phase": "promote",
@@ -1528,6 +1856,11 @@ class GameEngine:
             }
             if completion in ("ability", "trainer", "stadium"):
                 update["resume_after_promotes"] = (player, "main")
+            elif completion == "attack" and self.state.turn_after_promote is None:
+                # 攻击已消耗回合：换上后回合权归防守方（普通昏厥换上=防守方与默认
+                # 口径一致；自我昏厥换上后归对手——2026-09-19 主会话复核批准口径）；
+                # own_ko_by_attack 触发路径发动时已预置（D-WP6-6 归被攻击方）——不覆盖
+                update["turn_after_promote"] = 1 - player
             self.state = self.state.model_copy(update=update)
             return
         # 效果内若已终局（game_over）或翻上换阶段（bounce 直接翻），不覆盖其阶段。
@@ -1538,10 +1871,11 @@ class GameEngine:
                 # 失效缩减复查（task 026 WP6 零之大空洞，D-WP6-2 触点②③：
                 # transform/bounce/昏厥等离场在效果结算完毕后统一复查——沿用
                 # bench_shrink 挂起-恢复机制；check_knockouts 触点①经本路径覆盖，
-                # 效果中途不翻阶段）——超容方缩减完成后 begin_turn（对手）
+                # 效果中途不翻阶段）——超容方缩减完成后进宝可梦检查再开对手回合
                 if self._check_bench_shrink(first=None, resume=(1 - player, "begin_turn")):
                     return
-                self._begin_turn(1 - player)
+                # 宝可梦检查（task 026 WP7，D-WP7-1）：攻击后回合结束统一插入
+                self._start_pokemon_check(player)
             else:
                 self.state = self.state.model_copy(update={"pending_choice": None})
                 # 同上（D-WP6-2）：trainer/ability/stadium 完成后回效果方主阶段前复查
@@ -1624,6 +1958,9 @@ class GameEngine:
         self._set_player(player, p)
         self.state = self.state.model_copy(update={
             "turn": turn, "current_player": player, "phase": "draw",
+            # 检查进行中标记清零（task 026 WP7：正常路径进本函数前已清；
+            # 此处兜底防泄漏——回合开始即无未完结检查）
+            "pokemon_check_next": None,
         })
         # 攻击冷却解禁（task 026 WP4 裁决 2）：攻击于 turn N → 下个自己回合（N+1）
         # 仍锁 → N+2 回合开始解禁（turn 仅在先攻方回合开始递增）
@@ -1657,6 +1994,8 @@ class GameEngine:
     def _game_over(self, winner: int | None, reason: str, is_draw: bool = False) -> None:
         self.state = self.state.model_copy(update={
             "phase": "game_over", "winner": winner, "is_draw": is_draw,
+            # 检查进行中标记清零（task 026 WP7：终局即无未完结检查）
+            "pokemon_check_next": None,
         })
         self._emit("game_over", winner, reason=reason, is_draw=is_draw)
 

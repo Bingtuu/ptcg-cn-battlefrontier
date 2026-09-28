@@ -9,7 +9,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 ## 当前状态
 
-M1–M4 已达成（引擎骨架 / DSL+解释器 / 启发式 Agent+Runner+结果库 / 报告层），**M5 覆盖扩展进行中**：卡池 v1 九套已锁定（`config/target-pool.v1.yml`），缺口 81 张中 done 48 / blocked 0 / pending 33（task 026 WP0–WP6 完成，blocked 已清零），DSL 定义库 68 文件，全量 727 测试绿。逐日进展与下一步见 `STATUS.md`（事实源，本文件不抄写细节）。
+M1–M5 已达成（引擎骨架 / DSL+解释器 / 启发式 Agent+Runner+结果库 / 报告层 / 覆盖扩展+LLM 辅助编写试验）：卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 905 测试绿。**下一步 M6 校准基线 + 一期验收**（依赖 db 赛事数据积累）。逐日进展与下一步见 `STATUS.md`（事实源，本文件不抄写细节）。
 
 ## 架构分层与边界
 

@@ -4,8 +4,8 @@
 
 ## 当前
 
-**M5 覆盖清零、收口进行中**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）、task 026 ✅（WP0–WP8）、task 027 ✅（ACE SPEC + TERA）、**task 029 ✅（suppression 体系 + C 级收尾 8 卡，2026-09-20）**。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：**done 81 / blocked 0 / pending 0（覆盖清零）**。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张 first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，WP2 已根治落地）；批 2–4 累计 25 张全部核销通过；批 5（WP6）9 文件 first_pass 9/9、批 6（WP7）15/15、批 7（WP8）3/3、批 8（task 027）7/7、批 9（task 029）8 文件 first_pass 0/8（闸 2 首跑前测试脚手架 2 处修正，8 卡 YAML 全零返工——严格口径）。**gate3 攒批 42 文件全部核销通过（2026-09-20，human_edit_lines 累计 0）、附录 A 攒批 41 条决议全部核销（✅ 已核）**。
-M1–M4 已达成。**task 029 ✅（2026-09-20）**：suppression 声明式框架（suppress_ability/suppress_tool + 引擎统一守卫）、lock_play 物品锁、damage opponent_bench 备战狙击、attach own_deck distribute 任意分配、stadium_in_play/pokemon_<属性>/opponent_ability_pokemon_count 小词；D-029-6 正向词裁决（删 no_stadium_in_play）；定义库 101 文件；全量 905 绿 + 冒烟 80 局 0 失败；**缺口 done 81 / blocked 0 / pending 0**；下一步 = M5 达成确认（等用户）→ M6 校准基线。
+**M5 已达成（用户确认 2026-09-20）**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）、task 026 ✅（WP0–WP8）、task 027 ✅（ACE SPEC + TERA）、**task 029 ✅（suppression 体系 + C 级收尾 8 卡，2026-09-20）**。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：**done 81 / blocked 0 / pending 0（覆盖清零）**。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张 first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，WP2 已根治落地）；批 2–4 累计 25 张全部核销通过；批 5（WP6）9 文件 first_pass 9/9、批 6（WP7）15/15、批 7（WP8）3/3、批 8（task 027）7/7、批 9（task 029）8 文件 first_pass 0/8（闸 2 首跑前测试脚手架 2 处修正，8 卡 YAML 全零返工——严格口径）。**gate3 攒批 42 文件全部核销通过（2026-09-20，human_edit_lines 累计 0）、附录 A 攒批 41 条决议全部核销（✅ 已核）**。
+M1–M5 已达成（M5 用户确认 2026-09-20）。**task 029 ✅（2026-09-20）**：suppression 声明式框架（suppress_ability/suppress_tool + 引擎统一守卫）、lock_play 物品锁、damage opponent_bench 备战狙击、attach own_deck distribute 任意分配、stadium_in_play/pokemon_<属性>/opponent_ability_pokemon_count 小词；D-029-6 正向词裁决（删 no_stadium_in_play）；定义库 101 文件；全量 905 绿 + 冒烟 80 局 0 失败；**缺口 done 81 / blocked 0 / pending 0**；下一步 = M6 校准基线（依赖 db 赛事数据积累）。
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑
@@ -14,7 +14,7 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ✅ M2 DSL + 解释器 + 首批原语（第一套目标卡组）——task 005–008、010–017 全 ✅
 - ✅ M3 启发式 Agent + Runner + 结果库（百局端到端）——task 018–020 全 ✅（2026-08-29）
 - ✅ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）——task 021–023 全 ✅（2026-08-30）
-- ⬜ M5 覆盖扩展 + LLM 辅助编写试验
+- ✅ M5 覆盖扩展 + LLM 辅助编写试验——task 024–027、029 全 ✅（2026-09-20，用户确认达成：覆盖清零 81/81 + gate3 42 文件全核 + 附录 A 41 条全核）
 - ⬜ M6 校准基线 + 一期验收
 
 ## 工作记录
@@ -24,7 +24,7 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - **gate3 人工核销（5 批全过，human_edit_lines 累计 0）**：批 5 WP6 9 文件 / 批 6 WP7 15 文件（化朗镇「仅赫普的宝可梦生效」疑义——实证 `engine/core.py:1227-1232` condition 对攻击方持有者求值 + 三条正反测试，全过后放行）/ 批 7 WP8 3 文件（夜光能量降级条件疑义——实测 4 组合真值表证明特殊能量触发/基本能量不触发，与原文一致）/ 批 8 task 027 7 文件一次全过 / 批 9 task 029 8 文件（黑夜魔灵疑义——摘要措辞把特性咒怨炸弹与招式影子束缚混写，实证 YAML 为 ability_manual + on_attack 两独立 effect，实现正确）
 - **落账**：`cards/authoring-log.jsonl` 批 5–9 共 42 条 gate3 翻 true；`docs/m5-coverage-plan.md` `gate3 待核销` 清零；`docs/rules-reference.md` 附录 A 40 行（41 条决议：WP6 8 + WP7 11 + WP8 5 + t027 8 + t029 9）🔲 待核 → ✅ 已核 2026-09-20
 - **harness 质量汇总**（authoring-log 全量 157 条目）：gate3 已核销 80/157（批 1–4 未核条目为早期 harness 试验卡、非池内资产）；池内批次 first_pass 率——批 5–8 全 34 张 34/34，批 9 0/8（严格口径：闸 2 首跑前测试脚手架修正 2 处，YAML 零返工）；已核销卡人工修改量累计 0 行
-- **下一步**：M5 是否达成由用户确认 → M6 校准基线（依赖 db 赛事数据积累）
+- **下一步**：~~M5 是否达成由用户确认~~ **M5 已确认达成（用户 2026-09-20）** → M6 校准基线（依赖 db 赛事数据积累）
 
 ### 2026-09-20 task 029：持续 lock/suppression 体系 + C 级收尾 8 卡 ✅（M5 覆盖清零）
 
@@ -35,7 +35,7 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - **测试**：task 029 新 53 条（primitives_t29 34 + dsl_cards_t29 19）；**全量 905 绿（基线 852）+ ruff 零告警 + dsl-check --db 全库 101 文件全 OK + 镜像 hash 回归绿**
 - **真机冒烟 80 局 0 失败**（heuristic 4×20，`results/t29-smoke/`）：喷火龙大比鸟 vs 赛富豪 18/2；多龙巴鲁托 vs 猛雷鼓厄诡椪 6/13/平1；多龙黑夜魔灵 vs 多龙喷火龙 5/15；玛俐雪妖女 vs 赫普的苍响 10/9/平1。机制真实触发：lock_play 148 次、监视塔 10 次、阻碍之塔 44 次、黑夜魔灵 ko_self 42 次、旋转洛托姆特性 3 次 + 突击登陆失败门 2 次；庞克泵感/惩罚巨钳 80 局未自然出现（启发式路径未达），由单卡测试覆盖
 - **落账**：coverage-plan 8 行 pending→done——**缺口 done 81 / blocked 0 / pending 0（共 81，M5 覆盖清零）**；authoring-log 批 9 八条；附录 A D-029-1~8 + 学习器自弃候选共 9 条 🔲 待核；PRD §5.1 task 029 段；定义库 93→101 文件
-- **遗留**：~~8 个卡文件 gate3 待用户核销（攒批 42 个）+ 附录 A 待核决议攒批 41 条~~ **已全部核销（2026-09-20，见上方 M5 收口节）**；夜光能量异文本类 7 印刷未落地（回归池内需另文新写）；下一步 = M5 达成确认（等用户）→ M6 校准基线
+- **遗留**：~~8 个卡文件 gate3 待用户核销（攒批 42 个）+ 附录 A 待核决议攒批 41 条~~ **已全部核销（2026-09-20，见上方 M5 收口节）**；夜光能量异文本类 7 印刷未落地（回归池内需另文新写）；~~下一步 = M5 达成确认（等用户）~~ M5 已确认达成 → M6 校准基线
 
 ### 2026-09-20 task 027：ACE SPEC 核对 + TERA 规则盒 + C 级 7 卡 ✅
 

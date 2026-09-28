@@ -24,7 +24,7 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - **gate3 人工核销（5 批全过，human_edit_lines 累计 0）**：批 5 WP6 9 文件 / 批 6 WP7 15 文件（化朗镇「仅赫普的宝可梦生效」疑义——实证 `engine/core.py:1227-1232` condition 对攻击方持有者求值 + 三条正反测试，全过后放行）/ 批 7 WP8 3 文件（夜光能量降级条件疑义——实测 4 组合真值表证明特殊能量触发/基本能量不触发，与原文一致）/ 批 8 task 027 7 文件一次全过 / 批 9 task 029 8 文件（黑夜魔灵疑义——摘要措辞把特性咒怨炸弹与招式影子束缚混写，实证 YAML 为 ability_manual + on_attack 两独立 effect，实现正确）
 - **落账**：`cards/authoring-log.jsonl` 批 5–9 共 42 条 gate3 翻 true；`docs/m5-coverage-plan.md` `gate3 待核销` 清零；`docs/rules-reference.md` 附录 A 40 行（41 条决议：WP6 8 + WP7 11 + WP8 5 + t027 8 + t029 9）🔲 待核 → ✅ 已核 2026-09-20
 - **harness 质量汇总**（authoring-log 全量 157 条目）：gate3 已核销 80/157（批 1–4 未核条目为早期 harness 试验卡、非池内资产）；池内批次 first_pass 率——批 5–8 全 34 张 34/34，批 9 0/8（严格口径：闸 2 首跑前测试脚手架修正 2 处，YAML 零返工）；已核销卡人工修改量累计 0 行
-- **下一步**：~~M5 是否达成由用户确认~~ **M5 已确认达成（用户 2026-09-20）** → M6 校准基线（依赖 db 赛事数据积累）
+- **下一步**：~~M5 是否达成由用户确认~~ **M5 已确认达成（用户 2026-09-20）** → ~~M6 校准基线（依赖 db 赛事数据积累）~~ **M6 推迟（用户 2026-09-20 裁决）**：db 实测 pairings 仅 5 场 limitless 赛事 / 302 条可关联对局（9 套池 36 配对格头部仅 8 局），简中侧 mik_moe 123 场只有排名无对阵记录——matchup 矩阵无统计意义；先在 db 项目补 mik_moe 对阵抓取 / limitless 扩量，数据积累到位再启动 M6
 
 ### 2026-09-20 task 029：持续 lock/suppression 体系 + C 级收尾 8 卡 ✅（M5 覆盖清零）
 

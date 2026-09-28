@@ -362,7 +362,9 @@ class GameEngine:
             own_doc = effect_doc(self.card_effects, p.active.current.card)
             tool = p.active.attached_tool
             combined = [(a, own_doc) for a in own_attacks]
-            if tool is not None:
+            # 道具消除（task 029 阻碍之塔，D-029-2）：suppress_tool 在场时授予招式
+            # 不枚举（执行落点 _do_attack 双保险；落点清单见 _tool_suppressed）
+            if tool is not None and not self._tool_suppressed(p.active):
                 tool_doc = effect_doc(self.card_effects, tool.card)
                 combined += [(a, tool_doc) for a in tool.card.attacks]
             for i, (attack, doc) in enumerate(combined):
@@ -393,6 +395,13 @@ class GameEngine:
                 continue
             if c.card.trainer_subtype not in ("物品", "支援者"):
                 continue  # 宝可梦道具 / 竞技场的使用骨架随机制落地（task 008+）
+            # 物品锁（task 029 含羞苞 痒痒花粉，D-029-3）：受击方下个自己回合
+            # 无法从手牌使出物品（支援者/道具附着/能量附着不受影响）
+            if (
+                c.card.trainer_subtype == "物品"
+                and p.item_lock_mark is not None
+            ):
+                continue
             doc = effect_doc(self.card_effects, c.card)
             if doc is None or not any(e.trigger == "on_play" for e in doc.effects):
                 continue
@@ -441,6 +450,9 @@ class GameEngine:
             top = t.current
             doc = effect_doc(self.card_effects, top.card)
             if doc is None:
+                continue
+            # 特性消除（task 029 监视塔，D-029-1）：ability_manual 枚举门
+            if self._ability_suppressed(t):
                 continue
             effect = next((e for e in doc.effects if e.trigger == "ability_manual"), None)
             if effect is None:
@@ -516,6 +528,13 @@ class GameEngine:
         """
         doc = effect_doc(self.card_effects, source.card)
         if doc is None:
+            return False
+        # 特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源的 trigger_on_event
+        # 不分发（能量卡来源——喷射能量 own_attach_from_hand_to_bench——不受影响）
+        if (
+            source.card.supertype == Supertype.POKEMON
+            and self._ability_suppressed_card(source.card)
+        ):
             return False
         matched = [
             (i, e) for i, e in enumerate(doc.effects)
@@ -716,7 +735,9 @@ class GameEngine:
 
     def _do_play_stadium(self, player: int, action: Action) -> None:
         """【rules-manual §5】竞技场：手牌打出放公共场地；旧场进其放置方
-        （stadium_owner）弃牌区；每回合限 1 张、同名不可打出（枚举层已拦截）。"""
+        （stadium_owner）弃牌区；每回合限 1 张、同名不可打出（枚举层已拦截）。
+        打出后若存在超有效 HP 宝可梦（task 029 阻碍之塔 suppress_tool 致 modify_hp
+        加成失效）→ check_knockouts 判昏厥，换上完成后回出牌方主阶段。"""
         p, card = self._take_from_hand(self.state.players[player], action.iid)  # type: ignore[arg-type]
         old, old_owner = self.state.stadium, self.state.stadium_owner
         self._set_player(player, p.model_copy(update={"stadium_played_this_turn": True}))
@@ -730,6 +751,24 @@ class GameEngine:
             }))
         self._emit("play_stadium", player, iid=card.iid, name=card.card.name,
                    replaced=old.card.name if old else None)
+        # 道具消除（task 029 阻碍之塔，D-029-2）：suppress_tool 生效致 modify_hp
+        # 加成失效——按新有效 HP 判昏厥（动态求值天然无追溯，走 check_knockouts）；
+        # 战斗场昏厥换上完成后回出牌方主阶段（D-WP2-4 口径：打出竞技场不消耗回合）
+        if any(
+            m.damage >= self._effective_hp(m, i)
+            for i in (0, 1)
+            for m in ([self.state.players[i].active]
+                      if self.state.players[i].active else [])
+            + list(self.state.players[i].bench)
+        ):
+            self.state = self.state.model_copy(update={
+                "resume_after_promotes": (player, "main"),
+            })
+            self.check_knockouts()
+            if self.state.phase in ("promote", "game_over"):
+                return
+            # 仅备战昏厥（无换上）：恢复标记，继续主阶段
+            self.state = self.state.model_copy(update={"resume_after_promotes": None})
         # 备战区失效缩减（task 026 WP6 零之大空洞，D-WP6-2）：旧竞技场离场后超容方
         # 逐只自选弃置，双方同缩由旧场持有者先执行；缩减完成后回出牌方主阶段
         self._check_bench_shrink(first=old_owner, resume=(player, "main"))
@@ -791,8 +830,9 @@ class GameEngine:
         + 跨回合 KO 标记清除（task 017 化危为吉「上一个对手的回合」语义：
         标记只保留到自己回合结束）+ 回合级奖赏加成标记清除（task 026 WP5 白蕾雅，
         D-WP5-2 turn scoped）+ 撤退锁解除（task 026 WP6 穷追不舍「下个对手的回合」，
-        D-WP6-6：被锁目标自己的回合结束解除）+ 回合级伤害修正标记与精确口径昏厥
-        标记清除（task 026 WP7，D-WP7-3/D-WP7-7）。"""
+        D-WP6-6：被锁目标自己的回合结束解除）+ 物品锁解除（task 029 痒痒花粉
+        「在下一个对手的回合」，D-029-3：被锁方自己回合结束解除）+ 回合级伤害修正
+        标记与精确口径昏厥标记清除（task 026 WP7，D-WP7-3/D-WP7-7）。"""
         self._discard_turn_end_tools(player)
         p = self.state.players[player]
         if any(m.retreat_lock for m in ([p.active] if p.active else []) + list(p.bench)):
@@ -815,6 +855,10 @@ class GameEngine:
             update["turn_damage_mods"] = ()
         if p.own_ko_by_attack_during_opponent_turn:
             update["own_ko_by_attack_during_opponent_turn"] = False
+        if p.item_lock_mark is not None:
+            # 物品锁（task 029 含羞苞 痒痒花粉，D-029-3）：被锁方自己回合结束解除
+            # （施加方回合结束只动施加方状态，不会误清对侧新锁）
+            update["item_lock_mark"] = None
         if update:
             self._set_player(player, p.model_copy(update=update))
 
@@ -1009,6 +1053,10 @@ class GameEngine:
             source = atk.current
         else:
             assert tool is not None  # legal_actions 已保证索引合法
+            # 道具消除（task 029 阻碍之塔，D-029-2）：授予招式执行落点双保险
+            # （正常路径已被枚举门拦截，此处拦截 apply 之外的直接驱动）
+            if self._tool_suppressed(atk):
+                raise IllegalActionError("suppress_tool：授予招式随道具效果消除")
             attack = tool.card.attacks[action.attack_index - len(own_attacks)]
             doc = effect_doc(self.card_effects, tool.card)
             source = tool
@@ -1089,10 +1137,12 @@ class GameEngine:
 
         引擎对卡牌内容零硬编码：修正值读道具 DSL 文档 passive_static 的
         modify_hp 声明（condition 如 holder_is_basic 在求值点判定）。
+        道具消除（task 029 阻碍之塔，D-029-2）：suppress_tool 在场时道具修正失效
+        （_tool_suppressed 统一守卫）。
         """
         hp = mon.current.card.hp or 0
         tool = mon.attached_tool
-        if tool is None:
+        if tool is None or self._tool_suppressed(mon):
             return hp
         doc = effect_doc(self.card_effects, tool.card)
         if doc is None:
@@ -1168,9 +1218,9 @@ class GameEngine:
                         )
                     mod += amount
 
-        # ① 持有者道具
+        # ① 持有者道具（道具消除——task 029 阻碍之塔 D-029-2：suppress_tool 失效）
         tool = mon.attached_tool
-        if tool is not None:
+        if tool is not None and not self._tool_suppressed(mon):
             doc = effect_doc(self.card_effects, tool.card)
             if doc is not None:
                 scan(doc, source_kind="道具")
@@ -1185,6 +1235,9 @@ class GameEngine:
         seen: set[str] = set()
         for m in ([p.active] if p.active else []) + list(p.bench):
             if m.current.card.name in seen:
+                continue
+            # 特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源 aura 失效
+            if self._ability_suppressed(m):
                 continue
             doc = effect_doc(self.card_effects, m.current.card)
             if doc is None:
@@ -1251,9 +1304,10 @@ class GameEngine:
                         )
                     apply(node)
 
-        # ① 持有者道具（holder 口径：道具文档不声明 scope）
+        # ① 持有者道具（holder 口径：道具文档不声明 scope；
+        # 道具消除——task 029 阻碍之塔 D-029-2：suppress_tool 失效）
         tool = mon.attached_tool
-        if tool is not None:
+        if tool is not None and not self._tool_suppressed(mon):
             doc = effect_doc(self.card_effects, tool.card)
             if doc is not None:
                 scan(doc, mon, expect_scope=None)
@@ -1261,6 +1315,9 @@ class GameEngine:
         if mon.current.card.stage == 0:
             p = self.state.players[player]
             for m in ([p.active] if p.active else []) + list(p.bench):
+                # 特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源声明失效
+                if self._ability_suppressed(m):
+                    continue
                 doc = effect_doc(self.card_effects, m.current.card)
                 if doc is None:
                     continue
@@ -1424,13 +1481,16 @@ class GameEngine:
                 for node in nodes:
                     apply_node(node, attack_required=attack_required)
 
+        # ① 自身卡分支（月月熊口径；特性消除——task 029 监视塔 D-029-1：
+        # 宝可梦卡来源声明失效）
         doc = effect_doc(self.card_effects, mon.current.card)
-        if doc is not None:
+        if doc is not None and not self._ability_suppressed(mon):
             scan(doc, attack_required=True)
         # 道具分支（task 026 WP7 赫普的讲究头带，D-WP7-4）：attached_tool 文档的
         # passive_static modify_attack_cost，condition 对持有者求值；道具离场即失效
+        # （道具消除——task 029 阻碍之塔 D-029-2：suppress_tool 失效）
         tool = mon.attached_tool
-        if tool is not None:
+        if tool is not None and not self._tool_suppressed(mon):
             tdoc = effect_doc(self.card_effects, tool.card)
             if tdoc is not None:
                 scan(tdoc, attack_required=False)
@@ -1446,6 +1506,9 @@ class GameEngine:
         atk_p = self.state.players[attacker]
         mons = ([atk_p.active] if atk_p.active else []) + list(atk_p.bench)
         for m in mons:
+            # 特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源声明失效
+            if self._ability_suppressed(m):
+                continue
             doc = effect_doc(self.card_effects, m.current.card)
             if doc is None:
                 continue
@@ -1562,14 +1625,20 @@ class GameEngine:
         伤害免疫，不归本守卫管——跳过（求值点 = _protected_bench_from_attack_damage）。
         声明来源并集（task 026 WP8 薄雾能量，D-WP8-4，🔲 待核）：持有者**附着能量
         卡**文档的同 scope 声明与宝可梦卡自身声明并集（任一声明通过即免疫）；
-        「已经受到的效果，不会消失」= 落点守卫设计天然满足（拦截新落点，不做
-        回顾性清除）；能量离场即失效（求值点实时读声明）。
+        特性消除（task 029 监视塔，D-029-1）时宝可梦卡来源声明失效、能量卡来源
+        不受影响；「已经受到的效果，不会消失」= 落点守卫设计天然满足（拦截新落点，
+        不做回顾性清除）；能量离场即失效（求值点实时读声明）。
         一期守卫落点清单：apply_status / place_damage_counters / lock_retreat /
         devolve——新增攻击效果落点须显式评估是否接入本守卫（不接 = 不受保护，不猜）。
         """
         from battlefrontier.dsl.chooser import condition_met
 
-        docs = [effect_doc(self.card_effects, mon.current.card)]
+        # 特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源声明失效；
+        # 附着能量卡来源（薄雾能量，D-WP8-4）不受影响
+        docs = (
+            [] if self._ability_suppressed(mon)
+            else [effect_doc(self.card_effects, mon.current.card)]
+        )
         docs += [effect_doc(self.card_effects, e.card) for e in mon.attached_energy]
         for doc in docs:
             if doc is None:
@@ -1609,6 +1678,8 @@ class GameEngine:
 
         p = self.state.players[owner]
         for m in ([p.active] if p.active else []) + list(p.bench):
+            if self._ability_suppressed(m):
+                continue  # 特性消除（task 029 监视塔，D-029-1）：aura 来源失效
             doc = effect_doc(self.card_effects, m.current.card)
             if doc is None:
                 continue
@@ -1630,6 +1701,103 @@ class GameEngine:
                         return True
         return False
 
+    # ── suppression 统一守卫（task 029，D-029-1/2）────────────────────
+
+    def _suppress_ability_types(self) -> tuple[str, ...] | None:
+        """场上竞技场 passive_static 的 suppress_ability 声明（args.types 属性列表）。
+
+        无竞技场 / 无文档 / 无声明 → None；声明带 condition → DslError（不猜，
+        需要时再扩展逐玩家求值）。求值点实时读声明——竞技场离场/被顶即无声明可读
+        （天然恢复，对齐 provide_energy/bench_size 声明式先例）。
+        """
+        stadium = self.state.stadium
+        if stadium is None:
+            return None
+        doc = effect_doc(self.card_effects, stadium.card)
+        if doc is None:
+            return None
+        declared: list[str] = []
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            nodes = [n for n in effect.actions if n.action == "suppress_ability"]
+            if not nodes:
+                continue
+            if effect.condition is not None:
+                raise DslError(
+                    "suppress_ability 暂不支持 effect.condition（不猜；需要时再扩展）"
+                )
+            for node in nodes:
+                types = node.args.get("types")
+                if not (
+                    isinstance(types, list)
+                    and types
+                    and all(isinstance(t, str) for t in types)
+                ):
+                    raise DslError(
+                        f"suppress_ability 的 args.types 须为非空属性列表"
+                        f"（收到 {types!r}；不猜）"
+                    )
+                declared.extend(types)
+        return tuple(declared) if declared else None
+
+    def _ability_suppressed_card(self, card: CardDef) -> bool:
+        """特性消除判定（task 029 火箭队的监视塔，D-029-1）：场上竞技场声明
+        suppress_ability 且该卡（栈顶）属性命中 args.types → 其宝可梦卡来源的
+        特性全部消除（卡面原文：「将双方场上所有【无】宝可梦的特性全部消除。」）。
+
+        一期守卫落点清单（新增特性读点须显式接入本守卫，对齐 D-WP6-7 先例）：
+        ① ability_manual 枚举门（_main_actions）；
+        ② 宝可梦卡来源被动 aura——_protected_from_attack_effects（宝可梦卡文档
+        来源）/ _protected_bench_from_attack_damage / _effective_damage_modifier
+        aura 分支 / _effective_retreat_cost own_basic_all 分支 /
+        _effective_weakness / _effective_attack_cost 自身卡分支；
+        ③ 宝可梦卡来源 trigger_on_event 分发（_fire_trigger_on_event，含
+        pokemon_check/own_evolve_from_hand/own_ko_by_attack）。
+        能量卡/训练家来源不受影响；已结算效果无追溯（求值点实时判定）。
+        """
+        if card.supertype != Supertype.POKEMON:
+            return False
+        types = self._suppress_ability_types()
+        return types is not None and card.energy_type in types
+
+    def _ability_suppressed(self, mon: InPlayPokemon) -> bool:
+        """场上宝可梦维度的特性消除判定（读栈顶卡，见 _ability_suppressed_card）。"""
+        return self._ability_suppressed_card(mon.current.card)
+
+    def _tool_suppressed(self, mon: InPlayPokemon) -> bool:
+        """道具消除判定（task 029 阻碍之塔，D-029-2）：场上竞技场 passive_static
+        声明 suppress_tool → 双方所有宝可梦身上道具的效果全部消除
+        （卡面原文：「双方所有宝可梦身上放有的『宝可梦道具』的效果，全部消除。」）。
+
+        一期守卫落点清单（新增道具读点须显式接入本守卫）：
+        _effective_hp / _effective_damage_modifier / _effective_retreat_cost /
+        _effective_attack_cost 的道具分支 + grant_attack 授予招式（枚举
+        _main_actions 与执行 _do_attack 双落点）。
+        能量卡（provide_energy）与训练家效果不受影响；动态求值天然无追溯——
+        HP 加成失效即按新有效 HP 判昏厥（_do_play_stadium 补 check_knockouts）；
+        竞技场离场/被顶即恢复（求值点实时读声明）。
+        """
+        if mon.attached_tool is None:
+            return False
+        stadium = self.state.stadium
+        if stadium is None:
+            return False
+        doc = effect_doc(self.card_effects, stadium.card)
+        if doc is None:
+            return False
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            nodes = [n for n in effect.actions if n.action == "suppress_tool"]
+            if not nodes:
+                continue
+            if effect.condition is not None:
+                raise DslError(
+                    "suppress_tool 暂不支持 effect.condition（不猜；需要时再扩展）"
+                )
+            return True
+        return False
 
     def check_knockouts(self) -> None:
         """任意伤害来源后的统一昏厥检查入口（rules-manual §8；§7.2 检查后结算同源）。

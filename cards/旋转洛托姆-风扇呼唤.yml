@@ -1,0 +1,36 @@
+# 旋转洛托姆（CSV9.5C-148，基础，特性：风扇呼唤）——H 标文本类
+# （同名多文本拆分：另 1 文本类未写，不在本文件挂载，见 task 029 范围纪律）
+# text_raw 原文：「特性: 风扇呼唤
+# 只有在最初的自己的回合可以使用1次。选择自己牌库中，最多3张HP在「100」及以下的【无】宝可梦，在给对手看过之后，加入手牌。并重洗牌库。在这个回合，如果已经使用了其他的「风扇呼唤」的话，则无法使用这个特性。
+#
+# 【无】 突击登陆 70
+# 如果场上没有竞技场的话，则这个招式失败。」
+# 风扇呼唤（task 029，D-029-6）：ability_manual + limit once_per_turn_shared（「其他的
+# 风扇呼唤」按卡名共享——一期池内仅此一种卡有此特性，按卡名 = 等价，已知近似）+
+# condition first_own_turn（「只有在最初的自己的回合」，WP1 既有）。检索 up-to 3 张
+# HP≤100【无】宝可梦（filters pokemon_无 + hp_max:100，D-029-7 参数化泛化）→ reveal
+# 落结构化事件流（一期口径同猫头夜鹰：不建模对手可见视图泄露）→ 重洗。
+# 「可以使用」的放弃选项不建模（D-WP2-3），检索统一 up-to 纪律（min_choose=0）。
+# 突击登陆（task 029，D-029-7）：effect 级 condition stadium_in_play——「如果场上
+# 没有竞技场的话，则这个招式失败」的成功前提正向形式（对齐古月鸟 opponent_prizes_in
+# 正向挂载先例）；不满足 → 整个招式失败：不结算伤害/效果、攻击机会消耗、回合照常结束
+# （on_attack condition 引擎钩子，task 026 WP1）。
+card:
+  name_group: 旋转洛托姆
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：池内 H 标 4 印刷
+  card_ids: [CSV9.5C-148, CSV9C-161, CSVM2aC-012, SVP-292]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn_shared
+    condition: first_own_turn
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [pokemon_无, hp_max:100], choose: 3, destination: hand}
+      - {action: reveal, selector: own_hand, filters: [pokemon_无, hp_max:100]}
+      - {action: shuffle_deck}
+  - trigger: on_attack
+    attack: 突击登陆
+    condition: stadium_in_play
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 70}}

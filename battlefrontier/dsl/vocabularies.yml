@@ -44,6 +44,9 @@ actions:
   - discard_stadium         # 弃置竞技场（task 026 WP7：公共场入其持有者弃牌区）
   - shuffle_hand_into_deck  # 手牌洗回牌库（task 026 WP7 裁判：own_hand/opponent_hand 各自回库重洗）
   - provide_energy          # 声明式：特殊能量提供值（task 026 WP8 喷射/夜光/薄雾：passive_static，引擎读声明，解释器不执行；args.types=[无] 单属性 / all 彩虹）
+  - suppress_ability        # 声明式：特性消除（task 029 火箭队的监视塔：竞技场 passive_static，args.types=[属性] 双方场上该属性宝可梦特性全消；引擎 _ability_suppressed 统一守卫读声明）
+  - suppress_tool           # 声明式：道具消除（task 029 阻碍之塔：竞技场 passive_static，双方所有宝可梦道具效果全消；引擎 _tool_suppressed 统一守卫读声明）
+  - lock_play               # 打出锁（task 029 含羞苞 痒痒花粉：on_attack，args.category=item——受击方下个自己回合无法从手牌使出物品；玩家侧回合标记 + turn 戳，对齐 lock_retreat 结构）
 
 # 选择器（作用对象）
 selectors:
@@ -88,6 +91,7 @@ counters:
   - discarded_this_effect          # 本效果内前序 discard 节点弃置张数（task 026 WP5 ×N 伤害族）
   - flip_heads_count               # 本效果内掷币正面次数（task 026 WP5 until_tails 索财灵）
   - attached_energy_on_both_actives  # 双方战斗宝可梦附着能量总数（task 027 厄诡椪 万叶阵雨）
+  - opponent_ability_pokemon_count   # 对手场上拥有特性的宝可梦数量（task 029 巨钳螳螂 惩罚巨钳；CardDef.has_ability ← db abilities 非空）
 
 # 去向（destination 字段）
 destinations:

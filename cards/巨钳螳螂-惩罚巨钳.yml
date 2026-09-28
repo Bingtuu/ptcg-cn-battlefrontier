@@ -1,0 +1,19 @@
+# 巨钳螳螂（CSV4C-081，1阶，钢属性）——「惩罚巨钳/居合劈」G 标文本类
+# （同名多文本严格拆分：全库 8 文本类仅挂池内类，其余未写，见 task 029 范围纪律）
+# text_raw 原文：「【钢】 惩罚巨钳 10+
+# 追加造成对手场上拥有特性的宝可梦数量×50伤害。
+#
+# 【钢】【钢】 居合劈 70」
+# 惩罚巨钳 10+（task 029，D-029-8）：opponent_ability_pokemon_count 计数词——对手
+# 场上（战斗+备战）拥有特性的宝可梦数量 ×50 + 10（CardDef.has_ability ← db abilities
+# 非空，WP7 数据管道；特性被消除不影响「拥有特性」计数）。
+# 居合劈 70 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 巨钳螳螂
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：池内 G 标 4 印刷
+  card_ids: [CSV4C-081, CSVL2C-045, CSVL2C-085, SVP-029]
+effects:
+  - trigger: on_attack
+    attack: 惩罚巨钳
+    actions:
+      - {action: damage, selector: opponent_active, count: opponent_ability_pokemon_count, args: {base: 10, op: "+", per: 50}}

@@ -1,0 +1,17 @@
+# 含羞苞（CSV9.5C-004，基础，草属性）
+# text_raw 原文：「【0】 痒痒花粉 10
+# 在下一个对手的回合，对手无法从手牌使出物品。」
+# 痒痒花粉（task 029，D-029-3 🔲 待核）：damage 10 + lock_play（args.category=item）——
+# 受击方玩家侧回合标记（turn 戳对齐 lock_retreat 结构），下个对手回合物品从手牌打出
+# 枚举门控；锁作用于玩家侧（卡面「对手无法」），宝可梦撤退/离场不解锁，其自己回合
+# 结束解除；支援者/竞技场/道具附着/能量附着不受影响。
+card:
+  name_group: 含羞苞
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全库 3 印刷单类，全 H 标
+  card_ids: [CSV9.5C-004, CSVM2bC-001, SVP-411]
+effects:
+  - trigger: on_attack
+    attack: 痒痒花粉
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 10}}
+      - {action: lock_play, args: {category: item}}

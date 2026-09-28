@@ -224,6 +224,33 @@ deck 来源仍不触发。小扩展一批：`provide_energy` args.count（多单
 不公印章按宽口径 own_ko_during_opponent_turn 条件门（与 D-WP7-7 古玉鱼
 精确口径区分）；顶尖捕捉器双侧备战门维持现状，进附录 A 候选条目待核。
 
+**suppression 体系与持续锁（task 029 补充）**：**suppression 声明式框架**——
+竞技场 passive_static 声明 `suppress_ability`（火箭队的监视塔：args.types=[无]，
+双方场上该属性宝可梦的宝可梦卡来源特性全消）/ `suppress_tool`（阻碍之塔：
+双方所有宝可梦道具效果全消），引擎统一守卫 `_ability_suppressed` /
+`_tool_suppressed` 单入口读声明（对齐 provide_energy/bench_size 先例；落点
+清单见守卫 docstring）——ability 消除面 = ability_manual 枚举门 + 宝可梦卡
+来源被动 aura（protection/modify_damage/modify_retreat_cost/modify_weakness/
+modify_attack_cost 自身卡分支）+ 宝可梦卡来源 trigger_on_event 分发；tool
+消除面 = _effective_hp / _effective_damage_modifier / _effective_retreat_cost /
+_effective_attack_cost 道具分支 + 授予招式枚举与执行双落点。能量卡/训练家
+来源不受影响；竞技场离场即恢复、动态求值无追溯（HP 加成失效即按新有效 HP
+判昏厥——_do_play_stadium 补 check_knockouts，换上后回出牌方主阶段）；
+道具自身回合末自弃（grant_attack discard_at_turn_end）不在消除面内
+（已知近似，附录 A 候选待核）。
+`lock_play` 原语（含羞苞 痒痒花粉：args.category=item，受击方玩家侧回合标记
+(turn, 施加方)，下个自己回合物品打出枚举门控，撤退/离场不解锁、回合结束
+解除）。damage selector 扩 `opponent_bench`（备战狙击 choose=1；备战空 no-op
+主战照算；弱抗不结算，谢米/太晶守卫同落点）。attach_energy own_deck 增
+`args.distribute` 形式声明（长毛巨魔 庞克泵感：逐张挂起选目标任意分配 +
+target_filters，与 multi_target/energy_up_to 互斥）+ ability_feasible 双侧池门；
+场上过滤器新增 `owner_pokemon:X`。小词：招式失败门条件 `stadium_in_play`
+（旋转洛托姆 突击登陆——WP1 钩子「condition 不满足即失败」的成功前提正向词，
+对齐古月鸟 opponent_prizes_in 正向挂载先例）；filter `pokemon_<属性>`
+参数化泛化（卡维度 + 场上维度，字面词 pokemon_超 并入）；计数词
+`opponent_ability_pokemon_count`（巨钳螳螂 惩罚巨钳，对手场上 has_ability
+宝可梦数）。
+
 ### 5.3 覆盖策略：原语先行，逐卡落地
 
 从真实卡组反向驱动：取当前 G/H/I 环境 WUR 前 N 套卡组 → 列出涉及全部卡 → 归并所需原语 → 原语实现一个、解锁一批卡。第一批原语只做到覆盖这批卡组为止（YAGNI），不为长尾冷僻效果提前设计。

@@ -100,6 +100,13 @@ def _match_one(card: CardInstance, filter_word: str) -> bool:
             (c.supertype == Supertype.POKEMON and c.rule_box is None)
             or _match_one(card, "basic_energy")
         )
+    if filter_word.startswith("pokemon_"):
+        # 参数化过滤器（task 029 泛化，D-029-7，对齐 WP1 energy_<属性> 先例）：
+        # 宝可梦属性（旋转洛托姆 风扇呼唤检索「【无】宝可梦」）
+        return (
+            c.supertype == Supertype.POKEMON
+            and c.energy_type == filter_word.split("_", 1)[1]
+        )
     if filter_word.startswith("name:"):
         # 参数化过滤器（task 026 WP1）：「夜巡灵」式按卡名指定（同名回收/检索）
         return c.name == filter_word.split(":", 1)[1]
@@ -170,8 +177,21 @@ def _match_in_play(
     if filter_word.startswith("trait:"):
         # 场上维度的机制特质（task 026 WP1，如奥琳博士的气魄的 attach 目标过滤）
         return filter_word.split(":", 1)[1] in top.labels
-    if filter_word == "pokemon_超":
-        return top.supertype == Supertype.POKEMON and top.energy_type == "超"
+    if filter_word.startswith("pokemon_"):
+        # 参数化过滤器（task 029 泛化，D-029-7，原字面词 pokemon_超 并入，
+        # 对齐 WP1 energy_<属性> 先例）：场上宝可梦属性（栈顶）
+        return (
+            top.supertype == Supertype.POKEMON
+            and top.energy_type == filter_word.split("_", 1)[1]
+        )
+    if filter_word.startswith("owner_pokemon:"):
+        # 参数化过滤器（task 029，D-029-5 长毛巨魔 庞克泵感 target_filters）：
+        # 场上维度的主人归属（「玛俐的宝可梦」；db 未覆盖的主人组恒不匹配——不猜）
+        return (
+            top.supertype == Supertype.POKEMON
+            and top.owner is not None
+            and top.owner == filter_word.split(":", 1)[1]
+        )
     if filter_word == "would_survive_20":
         # 「对会被昏厥的宝可梦无法使用」（精神拥抱）：放 2 个指示物（20 伤害）后不昏厥
         hp = hp_of(mon) if hp_of is not None else (top.hp or 0)
@@ -521,6 +541,13 @@ _CONDITIONS = {
             + list(engine.state.players[player].bench)
         )
     ),
+    # task 029（旋转洛托姆 突击登陆「如果场上没有竞技场的话，则这个招式失败」）：
+    # WP1 古月鸟钩子「on_attack 效果级 condition 不满足 → 招式失败」的成功前提
+    # 正向词（卡面失败子句「没有竞技场」的正向形式 = 场上有竞技场；对齐古月鸟
+    # opponent_prizes_in:[4,3] 正向挂载先例）
+    "stadium_in_play": (
+        lambda engine, player, mon: engine.state.stadium is not None
+    ),
 }
 
 
@@ -608,9 +635,12 @@ def condition_met(
 def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
     """特性发动前的可行性门（task 011）：关键池为空则不枚举；未知原语形式 DslError（不猜）。
 
-    支持：attach_energy（destination=attach，能量池与目标池双侧非空）；draw（恒可行，
-    抽完即止/空结算合法）；recover_from_discard / search_deck（task 026 WP3：匹配池
-    非空，bench 去向备战区须有余量）。HP 类过滤器走有效 HP（task 015）。
+    支持：attach_energy（destination=attach，能量池与目标池双侧非空；selector
+    own_discard / own_hand target_pool=self（task 027）/ own_deck（task 029
+    D-029-5 庞克泵感任意分配，目标池 = own_pokemon_in_play + target_filters））；
+    draw（恒可行，抽完即止/空结算合法）；recover_from_discard / search_deck
+    （task 026 WP3：匹配池非空，bench 去向备战区须有余量）。HP 类过滤器走有效
+    HP（task 015）。
     """
     p = engine.state.players[player]
     hp_of = lambda m: engine._effective_hp(m, player)
@@ -625,6 +655,21 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                         f"args.target_pool='self'（收到 {node.args.get('target_pool')!r}，不猜）"
                     )
                 if not resolve_pool(p, "own_hand", node.filters):
+                    return False
+                continue
+            if node.selector == "own_deck":
+                # task 029（D-029-5 长毛巨魔 庞克泵感）：牌库能量任意分配附着——
+                # 能量池（牌库匹配）与目标池（场上 target_filters）双侧非空才可行；
+                # multi_target/energy_up_to 与 own_deck 组合语义冲突（不猜）
+                if node.args.get("multi_target") or node.args.get("energy_up_to"):
+                    raise DslError(
+                        "特性可行性门未支持 attach_energy own_deck × "
+                        "multi_target/energy_up_to（不猜）"
+                    )
+                if not resolve_pool(p, "own_deck", node.filters):
+                    return False
+                deck_target_filters = tuple(node.args.get("target_filters", ()))
+                if not resolve_in_play_pool(p, deck_target_filters, hp_of=hp_of):
                     return False
                 continue
             if node.selector != "own_discard":

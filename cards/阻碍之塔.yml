@@ -1,0 +1,16 @@
+# 阻碍之塔（CSV8C-203，竞技场）
+# text_raw 原文：「双方所有宝可梦身上放有的「宝可梦道具」的效果，全部消除。」
+# suppress_tool 声明式（task 029，D-029-2 🔲 待核）：passive_static（无 args）——
+# 引擎 _tool_suppressed 统一守卫读声明；消除面 = 道具全部引擎读点（_effective_hp /
+# _effective_damage_modifier / _effective_retreat_cost / _effective_attack_cost
+# 道具分支 + grant_attack 授予招式枚举与执行双落点 + 道具 on_attack 绑定）。动态求值
+# 天然无追溯（HP 加成失效即按新有效 HP 判昏厥，走 check_knockouts）；竞技场离场即
+# 恢复；能量卡被动（provide_energy，喷射/夜光/薄雾）不受影响。
+card:
+  name_group: 阻碍之塔
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全库 6 印刷单类，全 H 标
+  card_ids: [CSV8C-203, CSV8C-262, CSV9.5C-202, CSVM2aC-030, CSVM2cC-030, SVP-287]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: suppress_tool}

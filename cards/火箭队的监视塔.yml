@@ -1,0 +1,15 @@
+# 火箭队的监视塔（CSV10C-219，竞技场）
+# text_raw 原文：「将双方场上所有【无】宝可梦的特性全部消除。」
+# suppress_ability 声明式（task 029，D-029-1 🔲 待核）：passive_static +
+# args.types=[无]——引擎 _ability_suppressed 统一守卫读声明（目标 = 双方场上该属性
+# 宝可梦，读栈顶 types）；消除面 = ability_manual 枚举门 + 宝可梦卡来源被动 aura
+# （protection 等）+ 宝可梦卡来源 trigger_on_event 分发。竞技场离场即恢复（求值点
+# 实时读声明），已结算效果无追溯；能量卡/训练家效果不受影响。
+card:
+  name_group: 火箭队的监视塔
+  # 全库 1 印刷单类（I 标）
+  card_ids: [CSV10C-219]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: suppress_ability, args: {types: [无]}}

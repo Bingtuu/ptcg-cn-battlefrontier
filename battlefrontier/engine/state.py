@@ -203,6 +203,12 @@ class PlayerState(FrozenModel):
     # 内我方宝可梦因对手招式伤害被昏厥（宽口径 own_ko_during_opponent_turn 不含
     # 伤害来源判别）；_knockout_one 在招式上下文置位，我方回合结束清除
     own_ko_by_attack_during_opponent_turn: bool = False
+    # 物品锁（task 029 含羞苞 痒痒花粉，D-029-3）：「在下一个对手的回合，对手无法
+    # 从手牌使出物品」——受击方玩家侧回合标记 =（施加时 turn, 施加方 current_player），
+    # 对齐 paralyzed_mark 结构；锁作用于玩家侧（卡面「对手无法」——宝可梦撤退/离场
+    # 不解锁），持有者回合结束（core._on_turn_end）清除；连续被锁刷新标记。
+    # 物品打出枚举门控（core._main_actions），支援者/竞技场/道具附着/能量附着不受影响
+    item_lock_mark: tuple[int, int] | None = None
 
     @model_validator(mode="after")
     def _zone_limits(self) -> PlayerState:

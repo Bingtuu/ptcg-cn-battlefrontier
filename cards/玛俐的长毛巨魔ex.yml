@@ -1,0 +1,33 @@
+# 玛俐的长毛巨魔ex（CSV10C-148，2阶，规则盒 ex，特性：庞克泵感）
+# text_raw 原文：「特性: 庞克泵感
+# 在自己的回合，当将这张卡牌从手牌使出并进行进化时，可以使用1次。选择自己牌库中最多5张「基本【恶】能量」，以任意方式附着于自己的「玛俐的宝可梦」身上。并重洗牌库。
+#
+# 【恶】【恶】 暗影子弹 180
+# 给对手的1只备战宝可梦也造成30伤害。[备战宝可梦不计算弱点、抗性。]」
+# 庞克泵感（task 029，D-029-5 🔲 待核）：trigger_on_event own_evolve_from_hand
+# （喷火龙ex 烈炎支配先例；学习器 from_deck 进化不触发，D-WP3-2 口径）；
+# attach_energy own_deck up-to 5 基本恶能量 + args.distribute=true 显式声明
+# 「以任意方式」= 段1 选能量（min_choose=0）→ 段2 逐张挂起选目标自由分配（可集中
+# 可分散），target_filters [owner_pokemon:玛俐] 收敛目标池（仅玛俐的宝可梦可选）；
+# 选 0 → no-op 仍重洗（D-WP5-1 口径；重洗原语内建，不写 shuffle_deck 节点——重复
+# 洗牌 = 种子消耗差异）。「可以使用」的放弃选项不建模（D-WP2-3）。
+# 暗影子弹 180 + 备战狙击 30（task 029，D-029-4）：damage opponent_bench choose=1——
+# 备战空 → 该节点 no-op、主战 180 照算；「备战宝可梦不计算弱点、抗性」= rule_reference
+# 句（task 009 约定排除），引擎贯穿规则（_damage 备战落点不结算弱抗）天然满足，
+# 猛雷鼓先例。
+card:
+  name_group: 玛俐的长毛巨魔ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全库 2 印刷单类，全 I 标
+  card_ids: [CSV10C-148, SVP-397]
+effects:
+  - trigger: trigger_on_event
+    event: own_evolve_from_hand
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: attach_energy, selector: own_deck, filters: [basic_energy, energy_恶], choose: 5, destination: attach, args: {distribute: true, target_filters: ["owner_pokemon:玛俐"]}}
+  - trigger: on_attack
+    attack: 暗影子弹
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 180}}
+      - {action: damage, selector: opponent_bench, choose: 1, args: {amount: 30}}

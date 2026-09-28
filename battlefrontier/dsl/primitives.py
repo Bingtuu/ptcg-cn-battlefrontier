@@ -608,7 +608,19 @@ def _attach_energy_from_deck(
     每张从牌库按 iid 摘下附着（任意分配、可全给 1 只）；能量在选目标前不离
     牌库。multi_target/energy_up_to/damage_counters 与 own_deck 组合语义冲突
     → DslError（不猜）。
+    args.distribute=true（task 029，D-029-5 长毛巨魔 庞克泵感「以任意方式附着
+    于自己的『玛俐的宝可梦』身上」）：上述逐张挂起任意分配形式的显式声明标记
+    （执行语义与烈炎支配存量一致；target_filters 如 owner_pokemon:玛俐 收敛
+    目标池）；与 multi_target/energy_up_to 三形式互斥 → DslError；特性发动
+    可行性门见 chooser.ability_feasible（能量池与目标池双侧非空）。
     """
+    distribute = node.args.get("distribute", False)
+    if not isinstance(distribute, bool):
+        raise DslError(f"attach_energy 的 distribute 须为 bool（收到 {distribute!r}）")
+    if distribute and (node.args.get("multi_target") or node.args.get("energy_up_to")):
+        raise DslError(
+            "attach_energy 的 distribute 与 multi_target/energy_up_to 互斥（不猜）"
+        )
     if node.args.get("multi_target") or node.args.get("energy_up_to"):
         raise DslError(
             "attach_energy selector=own_deck 不支持 multi_target/energy_up_to"
@@ -951,6 +963,14 @@ def _eval_counter(ctx: ExecutionContext, word: str, target: InPlayPokemon | None
     if word == "opponent_taken_prizes":
         # task 026 WP5（月月熊 老练招式）：对手已拿奖赏 = 6 − 对手剩余奖赏
         return 6 - len(opp.prizes)
+    if word == "opponent_ability_pokemon_count":
+        # task 029（巨钳螳螂 惩罚巨钳「对手场上拥有特性的宝可梦数量」）：
+        # 对手场上（战斗+备战）has_ability 宝可梦数（CardDef.has_ability
+        # ← db abilities 非空，WP7 数据管道；特性被消除不影响「拥有特性」计数）
+        return sum(
+            1 for m in ([opp.active] if opp.active else []) + list(opp.bench)
+            if m.current.card.has_ability
+        )
     if word == "discarded_this_effect":
         # task 026 WP5（D-WP5-1 ×N 伤害族）：本效果内前序 discard 节点弃置张数
         return ctx.discarded_this_effect
@@ -1022,28 +1042,46 @@ def _damage_self(ctx: ExecutionContext, node: ActionNode) -> dict[str, object]:
 
 @register("damage")
 def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object] | NeedChoice:
-    """造成伤害：selector=opponent_active（自动目标）/ opponent_pokemon_any（choose=1 挂起选目标）。
+    """造成伤害：selector=opponent_active（自动目标）/ opponent_pokemon_any /
+    opponent_bench（choose=1 挂起选目标）/ self（自伤，见 _damage_self）。
 
     弱点 ×2 / 抗性 -30 由引擎规则骨架结算、仅对战斗场目标生效（rules-manual §6；
     备战区不计算是贯穿规则）。on_attack 触发的招式伤害落点为对手战斗场时，
     先加攻方持有者的声明式伤害修正（task 025 modify_damage，§6 顺序 2，
     在弱点抗性前）。伤害后统一 check_knockouts（rules-manual §8）。
+    opponent_bench（task 029 苍响/长毛巨魔 备战狙击，D-029-4）：choose=1 选对手
+    备战区 1 只；对手备战空 → 本节点 no-op（reason=no_targets）、同效果主战
+    伤害照算（WP4 宣言裁决延伸：效果落点空不阻却宣言）；谢米 protection
+    （D-WP7-5）与太晶备战免伤（D-027-1）守卫同落点生效。
     """
     from battlefrontier.engine.core import _weakness_resistance
 
-    if node.selector not in ("opponent_active", "opponent_pokemon_any", "self"):
-        raise DslError(f"damage 暂仅支持 opponent_active / opponent_pokemon_any / self（收到 {node.selector!r}）")
+    if node.selector not in (
+        "opponent_active", "opponent_pokemon_any", "opponent_bench", "self",
+    ):
+        raise DslError(
+            f"damage 暂仅支持 opponent_active / opponent_pokemon_any / "
+            f"opponent_bench / self（收到 {node.selector!r}）"
+        )
     engine = ctx.engine
     if node.selector == "self":
         return _damage_self(ctx, node)
     defender_idx = 1 - ctx.player
     d = engine.state.players[defender_idx]
 
-    if node.selector == "opponent_pokemon_any":
+    if node.selector in ("opponent_pokemon_any", "opponent_bench"):
         if node.choose != 1:
             raise DslError("damage 选目标暂仅支持 choose=1")
         if choice is None:
-            return NeedChoice(pool="opponent_pokemon_any", min_choose=1, max_choose=1)
+            if node.selector == "opponent_bench" and not d.bench:
+                # 备战狙击（task 029，D-029-4）：对手备战空 → 本节点 no-op
+                # 不挂起，同效果主战伤害照算
+                return {
+                    "amount": 0, "damage_mod": 0, "final": 0,
+                    "target_iid": None, "target": None, "to_bench": True,
+                    "protected": False, "reason": "no_targets",
+                }
+            return NeedChoice(pool=node.selector, min_choose=1, max_choose=1)
         slot, idx, target = engine._find_in_play(d, choice[0])
     else:
         _require_no_choose(node, "damage")
@@ -2215,6 +2253,41 @@ def _lock_retreat(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
         "active": o.active.model_copy(update={"retreat_lock": True}),
     }))
     return {"locked": True, "target": o.active.current.card.name}
+
+
+@register("lock_play")
+def _lock_play(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """打出锁（task 029 含羞苞 痒痒花粉，D-029-3）：「在下一个对手的回合，对手
+    无法从手牌使出物品」——受击方玩家侧回合标记（PlayerState.item_lock_mark =
+    （施加时 turn, 施加方），turn 戳结构对齐 paralyzed_mark；rules-manual 训练家
+    卡节：物品从手牌使用）。
+
+    锁作用于玩家侧（卡面「对手无法」）：宝可梦撤退/离场不解锁；受击方自己回合
+    结束解除（core._on_turn_end）；连续两回合被锁刷新标记。落点 = 物品打出枚举
+    门控（core._main_actions）；支援者/竞技场/道具附着/能量附着不受影响。
+    落点是玩家而非宝可梦——不接闪焰之幕类 protection 守卫（D-WP6-7 守卫清单
+    均作用于宝可梦目标）。
+    args.category 暂仅支持 item（未知 category = DslError 不猜）。
+    """
+    _require_no_choose(node, "lock_play")
+    if node.selector is not None:
+        raise DslError(
+            f"lock_play 不支持 selector（收到 {node.selector!r}；锁作用于对手玩家侧）"
+        )
+    category = node.args.get("category")
+    if category != "item":
+        raise DslError(
+            f"lock_play 的 category 暂仅支持 item（收到 {category!r}；不猜）"
+        )
+    engine = ctx.engine
+    opp_idx = 1 - ctx.player
+    o = engine.state.players[opp_idx]
+    engine._set_player(opp_idx, o.model_copy(update={
+        "item_lock_mark": (engine.state.turn, engine.state.current_player),
+    }))
+    return {
+        "locked": "item", "target_player": opp_idx, "turn": engine.state.turn,
+    }
 
 
 @register("devolve")

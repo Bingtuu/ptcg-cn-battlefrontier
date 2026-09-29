@@ -5,7 +5,18 @@
 ## 当前
 
 **M5 已达成（用户确认 2026-09-20）**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）、task 026 ✅（WP0–WP8）、task 027 ✅（ACE SPEC + TERA）、**task 029 ✅（suppression 体系 + C 级收尾 8 卡，2026-09-20）**。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：**done 81 / blocked 0 / pending 0（覆盖清零）**。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张 first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，WP2 已根治落地）；批 2–4 累计 25 张全部核销通过；批 5（WP6）9 文件 first_pass 9/9、批 6（WP7）15/15、批 7（WP8）3/3、批 8（task 027）7/7、批 9（task 029）8 文件 first_pass 0/8（闸 2 首跑前测试脚手架 2 处修正，8 卡 YAML 全零返工——严格口径）。**gate3 攒批 42 文件全部核销通过（2026-09-20，human_edit_lines 累计 0）、附录 A 攒批 41 条决议全部核销（✅ 已核）**。
-M1–M5 已达成（M5 用户确认 2026-09-20）。**task 029 ✅（2026-09-20）**：suppression 声明式框架（suppress_ability/suppress_tool + 引擎统一守卫）、lock_play 物品锁、damage opponent_bench 备战狙击、attach own_deck distribute 任意分配、stadium_in_play/pokemon_<属性>/opponent_ability_pokemon_count 小词；D-029-6 正向词裁决（删 no_stadium_in_play）；定义库 101 文件；全量 905 绿 + 冒烟 80 局 0 失败；**缺口 done 81 / blocked 0 / pending 0**；下一步 = M6 校准基线（依赖 db 赛事数据积累）。
+M1–M5 已达成（M5 用户确认 2026-09-20）。**task 029 ✅（2026-09-20）**：suppression 声明式框架（suppress_ability/suppress_tool + 引擎统一守卫）、lock_play 物品锁、damage opponent_bench 备战狙击、attach own_deck distribute 任意分配、stadium_in_play/pokemon_<属性>/opponent_ability_pokemon_count 小词；D-029-6 正向词裁决（删 no_stadium_in_play）；定义库 101 文件；全量 905 绿 + 冒烟 80 局 0 失败；**缺口 done 81 / blocked 0 / pending 0**；下一步 = M6 校准基线（数据前置不满足，2026-09-20 裁决推迟，任务清单见下）。
+
+### M6 数据前置任务清单（db 项目 Pokearena 侧，2026-09-20 勘察定稿）
+
+**阻塞点 = 用户申请 TopDeck.gg 免费 API key**（db 项目 `tasks/053-TopDeck接入.md` 已立项待 key）。拿到 key 后在 db 项目会话启动 task 053（预估 2~2.5 天）→ 数据达标后回本仓库启动 M6。
+
+1. **任务 1（用户动作）**：申请 TopDeck.gg API key → 填入 db 项目配置。理由：TopDeck API v2 单端点返回 standings + rounds 逐桌对阵含局分（比 Limitless pairings 更全），且可回溯抓取对齐窗口历史赛事——matchup 样本量扩到可用规模的唯一现实路径
+2. **任务 2（db 项目，依赖任务 1）**：启动 task 053 TopDeck 接入——抓取 + 归一化落库 pairings/deck_appearances，走 `v_pairing_players` 视图自动汇入 `stats_matchup` 链路（SDK/CLI 已就绪，M6 报告可直接消费，本仓库零改动）
+3. **任务 3（启动门槛）**：`ptcgdb stats matchup --min-n 30`——池内 9 套 archetype 头部配对格 n≥30、矩阵总行数相比现状（272 有向行 / 208 局）显著提升，达标即启动 M6 偏差表
+4. **已实证不要做的**：❌ mik_moe 对阵抓取（端点不存在，task 052 两轮实证：swiss 只是积分榜快照）/ ❌ limitless API 扩量（全窗口已扫完，5 场即上限，官方线下大赛在 RK9）/ ❌ 官方小程序（JWT+加密+签名四层防护，D1 已拍板不可行）
+5. **可选（推迟到 M6 出报告时评估）**：RK9.gg 对账源——官方顶级赛事逐轮 pairings 公开 HTML 但无卡组表，只能对账不能独立成源
+6. **口径影响（启动 M6 时须落附录 A 决议）**：CN 侧对阵数据不存在是硬约束——M6「真实赛事 matchup 矩阵」只能是 **EN 环境对齐段**（db 已有 CN GHI ⊆ EN 窗口对齐机制），偏差表校准的是「简中卡池模拟 vs EN 同窗口真实 meta」，环境差本身贡献一部分偏差
 ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 
 ## 里程碑

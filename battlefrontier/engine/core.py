@@ -165,6 +165,25 @@ class GameEngine:
         # 路径）；iid 供 own_ko_by_attack 触发解析攻击方（task 026 WP6，D-WP6-6）
         self._attack_damage_active: tuple[int, bool, int | None] | None = None
 
+    # ── 克隆（task 034 WP1，D-034-2）────────────────────────────────────
+
+    def clone(self, rng: RandomSource | None = None) -> GameEngine:
+        """对局快照克隆：MCTS determinization 前置（PRD §7.3 预留）。
+
+        state model_copy(deep=True) 深拷贝（pending_choice 在 GameState 内，
+        挂起上下文随拷贝，克隆可经 choose 正常续跑）；card_effects 共享引用
+        （DSL 文档不可变，CardLibrary/朴素 dict 均不复制）；events 全新空
+        列表（模拟事件不回流真实对局事件流）；rng 未传则建独立新实例
+        （固定种子 0——搜索侧经 determinizer 自带随机源注入，D-034-7；
+        克隆随机流与原引擎完全隔离，互不消费）。
+        瞬时值（_in_effect / _attack_damage_active）是效果执行中上下文，
+        决策点克隆恒处默认值，随构造重置。
+        """
+        new = GameEngine(rng if rng is not None else RandomSource(0))
+        new.state = self.state.model_copy(deep=True)
+        new.card_effects = self.card_effects
+        return new
+
     # ── 事件 ─────────────────────────────────────────────
 
     def _emit(self, kind: str, player: int | None = None, **detail: object) -> None:

@@ -159,6 +159,12 @@ class HeuristicAgent:
                     total += 0.5
             return total
 
+        # cost 段（代价支付，task 032 WP1，D-032-1）取最低评分——不弃高分宝可梦；
+        # actions 段（收益选择）与无挂起帧防御路径维持最高评分。tie-break 均为
+        # choices 升序（确定性）
+        pc = view.pending_choice
+        if pc is not None and pc.step_phase == "cost":
+            return min(acts, key=lambda a: (score(a), a.choices))
         return min(acts, key=lambda a: (-score(a), a.choices))
 
     # ── 主阶段行动排序 ──────────────────────────────────

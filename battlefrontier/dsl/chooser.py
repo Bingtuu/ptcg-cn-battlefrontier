@@ -65,6 +65,9 @@ class NeedChoice:
         self.discarded_count: int = 0
         # 解释器挂起时标注（ctx.attacker_iid 快照，task 026 WP6 own_ko_by_attack 穿透）
         self.attacker_iid: int | None = None
+        # 解释器挂起时标注（扁平步骤段快照，task 032 WP1，D-032-1）：
+        # "cost" | "actions"，经 build_pending 透传进 PendingChoice.step_phase
+        self.step_phase: str = "actions"
         # 嵌套传播（task 020 copy_attack）：内层效果挂起时标注效果定位与内层游标
         # （外层 run_effect 会覆盖 self.cursor 为外层节点游标，内层游标需另行转存）
         # inner = (card_id, 卡名, 招式名)：card_id 供 CardLibrary 精确解析（task 026）
@@ -346,6 +349,7 @@ def build_pending(
             cost_discarded=need.cost_discarded,
             discarded_count=need.discarded_count,
             attacker_iid=need.attacker_iid,
+            step_phase=need.step_phase,
             choose_groups=need.choose_groups,
         )
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
@@ -390,6 +394,7 @@ def build_pending(
         cost_discarded=need.cost_discarded,
         discarded_count=need.discarded_count,
         attacker_iid=need.attacker_iid,
+        step_phase=need.step_phase,
         ordered=need.ordered,
         distinct=need.distinct or "",
         pool_buckets=buckets,

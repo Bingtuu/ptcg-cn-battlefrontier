@@ -168,6 +168,10 @@ class PendingChoice(FrozenModel):
     # cost_discarded/discarded_count 穿透口径：恢复时重建 ctx.attacker_iid，
     # 供 place_damage_counters 的 opponent_attacker 选择器在恢复后继续读取）
     attacker_iid: int | None = None
+    # 挂起节点所属扁平步骤段（task 032 WP1，D-032-1）："cost" | "actions"，
+    # 解释器挂起时标注，经 chooser.build_pending 透传；Agent 据此区分代价支付
+    # （cost 取最低评分）与收益选择（actions 取最高评分）
+    step_phase: str = "actions"
 
 
 class PlayerState(FrozenModel):
@@ -265,6 +269,9 @@ class VisibleGameState(FrozenModel):
 
     pending_pool：chooser 挂起时向选择方揭示的检索池内容（仅当池在非公开区域，
     如牌库检索——rules-manual §3：检索时选择方可查看牌库选卡；对手视图恒 None）。
+    pending_choice：chooser 挂起时向选择方揭示的挂起帧（task 032 WP1，D-032-1；
+    对手视图恒 None，同 pending_pool 门控口径）——Agent 读 step_phase 区分
+    代价支付与收益选择方向。
     """
 
     own: VisibleSelfState
@@ -274,6 +281,7 @@ class VisibleGameState(FrozenModel):
     current_player: int
     phase: str
     pending_pool: tuple[CardInstance, ...] | None = None
+    pending_choice: PendingChoice | None = None
 
 
 class GameState(FrozenModel):
@@ -364,4 +372,6 @@ class GameState(FrozenModel):
             current_player=self.current_player,
             phase=self.phase,
             pending_pool=pending_pool,
+            # 挂起帧仅揭示给选择方（task 032 WP1：同 pending_pool 门控口径）
+            pending_choice=pc if pc is not None and pc.player == player else None,
         )

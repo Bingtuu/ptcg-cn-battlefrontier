@@ -210,6 +210,9 @@ def run_effect(
             result.discarded_count = ctx.discarded_this_effect
             # 攻击方栈顶 iid 随挂起冻结（task 026 WP6 own_ko_by_attack 穿透，同三件套口径）
             result.attacker_iid = ctx.attacker_iid
+            # 扁平步骤段（cost/actions）随挂起标注（task 032 WP1，D-032-1：
+            # Agent 据此区分代价支付/收益选择方向，同四件套穿透口径）
+            result.step_phase = phase
             return result
         # cost 段弃置记录（task 026 WP4，D-WP4-3）：供 recover_from_discard 的
         # exclude_cost_discarded 池剔除（「无法选择因为这张卡牌的效果而被弃置的能量」）

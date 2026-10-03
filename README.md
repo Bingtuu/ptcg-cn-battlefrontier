@@ -101,7 +101,30 @@ bfsim sensitivity 1 2                          # baseline vs 变体并排对比
 
 报告给出每个变体的胜率变化（ΔWR）、95% 置信区间与显著性检验（两比例 z 检验）。
 
-### 6. 校验卡牌定义
+### 6. matchup 矩阵与校准（M6）
+
+实验定义改用 `matrix` 段，即可对卡组池自动展开全部无向配对（镜像不打）：
+
+```yaml
+# my-matrix.yml
+name: my-matrix
+seed_start: 100000
+matrix:
+  pool: config/target-pool.v1.yml   # 卡组池（9 套 → 36 个配对）
+  games_per_pair: 500               # 每配对局数
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+```
+
+```bash
+bfsim run my-matrix.yml --workers 8         # 自动逐配对跑批，统一分组落库
+bfsim calibration my-matrix.yml             # 模拟 vs 真实赛事 matchup 偏差表
+```
+
+偏差表逐格给出模拟胜率（含置信区间）与真实赛事胜率的差值 Δ，按 |Δ| 降序，并附加权平均 |Δ| 等汇总——用于校准模拟与真实环境的偏差。
+
+### 7. 校验卡牌定义
 
 每张有效果的卡牌由 `cards/` 下一个 YAML 文件定义（引擎不认识任何具体卡牌，全部行为由数据驱动）。新增或修改卡牌定义后校验：
 
@@ -119,7 +142,7 @@ bfsim dsl-check cards/*.yml --db <卡牌数据库>   # 追加校验：卡牌存�
 
 ## 项目状态
 
-🚧 开发中。已可用：完整规则引擎、卡牌效果定义库（68 份定义，覆盖当前竞技环境 9 套主流卡组）、启发式与随机 AI、批量实验运行器、胜率/决策/敏感性报告。进行中：继续扩充卡牌覆盖。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
+一期里程碑 M1–M6 全部完成（2026-10-03）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式与随机 AI、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性报告与模拟 vs 真实赛事校准偏差表。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
 
 ## ⚖️ 合规声明
 

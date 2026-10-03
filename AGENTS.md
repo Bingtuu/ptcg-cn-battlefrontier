@@ -9,7 +9,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 ## 当前状态
 
-M1–M5 已达成（引擎骨架 / DSL+解释器 / 启发式 Agent+Runner+结果库 / 报告层 / 覆盖扩展+LLM 辅助编写试验）：卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 905 测试绿。**下一步 M6 校准基线 + 一期验收**（依赖 db 赛事数据积累）。逐日进展与下一步见 `STATUS.md`（事实源，本文件不抄写细节）。
+一期 M1–M6 全部完成（M6 校准基线 2026-10-03 产出：9 套池 36 无向配对 × 500 局模拟 matchup 矩阵 + 72 格模拟 vs 真实赛事偏差表，加权平均 |Δ| 13.2%；硬验收全过：确定性串/并行逐局一致 + 主库只读；里程碑达成待用户最终确认）：卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 928 测试绿。二期方向（赛富豪偏差归因与 Agent 迭代 / LLM harness 批量铺开）见 `STATUS.md`（事实源，本文件不抄写细节）。
 
 ## 架构分层与边界
 
@@ -61,6 +61,12 @@ bfsim report 1 --results results/exp.db [--decisions]
 
 # 换卡敏感性（实验定义含 variants 时 run 自动跑整组）
 bfsim sensitivity <base_id> <variant_id>... --results results/exp.db
+
+# matchup 矩阵（实验定义含 matrix 段时 run 自动展开卡池全部无向配对，group_name 归组）
+bfsim run experiments/m6-calibration.example.yml --workers 8 --results results/exp.db
+
+# 校准偏差表（模拟矩阵 vs 真实赛事 matchup；参数 = matrix 实验定义路径）
+bfsim calibration experiments/m6-calibration.example.yml --results results/exp.db
 
 # DSL 校验（闸 1）：schema + 词表；--db 追加 card_id 存在性 / 文本等价类一致 / 赛制合法
 bfsim dsl-check cards/*.yml --db "C:/Vibe Project/Pokearena/data/ptcg-cn.db"

@@ -4,7 +4,7 @@
 
 ## 当前
 
-**task 030 ✅（2026-10-03）：M6 校准基线产出，一期验收全过——M6 里程碑达成待用户确认**。前置达成（db 侧 task 057 Limitless online_open 收编：matchup n_games_used≈99,800、头部格 n=1,559；TopDeck 路径 task 053 供给侧实证关闭）。本仓库：matrix 实验模式（9 套池 36 无向配对 × 500 局 = 18,000 局，16 workers 6m15s，失败 12 局同一已知形态）+ `bfsim calibration` 偏差表（72 有向格：**加权平均 |Δ| 13.2% / CI 覆盖率 19.4%**，赛富豪模拟侧全面偏弱为最大结构信号）+ 一期验收（928 绿 + ruff 零告警 + 串/并行 500/500 events_hash 逐局一致 + 主库只读）+ LLM 管线评估（池内 42 文件 first_pass 34/42、human_edit_lines 累计 0 → **二期建议批量铺开生成式 harness**；Jev 决策模型调研结论不引入）。D-030-1~5 附录 A 🔲 待核。设计 `docs/superpowers/specs/2026-10-03-m6-calibration-design.md`，任务档 `tasks/done/task 030.md`。
+**task 030 ✅（2026-10-03）：M6 校准基线产出，一期验收全过——M6 里程碑达成（用户确认 2026-10-03，一期 M1–M6 全部收官）。前置达成（db 侧 task 057 Limitless online_open 收编：matchup n_games_used≈99,800、头部格 n=1,559；TopDeck 路径 task 053 供给侧实证关闭）。本仓库：matrix 实验模式（9 套池 36 无向配对 × 500 局 = 18,000 局，16 workers 6m15s，失败 12 局同一已知形态）+ `bfsim calibration` 偏差表（72 有向格：**加权平均 |Δ| 13.2% / CI 覆盖率 19.4%**，赛富豪模拟侧全面偏弱为最大结构信号）+ 一期验收（928 绿 + ruff 零告警 + 串/并行 500/500 events_hash 逐局一致 + 主库只读）+ LLM 管线评估（池内 42 文件 first_pass 34/42、human_edit_lines 累计 0 → **二期建议批量铺开生成式 harness**；Jev 决策模型调研结论不引入）。D-030-1~5 附录 A ✅ 已核（2026-10-03）。设计 `docs/superpowers/specs/2026-10-03-m6-calibration-design.md`，任务档 `tasks/done/task 030.md`。
 
 ## 里程碑
 
@@ -13,7 +13,7 @@
 - ✅ M3 启发式 Agent + Runner + 结果库（百局端到端）——task 018–020 全 ✅（2026-08-29）
 - ✅ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）——task 021–023 全 ✅（2026-08-30）
 - ✅ M5 覆盖扩展 + LLM 辅助编写试验——task 024–027、029 全 ✅（2026-09-20，用户确认达成：覆盖清零 81/81 + gate3 42 文件全核 + 附录 A 41 条全核）
-- ✅ M6 校准基线 + 一期验收——task 030 ✅（2026-10-03，达成待用户确认：偏差表 72 格产出 + 硬验收全过）
+- ✅ M6 校准基线 + 一期验收——task 030 ✅（2026-10-03，用户确认达成：偏差表 72 格产出 + 硬验收全过）
 
 ## 工作记录
 
@@ -28,7 +28,7 @@
 - **一期验收**：全量 928 绿 + ruff 零告警；确定性如上；主库只读（calibration 经 SDK）；覆盖 81/81 + 定义库 101 文件维持
 - **LLM 管线评估**（authoring-log 157 条）：池内批 5–9 共 42 文件 first_pass 34/42（批 5–8 全 34/34；批 9 严格口径 0/8=测试脚手架修正非 YAML 返工）；gate3 未封存 80/80 全核销、human_edit_lines 累计 0 → **二期建议：批量铺开生成式 harness**；**Jev（TypeSafe AI System One 决策模型）调研结论不引入**——DSL 编写是纯生成任务范式排除；Agent 决策层范式吻合但撞种子确定性/无外部服务依赖/规模不经济三条硬约束；记观察项（前提=可钉版本+本地运行的 Jev-like 成熟）
 - **落账**：D-030-1~5 附录 A 🔲 待核；设计 `docs/superpowers/specs/2026-10-03-m6-calibration-design.md`；`experiments/m6-calibration.example.yml` 入库；定义库不变（101 文件）
-- **遗留**：D-030-1~5 待用户核销；M6 达成待用户确认；赛富豪偏差归因 + Agent 迭代 + damage 空战斗场 no-op 评估归二期
+- **遗留**：~~D-030-1~5 待用户核销；M6 达成待用户确认~~ **均已确认（2026-10-03）**；赛富豪偏差归因 + Agent 迭代 + damage 空战斗场 no-op 评估归二期
 - **meta 披露**：跑批期间 rules-reference.md 文档编辑致部分子实验 code_version 记 `298ca17+dirty`（文档 dirt、代码不变，偏差表 meta 如实回显两版本串）
 
 ### 2026-09-20 M5 收口：gate3 攒批 42 文件 + 附录 A 攒批 41 条全部核销 ✅

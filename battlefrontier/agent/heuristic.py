@@ -288,15 +288,16 @@ class HeuristicAgent:
         """能量目标：仍有付不起的招式才补能（全就绪则不浪费每回合 1 次的附着）。
 
         战斗场未就绪优先补给；否则补给备战区未就绪最高分者；全都就绪返回 None 跳过。
-        A3 囤能例外（task 032 WP2，D-032-5）：主动宝可梦为手牌弹药型（on_attack
-        含 discard own_hand + 后续 damage count=discarded_this_effect）时不附着
-        ——能量留手牌作弹药；无 DSL 文档时现状不变。
+        A3 囤能例外（task 032 WP2，D-032-5 修订）：主动宝可梦为手牌弹药型（on_attack
+        含 discard own_hand + 后续 damage count=discarded_this_effect）且已能开打
+        （任一招式费用已满足）时不附着——能量留手牌作弹药；尚不能开打时照常补费
+        （M8b 复校准实证：无条件跳过会让未充能的主战手永久卡死）；无 DSL 文档时
+        现状不变。
         """
         active = view.own.active
-        if active is not None and has_hand_ammo_pattern(
+        hand_ammo = active is not None and has_hand_ammo_pattern(
             active.current.card, self.card_effects
-        ):
-            return None
+        )
 
         def needs_energy(poke: InPlayPokemon) -> bool:
             return any(
@@ -306,6 +307,8 @@ class HeuristicAgent:
 
         if active is not None and needs_energy(active):
             target_iid = active.current.iid
+        elif hand_ammo:
+            return None
         else:
             candidates = [b for b in view.own.bench if needs_energy(b)]
             if not candidates:

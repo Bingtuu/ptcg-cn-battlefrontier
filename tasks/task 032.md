@@ -17,7 +17,7 @@
 - **D-032-2（card_effects 入 Agent）**：`HeuristicAgent(params, card_effects=None)`；`experiment._build_one` / `build_agents` 加可选 card_effects 参数（worker payload 已带 DSL docs，可原地重建）；play.py 默认 None 兼容存量调用。DSL 文档 = 公开卡面信息，不违反可见视图纪律。None 时全部行为回退现状（静态伤害表）。
 - **D-032-3（变量伤害估算口径）**：对战斗场宝可梦栈顶卡的 DSL 文档，找 trigger=on_attack 且绑定该招式名的效果，取 selector=opponent_active 的 damage 节点求值：count 词映射可见状态量（attached_energy_on_both_actives / opponent_taken_prizes 等直接求值；`discarded_this_effect` 回读同效果前序 discard 节点池——pool=own_hand → 手牌中匹配 filters 的卡数，pool=own_attached_energy → 该宝可梦附着能量数）；未知计数词 / 无 DSL 文档 / 嵌套 copy → 回退静态基值（现状行为）。效果级 condition 仅求值奖赏类词（opponent_prizes_eq / opponent_prizes_in），其余未知 condition → 该招式不参与斩杀判定但基值仍入表。估算纯函数、零随机。
 - **D-032-4（斩杀最小弃置）**：pending choose 为 any_count discard 且同效果后续步骤含 `damage count=discarded_this_effect` 时：能斩杀 → 选达到斩杀的最小张数；不能斩杀 → 选最大（倾泻）。其他 any_count discard 维持现状。
-- **D-032-5（A3 囤能例外）**：主动宝可梦带「手牌弹药型」伤害模式（DSL 检测：on_attack 效果含 discard pool=own_hand + 后续 damage count=discarded_this_effect）→ `_pick_energy_attach` 返回 None（能量留手牌作弹药）。无 DSL 文档时现状不变。
+- **D-032-5（A3 囤能例外，M8b 复校准后修订）**：主动宝可梦带「手牌弹药型」伤害模式（DSL 检测：on_attack 效果含 discard pool=own_hand + 后续 damage count=discarded_this_effect）**且已能开打**（任一招式费用已满足）→ `_pick_energy_attach` 返回 None（囤手牌能量作弹药）；尚不能开打时照常补费。无 DSL 文档时现状不变。（初版「无条件跳过」经 M8b 复跑证伪：0 能量主战手永久卡死，淘金潮发动 580→123 次/500 局。）
 - **D-032-6（A4 牌库保护）**：HeuristicParams 新参 `deck_protect: bool = True` + `deck_low_threshold: int = 6`（默认值即新行为，旧实验 YAML 无参兼容）。牌库余量 ≤ threshold 时：含 draw 节点的 play_trainer 抑制（改走后续排序）；攻击选择中含 draw 的招式降权（有其他攻击则不选它）。检测经 DSL 文档（含 draw 节点即计，不过度细分「纯过牌」）。
 
 ## 验收标准（测试清单）

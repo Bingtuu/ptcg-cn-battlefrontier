@@ -4,7 +4,7 @@ D-032-2：HeuristicAgent(params, card_effects=None)，None 全回退现状。
 D-032-3：on_attack 效果的变量伤害公式（count 计数词）映射可见状态量估算，
 入 _attack_damage_table；未知结构回退静态基值。
 D-032-4：伤害关联 any_count discard——能斩杀选达到斩杀的最小张数，否则全选倾泻。
-D-032-5：手牌弹药型主动在场 → 能量留手牌不附着。
+D-032-5：手牌弹药型主动在场且已能开打 → 能量留手牌不附着；尚不能开打照常补费。
 D-032-6：牌库余量 ≤ 阈值 → 抑制含 draw 的训练家 / 降权含 draw 的招式。
 
 fixture DSL 文档优先用真实卡（赛富豪ex 淘金潮 50× / 猛雷鼓ex 极雷轰 70× /
@@ -297,16 +297,26 @@ def test_hand_ammo_pattern_detection() -> None:
     assert not has_hand_ammo_pattern(basic("白板"), GHOLDENGO_FX)
 
 
-def test_hand_ammo_active_skips_energy_attach() -> None:
-    """手牌弹药型主动在场 → _pick_energy_attach 返回 None（能量留手牌）。"""
-    state = state_with(gholdengo(), energies=0, p0_hand=(inst(51, energy()),))
+def test_hand_ammo_active_charged_skips_energy_attach() -> None:
+    """手牌弹药型主动已能开打（费用已满足）→ _pick_energy_attach 返回 None（囤弹药）。"""
+    state = state_with(gholdengo(), energies=1, p0_hand=(inst(51, energy()),))
     engine = engine_at(state)
     view = engine.state.visible_state(0)
     acts = [a for a in engine.legal_actions(0) if a.kind == "attach_energy"]
     assert acts
     agent = HeuristicAgent(card_effects=GHOLDENGO_FX)
     assert agent._pick_energy_attach(view, acts) is None
-    assert decide(engine, agent) == Action(kind="end_turn")
+
+
+def test_hand_ammo_active_uncharged_still_attaches() -> None:
+    """D-032-5 修订（M8b 复校准实证）：手牌弹药型主动尚未能开打时照常补费——
+    无条件跳过会让 0 能量主战手永久卡死（淘金潮 580 次→123 次/500 局的回归）。"""
+    state = state_with(gholdengo(), energies=0, p0_hand=(inst(51, energy()),))
+    engine = engine_at(state)
+    view = engine.state.visible_state(0)
+    acts = [a for a in engine.legal_actions(0) if a.kind == "attach_energy"]
+    picked = HeuristicAgent(card_effects=GHOLDENGO_FX)._pick_energy_attach(view, acts)
+    assert picked == Action(kind="attach_energy", iid=51, target_iid=1)
 
 
 def test_no_doc_keeps_energy_attach_behavior() -> None:

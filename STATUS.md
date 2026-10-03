@@ -4,6 +4,8 @@
 
 ## 当前
 
+**二期 PRD v1.0 已立项（2026-10-03）**：`docs/superpowers/specs/2026-10-03-phase2-prd-design.md`——四条线范围拍定（D2-1~D2-8）：主线 = Agent 升级（task 031 偏差归因 → D2-3 门控 MCTS）；LLM 铺开 = 增量模式暂不申请 API key；引擎收尾四项固定；环境演进 = Mega 调研先行。里程碑 M7（归因）→ M8（决策层升级）→ M9（收尾+调研）→ M10（校准复核）。
+
 **task 030 ✅（2026-10-03）：M6 校准基线产出，一期验收全过——M6 里程碑达成（用户确认 2026-10-03，一期 M1–M6 全部收官）。前置达成（db 侧 task 057 Limitless online_open 收编：matchup n_games_used≈99,800、头部格 n=1,559；TopDeck 路径 task 053 供给侧实证关闭）。本仓库：matrix 实验模式（9 套池 36 无向配对 × 500 局 = 18,000 局，16 workers 6m15s，失败 12 局同一已知形态）+ `bfsim calibration` 偏差表（72 有向格：**加权平均 |Δ| 13.2% / CI 覆盖率 19.4%**，赛富豪模拟侧全面偏弱为最大结构信号）+ 一期验收（928 绿 + ruff 零告警 + 串/并行 500/500 events_hash 逐局一致 + 主库只读）+ LLM 管线评估（池内 42 文件 first_pass 34/42、human_edit_lines 累计 0 → **二期建议批量铺开生成式 harness**；Jev 决策模型调研结论不引入）。D-030-1~5 附录 A ✅ 已核（2026-10-03）。设计 `docs/superpowers/specs/2026-10-03-m6-calibration-design.md`，任务档 `tasks/done/task 030.md`。
 
 ## 里程碑

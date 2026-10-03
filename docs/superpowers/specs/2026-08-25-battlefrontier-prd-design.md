@@ -236,8 +236,9 @@ modify_attack_cost 自身卡分支）+ 宝可梦卡来源 trigger_on_event 分�
 _effective_attack_cost 道具分支 + 授予招式枚举与执行双落点。能量卡/训练家
 来源不受影响；竞技场离场即恢复、动态求值无追溯（HP 加成失效即按新有效 HP
 判昏厥——_do_play_stadium 补 check_knockouts，换上后回出牌方主阶段）；
-道具自身回合末自弃（grant_attack discard_at_turn_end）不在消除面内
-（已知近似，附录 A 候选待核）。
+道具自身回合末自弃（grant_attack discard_at_turn_end）在消除面内——自弃文本
+= 宝可梦道具的效果，被消除时回合末不弃（2026-10-13 task 033 D-033-2 归正：
+TPCi Rules Team 2024-07-25 裁决）。
 `lock_play` 原语（含羞苞 痒痒花粉：args.category=item，受击方玩家侧回合标记
 (turn, 施加方)，下个自己回合物品打出枚举门控，撤退/离场不解锁、回合结束
 解除）。damage selector 扩 `opponent_bench`（备战狙击 choose=1；备战空 no-op

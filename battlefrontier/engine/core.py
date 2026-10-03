@@ -791,7 +791,9 @@ class GameEngine:
 
     def _discard_turn_end_tools(self, player: int) -> None:
         """回合结束弃置：DSL grant_attack args.discard_at_turn_end 声明的道具
-        （招式学习器 进化原文：「将在自己的回合结束时被放于弃牌区」）。"""
+        （招式学习器 进化原文：「将在自己的回合结束时被放于弃牌区」）。
+        自弃文本 = 宝可梦道具的效果 → 被 suppress_tool（阻碍之塔）消除时不弃
+        （D-033-2：TPCi Rules Team 2024-07-25）。"""
         p = self.state.players[player]
 
         def strip(mon: InPlayPokemon) -> tuple[InPlayPokemon, CardInstance | None]:
@@ -803,7 +805,7 @@ class GameEngine:
                 node.action == "grant_attack" and node.args.get("discard_at_turn_end")
                 for e in doc.effects for node in e.actions
             )
-            if flagged:
+            if flagged and not self._tool_suppressed(mon):
                 return mon.model_copy(update={"attached_tool": None}), tool
             return mon, None
 

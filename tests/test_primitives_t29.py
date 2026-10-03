@@ -531,6 +531,44 @@ def test_suppress_tool_energy_passive_unaffected():
     assert e.state.players[1].active.damage == 40
 
 
+LEARNER_DISCARD_DOC = parse_card_doc("""
+card:
+  name_group: 学习器
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: grant_attack, args: {attack: 授予打击, discard_at_turn_end: true}}
+""")
+
+
+def test_suppress_tool_discard_at_turn_end():
+    """D-033-2（task 033 WP2 归正）：学习器回合末自弃文本 = 宝可梦道具的效果——
+    阻碍之塔在场时被消除、回合末不弃（TPCi Rules Team 2024-07-25：TM 自弃文本
+    is an effect）；塔被顶掉即恢复自弃（动态求值）。"""
+    learner = tool_card("学习器", attacks=(
+        AttackDef(name="授予打击", cost=("无",), damage=30),))
+    holder = lambda: mon(1, pokemon("持器兽", hp=500), energies=1,
+                         tool=inst(90, learner))
+    effects = {
+        "阻碍之塔": BLOCKER_DOC, "监视塔": WATCHTOWER_DOC,
+        "学习器": LEARNER_DISCARD_DOC,
+    }
+    # 塔在场：回合末不弃
+    suppressed = board_engine(p0_active=holder(), stadium=blocker(), effects=effects)
+    suppressed.apply(0, Action(kind="end_turn"))
+    assert suppressed.state.players[0].active.attached_tool is not None
+    # 塔被顶掉：自弃恢复
+    lifted = board_engine(
+        p0_active=holder(),
+        p0_hand=(inst(60, stadium_card("监视塔")),),
+        stadium=blocker(), effects=effects)
+    lifted.apply(0, Action(kind="play_stadium", iid=60))
+    lifted.apply(0, Action(kind="end_turn"))
+    p0 = lifted.state.players[0]
+    assert p0.active.attached_tool is None
+    assert 90 in [c.iid for c in p0.discard]
+
+
 # ── 3. lock_play 物品锁（含羞苞 痒痒花粉，D-029-3）────────────────────
 
 POLLEN_DOC = parse_card_doc("""

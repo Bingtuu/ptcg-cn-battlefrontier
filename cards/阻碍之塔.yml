@@ -3,7 +3,9 @@
 # suppress_tool 声明式（task 029，D-029-2 🔲 待核）：passive_static（无 args）——
 # 引擎 _tool_suppressed 统一守卫读声明；消除面 = 道具全部引擎读点（_effective_hp /
 # _effective_damage_modifier / _effective_retreat_cost / _effective_attack_cost
-# 道具分支 + grant_attack 授予招式枚举与执行双落点 + 道具 on_attack 绑定）。动态求值
+# 道具分支 + grant_attack 授予招式枚举与执行双落点 + 道具 on_attack 绑定 +
+# discard_at_turn_end 自弃（2026-10-13 task 033 D-033-2 归正：自弃文本 = 道具效果）。
+# 动态求值
 # 天然无追溯（HP 加成失效即按新有效 HP 判昏厥，走 check_knockouts）；竞技场离场即
 # 恢复；能量卡被动（provide_energy，喷射/夜光/薄雾）不受影响。
 card:

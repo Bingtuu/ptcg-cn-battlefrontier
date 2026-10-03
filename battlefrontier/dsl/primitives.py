@@ -1086,7 +1086,15 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     else:
         _require_no_choose(node, "damage")
         if d.active is None:
-            raise DslError("damage opponent_active：对手战斗场为空")
+            # 对手战斗场为空（task 033 WP1，D-033-1）：效果结算窗口内目标已不存在
+            # （如前序节点昏厥、换上排队中）→ 本节点 no-op，同效果后续节点照算
+            # （WP4 宣言裁决延伸 + D-029-4 备战空 no-op 同型；真实规则：追加伤害
+            # 作用于已昏厥的原目标即落空，换上在攻击完成后进行）
+            return {
+                "amount": 0, "damage_mod": 0, "final": 0,
+                "target_iid": None, "target": None, "to_bench": False,
+                "protected": False, "reason": "no_targets",
+            }
         slot, idx, target = "active", -1, d.active
 
     amount = _resolve_damage_amount(ctx, node, target)

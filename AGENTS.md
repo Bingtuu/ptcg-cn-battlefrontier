@@ -3,13 +3,13 @@
 BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）对战模拟与卡组强度测试引擎。
 [ptcg-cn-db](https://github.com/Bingtuu/ptcg-cn-db)（数据基建层）之上的应用层：完整规则引擎 + 效果 DSL + AI 智能体，通过大规模模拟对局产出卡组胜率、最优策略（决策数据聚合报告）与换卡敏感性分析。
 
-**权威文档**：`docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md`（PRD v1.0）——一切设计以它为准，含 12 条决策记录（D1–D12）与一期里程碑 M1–M6。
+**权威文档**：`docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md`（一期 PRD v1.0）+ `docs/superpowers/specs/2026-10-03-phase2-prd-design.md`（二期 PRD v1.0，D2-1~D2-8 + 里程碑 M7–M10）——一切设计以它们为准，含 12 条决策记录（D1–D12）与一期里程碑 M1–M6。
 **规则事实源**：`docs/rules-manual.md`——依简中官网规则页逐节整理的完整规则说明书（正文事实源）；`docs/rules-reference.md`——引擎/DSL 实现落点速查 + 术语表（「昏厥」等官方用词），争议规则进其附录 A 规则决议日志；规则查询流程已 skill 化（`.kimi-code/skills/ptcg-rules`）。
 **数据契约**：上游 db 项目 PRD 的 FR-10 sim 骨架契约——模拟结果永远落独立库，主库只读，经 card_id / name_group / 快照 id 关联。
 
 ## 当前状态
 
-一期 M1–M6 全部完成（M6 校准基线 2026-10-03 产出并经用户确认达成：9 套池 36 无向配对 × 500 局模拟 matchup 矩阵 + 72 格模拟 vs 真实赛事偏差表，加权平均 |Δ| 13.2%；硬验收全过：确定性串/并行逐局一致 + 主库只读）：卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 928 测试绿。二期方向（赛富豪偏差归因与 Agent 迭代 / LLM harness 批量铺开）见 `STATUS.md`（事实源，本文件不抄写细节）。
+一期 M1–M6 全部完成（M6 校准基线 2026-10-03：9 套池 36 无向配对 × 500 局模拟 matchup 矩阵 + 72 格偏差表，加权平均 |Δ| 13.2%）；二期 M7（偏差归因）/ M8（决策层升级：启发式修复批 + **MCTS 落地**）/ M9（引擎收尾 D2-5 清零）已完成（2026-10-13）——MCTS 多世界 determinized UCT 上线（`type: mcts`，迭代预算零墙钟），单格验证赛富豪(MCTS) +27.9pts / 苍响(MCTS) +13.9pts；卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 996 测试绿。下一步（MCTS 铺开与预算档拍板 / M10 校准复核 / Mega 调研待 db 数据）见 `STATUS.md`（事实源，本文件不抄写细节）。
 
 ## 架构分层与边界
 
@@ -19,7 +19,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 - **引擎对卡牌内容零硬编码**："这张卡做什么"全部由 DSL 定义、解释器执行；引擎只管规则骨架（阶段机、伤害、奖赏、胜负）。
 - **DSL 定义库是独立资产**：每（卡名 + 文本）等价类一个 YAML（同名多文本**严格拆分**，如 `火恐龙-大字爆炎.yml` / `火恐龙-闪焰之幕.yml`），Pydantic schema 强校验，进版本控制，单卡效果测试不依赖整局模拟。**装载键 = card_id 精确挂载**（`card_ids` 必填，2026-09-06 决议；无名字兜底——防取错印刷），闸 1 校验走 `bfsim dsl-check --db`（card_id 存在性 / 文件内归一化 text_raw 一致 / 赛制合法性）。
-- **Agent 接口统一**：`observe(visible_state, legal_actions) -> action`，启发式 / MCTS / RL 共用；Agent 只见过滤后的可见视图（对手手牌内容不可见），引擎枚举合法行动，AI 永不非法操作。
+- **Agent 接口统一**：`observe(visible_state, legal_actions) -> action`，启发式 / MCTS / RL 共用；Agent 只见过滤后的可见视图（对手手牌内容不可见），引擎枚举合法行动，AI 永不非法操作。MCTS（task 034）经可选 `bind_engine` 钩子挂接引擎，读真实状态的唯一用途是 determinization 重采样隐藏信息，搜索全程在克隆上进行（信息纪律 + 模拟事件不回流真实事件流）。
 - **数据只进不出**：消费 db 项目只读；模拟结果落本项目独立 SQLite。
 
 ## 技术栈与约束

@@ -1,0 +1,11 @@
+# task 034 WP4 单格验证对照：赫普的苍响(MCTS)×赛富豪(heuristic)
+# 同格反向（m8c-gholdengo-mcts.example.yml 的镜像），同种子区间
+name: m8c-zacian-mcts
+games: 500
+seed_start: 117000
+decks:
+  a: {source: db, deck_id: "mik_moe:655513"}
+  b: {source: db, deck_id: "mik_moe:655512"}
+agents:
+  a: {type: heuristic}
+  b: {type: mcts, params: {worlds: 2, iterations: 50}}

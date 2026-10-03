@@ -1,0 +1,12 @@
+# task 034 WP4 单格验证：赛富豪(MCTS)×赫普的苍响(heuristic)
+# M6/M9 最大偏差格（赛富豪模拟侧全面偏弱）；种子区间对齐 matrix 格 #35（k=34）
+# 用法：bfsim run experiments/m8c-gholdengo-mcts.example.yml --workers 16 --results results/m8c-mcts.db
+name: m8c-gholdengo-mcts
+games: 500
+seed_start: 117000
+decks:
+  a: {source: db, deck_id: "mik_moe:655513"}
+  b: {source: db, deck_id: "mik_moe:655512"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50}}
+  b: {type: heuristic}

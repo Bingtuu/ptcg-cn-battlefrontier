@@ -1,6 +1,6 @@
 # task 034 · MCTS 决策层（M8 主线，D2-3 门控已通过）
 
-- 状态：进行中
+- 状态：完成（2026-10-13，500×2 向验证落账；MCTS 铺开与预算档待用户拍板）
 - 关联：二期 PRD §3.1（MCTS 技术口径预登记）/ §7.3 一期预留（状态快照 + determinization + evaluate 纯函数）；M8b 复校准结论（剩余偏差由策略深度主导，局部规则修复已尽）
 - 立项依据：用户拍板 2026-10-13（M8b 评估点论证成立后的正式启动）
 
@@ -43,4 +43,20 @@
 
 ## 结果与遗留
 
-（完工填写）
+**WP1（引擎克隆 + determinizer，子代理 TDD + 主会话复验）**：`GameEngine.clone()`（state 深拷贝含 pending_choice 挂起上下文 / card_effects 共享 / events 全新 / rng 独立）+ `agent/determinize.py`（己方 deck+prizes 重洗、对手 hand+deck+prizes 三区合并重洗切回；计数与多重集合守恒；13 测试）。
+
+**WP2（MCTS 搜索核心，子代理 TDD + 主会话复验修订）**：`agent/mcts.py`——多世界 determinized UCT（UCB1 c=√2；跨世界按根行动访问数聚合，平手取 legal 序靠前者）；rollout = HeuristicAgent 打到底（胜 1/平 0.5/负 0，回合 cap=根+50）；挂起根不决定化（D-034-9）。**主会话复验修订**：逐迭代克隆 rng 原实现逐迭代抽新种子 → 同行动路径回放遇概率事件（掷币）状态分叉、树边行动可能失真/非法；修为世界内固定 iter_seed（determinization 钉死未来随机性），回归测试钉住口径。
+
+**WP3（接线，主会话直改）**：play_game 驱动循环 `bind_engine` hasattr 钩子；AgentCfg type=mcts + MCTS_PARAMS 词表（worlds/iterations/rollout_turn_cap，禁墙钟）；build_agents 独立随机流（seed+offset 先例）。996 绿 + ruff 零告警。
+
+**WP4 单格验证（进行中）**：格 = 赛富豪×赫普的苍响（M6 最大偏差格，∓53.8；M9 基线赛富豪 93/403=18.75%）；种子区间对齐 matrix k=34（117000..117499）；预算 worlds=2/iterations=50。
+- 冒烟 20 局：A胜10/B胜9/平1/失败0——赛富豪胜率 18.75%→52.6%（n=20 仅方向性信号）
+- 性能基线：2×50 预算 ≈ 187s/局/worker（瓶颈 = 引擎单步成本非搜索框架，WP2 cProfile 实测 94% 在 rollout 引擎侧）
+- 确定性：小预算 20 局串/并行 events_hash 20/20 全等（m8c-det-serial/parallel.db）
+- 500×2 向全量（results/m8c-mcts.db，workers=16，wall 3h48m ≈ 219s/局/worker，失败 0）：
+  - **赛富豪(MCTS)×苍响(heuristic)：219胜251负30平 → 46.6%**（基线 18.75%，+27.9pts，向真实侧 ~72% 收敛过半）
+  - **苍响(MCTS)×赛富豪(heuristic)：476胜24负0平 → 苍响 95.2%**（基线 81.25%，+13.9pts）
+  - 双向一致：MCTS 显著提升使用方胜率，实证 M8b 归因「剩余偏差由策略深度主导」与 D2-3 门控结论
+- matrix 全铺开可行性：~219s/局/worker × 18000 局 / 16 workers ≈ 68.7h——不适合例行 matrix；MCTS 定位 = 定点格分析/高预算单格，铺开与否与预算档（2×50 基线）调整待用户拍板
+
+**遗留**：①MCTS 半格收敛（46.6% vs 真实 ~72%）——预算加深（worlds/iterations 上调）或 rollout 质量改善的空间待评估；②串并一致实测 20/20（500 全量串行 ≈30h 不现实，单元级同种子双跑 hash 一致 + 实验级 20/20 为证据链）；③引擎单步成本是 MCTS 规模化的唯一瓶颈（cProfile 94% rollout 引擎侧），性能优化若立项另开 task。

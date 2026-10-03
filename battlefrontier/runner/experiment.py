@@ -211,16 +211,18 @@ def apply_swaps(deck: list[CardDef], swaps: list[SwapCfg],
 
 
 # ── Agent 构建（worker 内同规则重建）─────────────────────
-def _build_one(cfg: AgentCfg, seed: int, offset: int):
+def _build_one(cfg: AgentCfg, seed: int, offset: int, card_effects=None):
     if cfg.type == "heuristic":
-        return HeuristicAgent(HeuristicParams(**cfg.params))
+        # card_effects（task 032 WP2，D-032-2）：DSL 文档 = 公开卡面信息，
+        # 供变量伤害估算 / 囤能 / 牌库保护；None 回退静态基值现状
+        return HeuristicAgent(HeuristicParams(**cfg.params), card_effects=card_effects)
     return RandomAgent(RandomSource(seed + offset))
 
 
-def build_agents(defn: ExperimentDef, seed: int) -> list:
+def build_agents(defn: ExperimentDef, seed: int, card_effects=None) -> list:
     """与 play.py 默认随机源偏移一致（seed+1_000_001 / +2_000_002），保证口径稳定。"""
-    return [_build_one(defn.agents.a, seed, 1_000_001),
-            _build_one(defn.agents.b, seed, 2_000_002)]
+    return [_build_one(defn.agents.a, seed, 1_000_001, card_effects),
+            _build_one(defn.agents.b, seed, 2_000_002, card_effects)]
 
 
 # ── 准备（卡组解析 + DSL 文档 + 数据版本）────────────────
@@ -412,18 +414,19 @@ def _run_one_experiment(payload: dict) -> tuple[int, GameResult | None, str | No
     """多进程 worker 入口（模块级函数，可 pickle）。失败局返回错误文本而非抛出。"""
     try:
         agents_cfg = AgentSides.model_validate(payload["agents"])
+        # worker 内重建 CardLibrary（载荷为去重后的文档列表；挂载键 = card_id）
+        card_effects = CardLibrary.from_docs(
+            ("<worker>", CardEffectDoc.model_validate(d))
+            for d in payload["card_effects"])
         agents = [
-            _build_one(agents_cfg.a, payload["seed"], 1_000_001),
-            _build_one(agents_cfg.b, payload["seed"], 2_000_002),
+            _build_one(agents_cfg.a, payload["seed"], 1_000_001, card_effects),
+            _build_one(agents_cfg.b, payload["seed"], 2_000_002, card_effects),
         ]
         result = play_game(
             deck_a=[CardDef.model_validate(c) for c in payload["deck_a"]],
             deck_b=[CardDef.model_validate(c) for c in payload["deck_b"]],
             seed=payload["seed"],
-            # worker 内重建 CardLibrary（载荷为去重后的文档列表；挂载键 = card_id）
-            card_effects=CardLibrary.from_docs(
-                ("<worker>", CardEffectDoc.model_validate(d))
-                for d in payload["card_effects"]),
+            card_effects=card_effects,
             agents=agents,
         )
         return payload["seed"], result, None
@@ -477,7 +480,7 @@ def execute_experiment(prep: PreparedExperiment, defn: ExperimentDef,
                     try:
                         result = play_game(prep.deck_a, prep.deck_b, seed=seed,
                                            card_effects=prep.card_effects,
-                                           agents=build_agents(defn, seed))
+                                           agents=build_agents(defn, seed, prep.card_effects))
                     except Exception as e:  # noqa: BLE001 — 失败局落库继续（不猜纪律）
                         record_error(seed, f"{type(e).__name__}: {e}")
                     else:

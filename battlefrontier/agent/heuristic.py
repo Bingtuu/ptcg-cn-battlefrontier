@@ -15,11 +15,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from battlefrontier.agent.dsl_estimate import (
+    attack_has_draw,
+    card_has_draw,
+    damage_formula,
+    estimate_attack_damage,
+    has_hand_ammo_pattern,
+    pending_damage_link,
+)
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import _energy_satisfied
 from battlefrontier.engine.state import (
+    CardDef,
     CardInstance,
     InPlayPokemon,
+    PendingChoice,
     Supertype,
     VisibleGameState,
 )
@@ -52,6 +62,11 @@ class HeuristicParams:
     play_stadiums: bool = True
     attach_tools: bool = True
     retreat_when_powerless: bool = True  # 战斗场无可支付招式且备战区有就绪打手时撤退
+    # 牌库资源管理（task 032 WP2，D-032-6）：牌库余量 ≤ deck_low_threshold 时
+    # 抑制含 draw 节点的训练家、攻击选择排除含 draw 的招式（有其他攻击可选时）；
+    # 默认值即新行为，旧实验 YAML 无参兼容
+    deck_protect: bool = True
+    deck_low_threshold: int = 6
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -91,10 +106,16 @@ def evaluate(view: VisibleGameState, params: HeuristicParams) -> float:
 
 
 class HeuristicAgent:
-    """通用启发式 Agent：只读 VisibleGameState，决策确定（无随机源）。"""
+    """通用启发式 Agent：只读 VisibleGameState，决策确定（无随机源）。
 
-    def __init__(self, params: HeuristicParams | None = None) -> None:
+    card_effects（task 032 WP2，D-032-2）：可选 DSL 文档库（公开卡面信息，
+    不违反可见视图纪律），供变量伤害估算 / 囤能例外 / 牌库保护读取；
+    None 时全部行为回退静态基值现状。
+    """
+
+    def __init__(self, params: HeuristicParams | None = None, card_effects=None) -> None:
         self.params = params or HeuristicParams()
+        self.card_effects = card_effects
 
     def observe(self, view: VisibleGameState, legal_actions: list[Action]) -> Action:
         if not legal_actions:
@@ -159,18 +180,53 @@ class HeuristicAgent:
                     total += 0.5
             return total
 
+        pc = view.pending_choice
+        # 伤害关联 any_count discard（task 032 WP2，D-032-4）：淘金潮/极雷轰型——
+        # 弃得越多伤害越高，是「收益」不是「代价」，优先于 cost/actions 评分方向：
+        # 能斩杀选达到斩杀的最小张数（省弹药），不能斩杀全选倾泻
+        if pc is not None:
+            linked = self._pick_damage_linked_discard(view, acts, pc)
+            if linked is not None:
+                return linked
         # cost 段（代价支付，task 032 WP1，D-032-1）取最低评分——不弃高分宝可梦；
         # actions 段（收益选择）与无挂起帧防御路径维持最高评分。tie-break 均为
         # choices 升序（确定性）
-        pc = view.pending_choice
         if pc is not None and pc.step_phase == "cost":
             return min(acts, key=lambda a: (score(a), a.choices))
         return min(acts, key=lambda a: (-score(a), a.choices))
+
+    def _pick_damage_linked_discard(
+        self, view: VisibleGameState, acts: list[Action], pc: PendingChoice
+    ) -> Action | None:
+        """D-032-4：any_count discard 后续 damage count=discarded_this_effect 时，
+        按斩杀需求定量弃置；非伤害关联返回 None（回退评分方向）。"""
+        node = pending_damage_link(pc, self.card_effects)
+        if node is None:
+            return None
+        opp = view.opponent.active
+        if opp is None:
+            return None
+        remaining = (opp.current.card.hp or 0) - opp.damage
+        target: int | None = None
+        for n in range(pc.min_choose, pc.max_choose + 1):
+            dmg = damage_formula(node, n)
+            if dmg is None:
+                return None
+            if dmg >= remaining:
+                target = n  # 能斩杀 → 达到斩杀的最小张数
+                break
+        if target is None:
+            target = pc.max_choose  # 不能斩杀 → 倾泻全选
+        candidates = [a for a in acts if len(a.choices) == target]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda a: a.choices)  # tie-break choices 升序
 
     # ── 主阶段行动排序 ──────────────────────────────────
 
     def _decide_main(self, view: VisibleGameState, by_kind: dict[str, list[Action]]) -> Action:
         hand = {c.iid: c for c in view.own.hand}
+        deck_low = self._deck_low(view)
         if self.params.use_abilities and (acts := by_kind.get("use_ability")):
             return min(acts, key=lambda a: a.iid)
         if acts := by_kind.get("evolve"):
@@ -196,11 +252,17 @@ class HeuristicAgent:
         if self.params.play_items:
             items = [a for a in by_kind.get("play_trainer", [])
                      if hand[a.iid].card.trainer_subtype == "物品"]
+            if deck_low:  # D-032-6：含 draw 节点物品抑制（跳过该卡，继续排序）
+                items = [a for a in items
+                         if not card_has_draw(hand[a.iid].card, self.card_effects)]
             if items:
                 return min(items, key=lambda a: a.iid)
         if self.params.play_supporters:
             supporters = [a for a in by_kind.get("play_trainer", [])
                           if hand[a.iid].card.trainer_subtype == "支援者"]
+            if deck_low:  # D-032-6：含 draw 节点支援者抑制
+                supporters = [a for a in supporters
+                              if not card_has_draw(hand[a.iid].card, self.card_effects)]
             if supporters:
                 return min(supporters, key=lambda a: a.iid)
         if self.params.play_stadiums and (acts := by_kind.get("play_stadium")):
@@ -215,11 +277,26 @@ class HeuristicAgent:
             key=lambda a: (a.kind, a.iid or 0, a.target_iid or 0),
         )
 
+    def _deck_low(self, view: VisibleGameState) -> bool:
+        """D-032-6：牌库余量触及保护线（deck_protect 关闭时恒 False）。"""
+        return (
+            self.params.deck_protect
+            and view.own.deck_count <= self.params.deck_low_threshold
+        )
+
     def _pick_energy_attach(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """能量目标：仍有付不起的招式才补能（全就绪则不浪费每回合 1 次的附着）。
 
         战斗场未就绪优先补给；否则补给备战区未就绪最高分者；全都就绪返回 None 跳过。
+        A3 囤能例外（task 032 WP2，D-032-5）：主动宝可梦为手牌弹药型（on_attack
+        含 discard own_hand + 后续 damage count=discarded_this_effect）时不附着
+        ——能量留手牌作弹药；无 DSL 文档时现状不变。
         """
+        active = view.own.active
+        if active is not None and has_hand_ammo_pattern(
+            active.current.card, self.card_effects
+        ):
+            return None
 
         def needs_energy(poke: InPlayPokemon) -> bool:
             return any(
@@ -227,7 +304,6 @@ class HeuristicAgent:
                 for atk in poke.current.card.attacks
             )
 
-        active = view.own.active
         if active is not None and needs_energy(active):
             target_iid = active.current.iid
         else:
@@ -264,45 +340,80 @@ class HeuristicAgent:
             key=lambda a: (-pokemon_score(view.own.bench[a.bench_index], self.params), a.bench_index),
         )
 
-    def _attack_damage_table(self, view: VisibleGameState) -> list[int]:
-        """各招式（含道具授予招式，core.py 同序）对对手战斗场的有效伤害。
-
-        弱点 ×2 / 抗性 -30（rules-manual §6）；纯效果招式记 0，不参与斩杀判定。
-        """
+    def _attack_sources(self, view: VisibleGameState) -> tuple[list, list[CardDef]]:
+        """各招式（含道具授予招式，core.py 同序）与其来源卡（本体 / 附着道具）。"""
         active = view.own.active
-        opp = view.opponent.active
         assert active is not None
         attacks = list(active.current.card.attacks)
+        sources = [active.current.card] * len(attacks)
         if active.attached_tool is not None:
-            attacks += active.attached_tool.card.attacks
-        table: list[int] = []
-        for atk in attacks:
-            dmg = atk.damage
-            if dmg is None:
-                table.append(0)
-                continue
-            if opp is not None:
-                own_type = active.current.card.energy_type
+            tool_attacks = list(active.attached_tool.card.attacks)
+            attacks += tool_attacks
+            sources += [active.attached_tool.card] * len(tool_attacks)
+        return attacks, sources
+
+    def _attack_table(self, view: VisibleGameState) -> list[tuple[int, bool]]:
+        """各招式对对手战斗场的（有效伤害， 可参与斩杀判定）。
+
+        每招先查 DSL 变量伤害估算器（task 032 WP2，D-032-3：淘金潮 50×手牌弃能
+        等不再被看成静态基值）；估算 None 回退 atk.damage 现状路径。
+        弱点 ×2 / 抗性 -30（rules-manual §6）维持既有后处理；纯效果招式记 0。
+        lethal_ok=False（效果 condition 不可判 / 不满足）的招式基值仍入表、
+        不参与斩杀判定。
+        """
+        opp = view.opponent.active
+        attacks, sources = self._attack_sources(view)
+        table: list[tuple[int, bool]] = []
+        for atk, src in zip(attacks, sources, strict=True):
+            est = estimate_attack_damage(view, atk.name, atk.damage, src, self.card_effects)
+            if est is None:
+                dmg, lethal_ok = atk.damage or 0, True
+            else:
+                dmg, lethal_ok = est.amount, est.lethal_ok
+            if opp is not None and dmg:
+                own_type = view.own.active.current.card.energy_type
                 if opp.current.card.weakness and own_type == opp.current.card.weakness:
                     dmg *= 2
                 if opp.current.card.resistance and own_type == opp.current.card.resistance:
                     dmg = max(0, dmg - RESISTANCE_AMOUNT)
-            table.append(dmg)
+            table.append((dmg, lethal_ok))
         return table
 
+    def _attack_damage_table(self, view: VisibleGameState) -> list[int]:
+        """各招式对对手战斗场的有效伤害（_attack_table 的伤害投影）。"""
+        return [dmg for dmg, _ in self._attack_table(view)]
+
     def _lethal_attack(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
-        """斩杀检测：能直接昏厥对手战斗场的招式，取有效伤害最高者（tie 取下标小者）。"""
+        """斩杀检测：能直接昏厥对手战斗场且可参与斩杀判定的招式，取有效伤害最高者
+        （tie 取下标小者）。"""
         opp = view.opponent.active
         if opp is None:
             return None
-        table = self._attack_damage_table(view)
+        table = self._attack_table(view)
         remaining = (opp.current.card.hp or 0) - opp.damage
-        lethal = [a for a in acts if table[a.attack_index] >= remaining]
+        lethal = [
+            a for a in acts
+            if table[a.attack_index][1] and table[a.attack_index][0] >= remaining
+        ]
         if not lethal:
             return None
-        return max(lethal, key=lambda a: (table[a.attack_index], -a.attack_index))
+        return max(lethal, key=lambda a: (table[a.attack_index][0], -a.attack_index))
 
     def _pick_attack(self, view: VisibleGameState, acts: list[Action]) -> Action:
-        """无斩杀时取有效伤害最高的招式（tie 取下标小者）。"""
-        table = self._attack_damage_table(view)
-        return max(acts, key=lambda a: (table[a.attack_index], -a.attack_index))
+        """无斩杀时取有效伤害最高的招式（tie 取下标小者）。
+
+        D-032-6：牌库余量触及保护线时排除含 draw 节点的招式（有其他攻击可选时）。
+        """
+        table = self._attack_table(view)
+        candidates = acts
+        if self._deck_low(view):
+            attacks, sources = self._attack_sources(view)
+            non_draw = [
+                a for a in acts
+                if not attack_has_draw(
+                    sources[a.attack_index], attacks[a.attack_index].name, self.card_effects
+                )
+            ]
+            if non_draw:
+                candidates = non_draw
+        return max(candidates, key=lambda a: (table[a.attack_index][0], -a.attack_index))

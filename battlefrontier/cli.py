@@ -106,6 +106,42 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_calibration(args: argparse.Namespace) -> int:
+    """M6 偏差表（task 030 WP3）：matrix 实验定义 → 结果库子实验 vs 真实赛事 matchup。"""
+    from ptcgdb.sdk import open_db
+
+    from battlefrontier.data.pool import load_target_pool
+    from battlefrontier.report.calibration import (
+        REAL_AS_OF,
+        REAL_BASIS,
+        REAL_DATE_FROM,
+        REAL_DATE_TO,
+        REAL_MIN_N,
+        calibration_report,
+        format_calibration,
+    )
+
+    defn = load_experiment(args.experiment)
+    if defn.matrix is None:
+        print("错误：calibration 需要 matrix 模式实验定义")
+        return 1
+    pool = load_target_pool(defn.matrix.pool)
+    sdk = open_db(args.db or load_db_path())
+    try:
+        real = sdk.stats_matchup(date_from=REAL_DATE_FROM, date_to=REAL_DATE_TO,
+                                 as_of=REAL_AS_OF, basis=REAL_BASIS,
+                                 division="master", min_n=REAL_MIN_N)
+    finally:
+        sdk.close()
+    db = ResultsDB(args.results)
+    try:
+        rep = calibration_report(db, defn, pool, real.data, dict(real.meta))
+    finally:
+        db.close()
+    print(format_calibration(rep))
+    return 0
+
+
 def _check_doc_against_db(doc, db, legal_ids: frozenset, snapshot_id: str) -> None:
     """闸 1 装配校验（task 026 WP0，--db 时启用）；失败抛 DslError 列明原因。
 
@@ -226,6 +262,11 @@ def main(argv: list[str] | None = None) -> int:
     sen_p.add_argument("base_id", type=int, help="baseline 实验 id")
     sen_p.add_argument("variant_ids", type=int, nargs="+", help="variant 实验 id 列表")
     sen_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    cal_p = sub.add_parser("calibration",
+                           help="M6 偏差表：模拟矩阵 vs 真实赛事 matchup（task 030）")
+    cal_p.add_argument("experiment", help="matrix 实验定义 YAML 路径")
+    cal_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    cal_p.add_argument("--db", default=None, help="ptcg-cn.db 路径（缺省读本机配置）")
     chk_p = sub.add_parser("dsl-check", help="DSL 文件校验（schema + 词表；LLM harness 闸 1）")
     chk_p.add_argument("files", nargs="+", help="DSL YAML 路径（可多个）")
     chk_p.add_argument("--db", default=None,
@@ -239,6 +280,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(args)
     if args.cmd == "sensitivity":
         return _cmd_sensitivity(args)
+    if args.cmd == "calibration":
+        return _cmd_calibration(args)
     if args.cmd == "dsl-check":
         return _cmd_dsl_check(args)
     print(f"battlefrontier {__import__('battlefrontier').__version__}："

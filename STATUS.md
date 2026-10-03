@@ -4,20 +4,7 @@
 
 ## 当前
 
-**M5 已达成（用户确认 2026-09-20）**：task 024 ✅（卡组池锁定 + LLM harness）、task 025 ✅（批 1：小原语批 + A 级处理）、task 026 ✅（WP0–WP8）、task 027 ✅（ACE SPEC + TERA）、**task 029 ✅（suppression 体系 + C 级收尾 8 卡，2026-09-20）**。**卡池 v1 = 9 套（全窗口 WUR 覆盖 53.4%，`config/target-pool.v1.yml`）**。缺口 81 张（`docs/m5-coverage-plan.md`）：**done 81 / blocked 0 / pending 0（覆盖清零）**。**关键发现：A 级初判失真严重**（46 张初判「现有原语可写」实测仅 10 张可直接写）。LLM harness 质量数据：批 1 新写 DSL 12 张 first_pass 10/12、gate3 11/12 **核销完毕**（彷徨夜灵不过转 blocked——装配取错印刷，WP2 已根治落地）；批 2–4 累计 25 张全部核销通过；批 5（WP6）9 文件 first_pass 9/9、批 6（WP7）15/15、批 7（WP8）3/3、批 8（task 027）7/7、批 9（task 029）8 文件 first_pass 0/8（闸 2 首跑前测试脚手架 2 处修正，8 卡 YAML 全零返工——严格口径）。**gate3 攒批 42 文件全部核销通过（2026-09-20，human_edit_lines 累计 0）、附录 A 攒批 41 条决议全部核销（✅ 已核）**。
-M1–M5 已达成（M5 用户确认 2026-09-20）。**task 029 ✅（2026-09-20）**：suppression 声明式框架（suppress_ability/suppress_tool + 引擎统一守卫）、lock_play 物品锁、damage opponent_bench 备战狙击、attach own_deck distribute 任意分配、stadium_in_play/pokemon_<属性>/opponent_ability_pokemon_count 小词；D-029-6 正向词裁决（删 no_stadium_in_play）；定义库 101 文件；全量 905 绿 + 冒烟 80 局 0 失败；**缺口 done 81 / blocked 0 / pending 0**；下一步 = M6 校准基线（数据前置不满足，2026-09-20 裁决推迟，任务清单见下）。
-
-### M6 数据前置任务清单（db 项目 Pokearena 侧，2026-09-20 勘察定稿）
-
-**阻塞点 = 用户申请 TopDeck.gg 免费 API key**（db 项目 `tasks/053-TopDeck接入.md` 已立项待 key）。拿到 key 后在 db 项目会话启动 task 053（预估 2~2.5 天）→ 数据达标后回本仓库启动 M6。
-
-1. **任务 1（用户动作）**：申请 TopDeck.gg API key → 填入 db 项目配置。理由：TopDeck API v2 单端点返回 standings + rounds 逐桌对阵含局分（比 Limitless pairings 更全），且可回溯抓取对齐窗口历史赛事——matchup 样本量扩到可用规模的唯一现实路径
-2. **任务 2（db 项目，依赖任务 1）**：启动 task 053 TopDeck 接入——抓取 + 归一化落库 pairings/deck_appearances，走 `v_pairing_players` 视图自动汇入 `stats_matchup` 链路（SDK/CLI 已就绪，M6 报告可直接消费，本仓库零改动）
-3. **任务 3（启动门槛）**：`ptcgdb stats matchup --min-n 30`——池内 9 套 archetype 头部配对格 n≥30、矩阵总行数相比现状（272 有向行 / 208 局）显著提升，达标即启动 M6 偏差表
-4. **已实证不要做的**：❌ mik_moe 对阵抓取（端点不存在，task 052 两轮实证：swiss 只是积分榜快照）/ ❌ limitless API 扩量（全窗口已扫完，5 场即上限，官方线下大赛在 RK9）/ ❌ 官方小程序（JWT+加密+签名四层防护，D1 已拍板不可行）
-5. **可选（推迟到 M6 出报告时评估）**：RK9.gg 对账源——官方顶级赛事逐轮 pairings 公开 HTML 但无卡组表，只能对账不能独立成源
-6. **口径影响（启动 M6 时须落附录 A 决议）**：CN 侧对阵数据不存在是硬约束——M6「真实赛事 matchup 矩阵」只能是 **EN 环境对齐段**（db 已有 CN GHI ⊆ EN 窗口对齐机制），偏差表校准的是「简中卡池模拟 vs EN 同窗口真实 meta」，环境差本身贡献一部分偏差
-ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
+**task 030 ✅（2026-10-03）：M6 校准基线产出，一期验收全过——M6 里程碑达成待用户确认**。前置达成（db 侧 task 057 Limitless online_open 收编：matchup n_games_used≈99,800、头部格 n=1,559；TopDeck 路径 task 053 供给侧实证关闭）。本仓库：matrix 实验模式（9 套池 36 无向配对 × 500 局 = 18,000 局，16 workers 6m15s，失败 12 局同一已知形态）+ `bfsim calibration` 偏差表（72 有向格：**加权平均 |Δ| 13.2% / CI 覆盖率 19.4%**，赛富豪模拟侧全面偏弱为最大结构信号）+ 一期验收（928 绿 + ruff 零告警 + 串/并行 500/500 events_hash 逐局一致 + 主库只读）+ LLM 管线评估（池内 42 文件 first_pass 34/42、human_edit_lines 累计 0 → **二期建议批量铺开生成式 harness**；Jev 决策模型调研结论不引入）。D-030-1~5 附录 A 🔲 待核。设计 `docs/superpowers/specs/2026-10-03-m6-calibration-design.md`，任务档 `tasks/done/task 030.md`。
 
 ## 里程碑
 
@@ -26,9 +13,23 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 - ✅ M3 启发式 Agent + Runner + 结果库（百局端到端）——task 018–020 全 ✅（2026-08-29）
 - ✅ M4 报告层（胜率 / 决策聚合 / 换卡敏感性）——task 021–023 全 ✅（2026-08-30）
 - ✅ M5 覆盖扩展 + LLM 辅助编写试验——task 024–027、029 全 ✅（2026-09-20，用户确认达成：覆盖清零 81/81 + gate3 42 文件全核 + 附录 A 41 条全核）
-- ⬜ M6 校准基线 + 一期验收
+- ✅ M6 校准基线 + 一期验收——task 030 ✅（2026-10-03，达成待用户确认：偏差表 72 格产出 + 硬验收全过）
 
 ## 工作记录
+
+### 2026-10-03 task 030：M6 校准基线——matrix 跑批 + 偏差表 + 一期验收 ✅
+
+- **前置**：db 侧数据门槛达成（task 057 Limitless online_open 388 场收编：`--basis intl_aligned --min-n 30` 实测 n_games_used≈99,800、头部格 n=1,559、池内 36 配对 72 有向格全在、最小 n=48；TopDeck 路径 task 053 供给侧实证关闭弃用）
+- **流程**：brainstorming 立项（用户三决策：单 task / 每格 500 局 / matrix 声明式 + calibration 报告）→ 设计文档 + Jev 调研落账 → TDD 任务书 → WP1/WP3 子代理 TDD + 主会话合并复核（09-20 降本裁决口径）→ WP2 主会话跑批 → WP4 验收落账
+- **WP1 matrix 骨架（469aa3b）**：池 9 条 en_archetype 映射（实查 db 全命中）；`MatrixCfg` + `ExperimentDef` 双模式互斥校验；`expand_matrix`（种子区间连续不重叠）+ `run_matrix`（group_name 归组）；`experiments_by_group` 访问器；CLI run matrix 分支；14 新测试（919 绿）
+- **WP3 偏差表（298ca17）**：`report/calibration.py`（真实侧注入式可测，分母=决定局、失败局单列、缺格 None 排尾、加权 |Δ| 与 CI 覆盖率汇总）+ `bfsim calibration` 子命令（D-030-1 口径常量钉死）；9 新测试（928 绿）
+- **WP2 跑批**：基准 50 局 4.7s（4 workers）→ 正式 18,000 局 16 workers **6m15s**；失败 12 局（0.067%，全部 `DslError: damage opponent_active 对手战斗场为空`，集中喷火龙大比鸟 5 配对——显式落库不进分母，改 no-op 与否留二期）；确定性复核：配对 1 串行 500 局 vs 并行 **500/500 events_hash 逐局一致**
+- **偏差表（M6 核心产出）**：72 有向格，**加权平均 |Δ| 13.2%（权重=real_n）/ CI 覆盖率 19.4%（14/72）**——系统性偏差存在，符合 PRD §10.2「不设死阈值、作迭代依据」定位。结构信号：赛富豪模拟侧全面偏弱（vs 苍响 Δ-53.8%（real n=68 小样本）/ vs 沙奈朵 -42.5% / vs 玛俐 -31.4% / vs 多龙喷 -29.2%，启发式 Agent 赛富豪轴操作不佳为首要嫌疑）；拟合最佳 沙奈朵×玛俐 Δ0.0%。偏差混杂三层因素（Agent vs 人类 / 同 archetype 异卡表 / EN-CN 环境差），本期只建基线不归因
+- **一期验收**：全量 928 绿 + ruff 零告警；确定性如上；主库只读（calibration 经 SDK）；覆盖 81/81 + 定义库 101 文件维持
+- **LLM 管线评估**（authoring-log 157 条）：池内批 5–9 共 42 文件 first_pass 34/42（批 5–8 全 34/34；批 9 严格口径 0/8=测试脚手架修正非 YAML 返工）；gate3 未封存 80/80 全核销、human_edit_lines 累计 0 → **二期建议：批量铺开生成式 harness**；**Jev（TypeSafe AI System One 决策模型）调研结论不引入**——DSL 编写是纯生成任务范式排除；Agent 决策层范式吻合但撞种子确定性/无外部服务依赖/规模不经济三条硬约束；记观察项（前提=可钉版本+本地运行的 Jev-like 成熟）
+- **落账**：D-030-1~5 附录 A 🔲 待核；设计 `docs/superpowers/specs/2026-10-03-m6-calibration-design.md`；`experiments/m6-calibration.example.yml` 入库；定义库不变（101 文件）
+- **遗留**：D-030-1~5 待用户核销；M6 达成待用户确认；赛富豪偏差归因 + Agent 迭代 + damage 空战斗场 no-op 评估归二期
+- **meta 披露**：跑批期间 rules-reference.md 文档编辑致部分子实验 code_version 记 `298ca17+dirty`（文档 dirt、代码不变，偏差表 meta 如实回显两版本串）
 
 ### 2026-09-20 M5 收口：gate3 攒批 42 文件 + 附录 A 攒批 41 条全部核销 ✅
 
@@ -451,3 +452,4 @@ ptcgdb SDK 已接入（`C:/Vibe Project/Pokearena` 可编辑安装）。
 | 2026-09-06 | DSL 归组口径 =（卡名 + 文本）等价类，**严格拆分**：同语义异措辞也拆（朋友手册「最多2张」/「2张」级别差异不合并）；装载键 name_group → card_id 精确挂载；闸 1 校验文件内 card_ids 归一化 text_raw 一致 | 用户决议（池内实测：112 卡名中 40 个全库多文本、火恐龙/索财灵池内同名异效）；归 task 026 前置 |
 | 2026-09-06 | task 026 re-scope：解锁项驱动替代字母批；顺序 = 装配校验前置 → filters/conditions → trigger_on_event + place_damage_counters → 其余按解锁卡数；老大的指令顺带 | 用户决议；tasks/task 026.md |
 | 2026-09-19 | 卡池 v1 维持锁定（db 新快照 standard-2026-09-16 + 数据至 09-09 后不换池）——校准基线需要池稳定；密勒顿回池评估留待 M6 后 | 用户决议；STATUS 2026-09-19 数据更新验收节 |
+| 2026-10-03 | M6 立项三决策：单 task 030 一次做完 / 模拟矩阵每配对格 500 局 / matrix 声明式实验定义 + `bfsim calibration` 报告（偏差表参数 = matrix YAML 路径非组名）；Jev 决策模型调研后不引入（观察项） | 用户决议；设计文档 2026-10-03-m6-calibration-design.md |

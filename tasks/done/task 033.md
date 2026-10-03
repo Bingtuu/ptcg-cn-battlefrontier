@@ -42,9 +42,9 @@ WP2–WP4 验收：
 
 ## 结果与遗留
 
-**WP1（D-033-1 🔲 待核）**：`damage opponent_active` 空战斗场 no-op 化落地——`_damage` else 分支返回 `reason=no_targets` 结果字典，不再抛 DslError。新测试 `tests/test_damage_empty_active.py`（双段击 fixture：首节点 9999 昏厥 → 次节点 no-op，promote 走队列）。预期修复 M6 12 局 / M8b 18 局失败（同一形态：古玉鱼 嫉妒业火首节点昏厥后次节点读空战斗场）。
+**WP1（D-033-1 ✅ 已核）**：`damage opponent_active` 空战斗场 no-op 化落地——`_damage` else 分支返回 `reason=no_targets` 结果字典，不再抛 DslError。新测试 `tests/test_damage_empty_active.py`（双段击 fixture：首节点 9999 昏厥 → 次节点 no-op，promote 走队列）。预期修复 M6 12 局 / M8b 18 局失败（同一形态：古玉鱼 嫉妒业火首节点昏厥后次节点读空战斗场）。
 
-**WP2（D-033-2 🔲 待核 / D-033-3 ✅）**：
+**WP2（D-033-2 ✅ 已核 / D-033-3 ✅）**：
 - 顶尖捕捉器 → **维持现状**（D-033-3，关闭归正口）：CN text_raw「…互换。**然后**，将自己的战斗宝可梦与备战宝可梦互换。」为顺序「然后」非条件句（对照 EN 印刷 "If you do" 条件句属在地化差异，CN 与日文原版「その後」同构）；无「只有…才可使用」前置 → 对手备战空时整卡可用、第一节点 no-op、自换照算。
 - 学习器自弃 → **归正**（D-033-2）：TPCi Rules Team 2024-07-25 裁决（Compendium「Technical Machine: Evolution / Jamming Tower」条目）——自弃文本 is an effect of the Tool → 阻碍之塔在场时回合末**不弃**。实现：`_discard_turn_end_tools` strip 增 `_tool_suppressed` 守卫（原「不在消除面内」近似作废）；测试 `test_suppress_tool_discard_at_turn_end`（塔在不弃 / 顶掉即恢复自弃）。PRD 与 D-029-2 条目同步修订。
 - aura 去重键粒度 → **维持现状**（D-033-4，关闭归正口）：「拥有这个特性的宝可梦…不会重复」精确去重键 = 特性名，现状按来源卡名去重（D-WP7-3③）；当前池内此类 aura 仅 慷慨（单印刷单文本），同名异特性/异名同特性双向均不可达 → 近似成立，触发重议条件写入附录 A。
@@ -58,4 +58,4 @@ WP2–WP4 验收：
 
 **影响面复跑**：`results/m9-recalibration.db`（36 配对 × 500 局，workers=16）——**失败局 18 → 1**（仅剩 沙奈朵×猛雷鼓厄诡椪 1 局 = M8b 已知 copy_attack 嵌套层级>1 形态，seed 100536，本任务范围外）；原失败局修复后正常完局进分母，相关格胜率小幅变动（如实记录不设阈值，D2-5 口径）。串并一致抽查：matrix 第 1 配对（沙奈朵×喷火龙大比鸟，种子 100000-100499）串行 500 局 vs 并行 events_hash **500/500 全等**（`results/m9-serial-check.db`）。dsl-check 全库 101 文件 OK；全量 964 绿 + ruff 零告警。
 
-**遗留**：①M8b 已知 1 局 `copy_attack 嵌套层级>1` 失败（seed 100536）不在本任务范围，复跑预期仍存在；②MCTS 立项仍待用户拍板；③D-033-1 / D-033-2 附录 A 🔲 待用户核销。
+**遗留**：①M8b 已知 1 局 `copy_attack 嵌套层级>1` 失败（seed 100536）不在本任务范围，复跑预期仍存在；②MCTS 立项仍待用户拍板；③D-033-1 / D-033-2 附录 A ✅ 已核销 2026-10-13。

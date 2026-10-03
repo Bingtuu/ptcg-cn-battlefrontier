@@ -247,6 +247,57 @@ class TestConvergence:
         assert actions[0] == actions[1] and actions[0].kind == "attack"
 
 
+# ── 接线（task 034 WP3：bind_engine 钩子 / type=mcts 构建 / 确定性）────────
+
+
+class TestWiring:
+    def test_play_game_binds_and_completes(self) -> None:
+        """play_game 驱动循环在 observe 前 bind_engine；白板小预算整局打完。"""
+        from helpers import deck60
+
+        from battlefrontier.runner.play import play_game
+
+        agents = [_mcts(worlds=1, iterations=1), _mcts(seed=99, worlds=1, iterations=1)]
+        r = play_game(deck60(), deck60(), seed=3, agents=agents)
+        assert r.phase == "game_over"
+        assert agents[0]._engine is not None and agents[1]._engine is not None
+
+    def test_play_game_same_seed_same_hash(self) -> None:
+        """同种子双跑 events_hash 逐局一致（MCTS 决策确定性，硬验收口径）。"""
+        from helpers import deck60
+
+        from battlefrontier.runner.play import play_game
+
+        def run() -> str:
+            agents = [_mcts(worlds=1, iterations=2), _mcts(seed=99, worlds=1, iterations=2)]
+            return play_game(deck60(), deck60(), seed=5, agents=agents).events_hash
+
+        assert run() == run()
+
+    def test_build_agents_mcts_type(self) -> None:
+        """实验定义 type=mcts 经 build_agents 构建：params 透传 + rng 独立流。"""
+        from battlefrontier.runner.experiment import (
+            AgentCfg,
+            AgentSides,
+            ExperimentDef,
+            build_agents,
+        )
+
+        defn = ExperimentDef(
+            name="t", games=1,
+            decks={"a": {"source": "db", "deck_id": "x"},
+                   "b": {"source": "db", "deck_id": "y"}},
+            agents=AgentSides(
+                a=AgentCfg(type="mcts", params={"worlds": 2, "iterations": 5}),
+                b=AgentCfg(type="heuristic"),
+            ),
+        )
+        agents = build_agents(defn, seed=42)
+        assert isinstance(agents[0], MCTSAgent)
+        assert agents[0].worlds == 2 and agents[0].iterations == 5
+        assert agents[0]._rng is not agents[1].__dict__.get("_rng")
+
+
 # ── 挂接钩子（D-034-1）─────────────────────────────────────────────────────
 
 

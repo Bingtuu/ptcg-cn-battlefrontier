@@ -55,9 +55,11 @@ def test_load_valid(tmp_path):
     "name: t\ngames: 4\ndecks:\n  a: {source: db, deck_id: x}\n",  # 缺 decks.b
     "name: t\ngames: 0\ndecks:\n  a: {source: db, deck_id: x}\n  b: {source: db, deck_id: y}\n",
     ("name: t\ngames: 1\ndecks:\n  a: {source: db, deck_id: x}\n  b: {source: db, deck_id: y}\n"
-     "agents:\n  a: {type: mcts}\n"),                                  # 未知 agent type
+     "agents:\n  a: {type: minimax}\n"),                              # 未知 agent type
     ("name: t\ngames: 1\ndecks:\n  a: {source: db, deck_id: x}\n  b: {source: db, deck_id: y}\n"
      "agents:\n  a: {type: heuristic, params: {w_hindsight: 1}}\n"),   # 未知参数名（不猜）
+    ("name: t\ngames: 1\ndecks:\n  a: {source: db, deck_id: x}\n  b: {source: db, deck_id: y}\n"
+     "agents:\n  a: {type: mcts, params: {time_limit: 5}}\n"),         # mcts 未知参数（禁墙钟，不猜）
     "name: t\ngames: 1\ndecks:\n  a: {source: http, url: x}\n  b: {source: db, deck_id: y}\n",
     "name: t\ngames: 1\ndecks:\n  a: {source: db}\n  b: {source: db, deck_id: y}\n",  # db 缺 deck_id
 ])

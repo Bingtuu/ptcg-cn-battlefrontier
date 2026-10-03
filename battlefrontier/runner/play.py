@@ -58,8 +58,11 @@ def play_game(
         if not actions:  # 防御：理论上各阶段必有可选项
             engine.force_draw(reason="no_legal_actions")
             break
+        agent = agents[player]
+        if hasattr(agent, "bind_engine"):  # MCTS 挂接钩子（D-034-1）
+            agent.bind_engine(engine)
         view = engine.state.visible_state(player)
-        engine.apply(player, agents[player].observe(view, actions))
+        engine.apply(player, agent.observe(view, actions))
 
     s = engine.state
     payload = json.dumps(

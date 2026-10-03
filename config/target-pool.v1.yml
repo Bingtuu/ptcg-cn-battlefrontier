@@ -22,12 +22,12 @@ query:
   legality_constraint: "代表卡组须通过 standard-2026-07-16 校验（当前环境口径）"
   substitution: "放逐Box/雷吉铎拉戈/洛奇亚始祖大鸟/密勒顿 无合法卡组，以退赛后窗口（07-16~08-28，2 场）WUR 前列替补"
 decks:
-  - {archetype: 沙奈朵, wur: 0.129, n: 56, deck_id: "mik_moe:644634", note: "rank 1，2026-08-01，5 次出战；M2 已覆盖（23 卡 DSL 入库）"}
-  - {archetype: 喷火龙 大比鸟, wur: 0.116, n: 42, deck_id: "mik_moe:650353", note: "rank 4，2026-08-01（合法候选最高名次）"}
-  - {archetype: 猛雷鼓 厄诡椪, wur: 0.115, n: 29, deck_id: "mik_moe:652967", note: "rank 1，2026-08-01，4 次出战"}
-  - {archetype: 多龙巴鲁托 黑夜魔灵, wur: 0.056, n: 14, deck_id: "mik_moe:655545", note: "rank 11，2026-08-01（合法候选最高名次）"}
-  - {archetype: 多龙巴鲁托 喷火龙, wur: 0.049, n: 15, deck_id: "mik_moe:655776", note: "rank 1，2026-08-01"}
-  - {archetype: 玛俐的长毛巨魔 雪妖女, wur: 0.027, n: 11, deck_id: "mik_moe:643572", note: "替补（退赛后 WUR 0.120）；rank 2，2026-08-01"}
-  - {archetype: 赛富豪, wur: 0.027, n: 17, deck_id: "mik_moe:655513", note: "替补（退赛后 WUR 0.031）；rank 1，2026-08-01"}
-  - {archetype: 多龙巴鲁托, wur: 0.011, n: 14, deck_id: "mik_moe:648346", note: "替补（退赛后 WUR 0.041）；rank 7，2026-08-01"}
-  - {archetype: 赫普的苍响, wur: 0.004, n: 4, deck_id: "mik_moe:655512", note: "替补（退赛后 WUR 0.019）；rank 1，2026-08-01"}
+  - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.129, n: 56, deck_id: "mik_moe:644634", note: "rank 1，2026-08-01，5 次出战；M2 已覆盖（23 卡 DSL 入库）"}
+  - {archetype: 喷火龙 大比鸟, en_archetype: Charizard Pidgeot, wur: 0.116, n: 42, deck_id: "mik_moe:650353", note: "rank 4，2026-08-01（合法候选最高名次）"}
+  - {archetype: 猛雷鼓 厄诡椪, en_archetype: Raging Bolt Ogerpon, wur: 0.115, n: 29, deck_id: "mik_moe:652967", note: "rank 1，2026-08-01，4 次出战"}
+  - {archetype: 多龙巴鲁托 黑夜魔灵, en_archetype: Dragapult Dusknoir, wur: 0.056, n: 14, deck_id: "mik_moe:655545", note: "rank 11，2026-08-01（合法候选最高名次）"}
+  - {archetype: 多龙巴鲁托 喷火龙, en_archetype: Dragapult Charizard, wur: 0.049, n: 15, deck_id: "mik_moe:655776", note: "rank 1，2026-08-01"}
+  - {archetype: 玛俐的长毛巨魔 雪妖女, en_archetype: Grimmsnarl Froslass, wur: 0.027, n: 11, deck_id: "mik_moe:643572", note: "替补（退赛后 WUR 0.120）；rank 2，2026-08-01"}
+  - {archetype: 赛富豪, en_archetype: Gholdengo, wur: 0.027, n: 17, deck_id: "mik_moe:655513", note: "替补（退赛后 WUR 0.031）；rank 1，2026-08-01"}
+  - {archetype: 多龙巴鲁托, en_archetype: Dragapult, wur: 0.011, n: 14, deck_id: "mik_moe:648346", note: "替补（退赛后 WUR 0.041）；rank 7，2026-08-01"}
+  - {archetype: 赫普的苍响, en_archetype: "Hop's Zacian", wur: 0.004, n: 4, deck_id: "mik_moe:655512", note: "替补（退赛后 WUR 0.019）；rank 1，2026-08-01"}

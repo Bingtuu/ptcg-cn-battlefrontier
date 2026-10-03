@@ -22,6 +22,7 @@ from battlefrontier.agent.heuristic import HeuristicAgent, HeuristicParams
 from battlefrontier.agent.random_agent import RandomAgent
 from battlefrontier.data.cards import carddef_from_db
 from battlefrontier.data.deck import load_deck
+from battlefrontier.data.pool import TargetPool
 from battlefrontier.dsl import CardLibrary, load_card_dir
 from battlefrontier.dsl.schema import CardEffectDoc
 from battlefrontier.engine.rng import RandomSource
@@ -121,14 +122,33 @@ class VariantCfg(FrozenModel):
         return self
 
 
+# ── matchup 矩阵：matrix（task 030，M6 校准基线）───────────
+
+class MatrixCfg(FrozenModel):
+    """matchup 矩阵模式（task 030）：引用卡池文件，展开为全部无向配对子实验。"""
+
+    pool: str                       # target-pool YAML 路径
+    games_per_pair: int = Field(gt=0)
+
+
 class ExperimentDef(FrozenModel):
     name: str
-    games: int = Field(gt=0)
+    games: int | None = Field(default=None, gt=0)
     seed_start: int = 0
-    decks: DeckSides
+    decks: DeckSides | None = None
     agents: AgentSides = Field(default_factory=AgentSides)
     snapshot_date: str | None = None
     variants: list[VariantCfg] = []
+    matrix: MatrixCfg | None = None
+
+    @model_validator(mode="after")
+    def _check_modes(self) -> ExperimentDef:
+        if self.matrix is not None:
+            if self.decks is not None or self.games is not None or self.variants:
+                raise ValueError("matrix 模式与 decks/games/variants 互斥（不猜）")
+        elif self.decks is None or self.games is None:
+            raise ValueError("单实验模式需要 decks + games（不猜）")
+        return self
 
     @model_validator(mode="after")
     def _check_variants(self) -> ExperimentDef:
@@ -302,6 +322,8 @@ def prepare_experiment(defn: ExperimentDef, db_path: str,
     """解析双方卡组（db/file）+ 按卡组卡名过滤 DSL 文档 + 锁定数据版本。"""
     from ptcgdb.sdk import open_db
 
+    # matrix 顶层定义不会走到这里（CLI 先走 run_matrix）；子实验必有 decks
+    assert defn.decks is not None, "prepare_experiment 需要单实验模式或 matrix 子实验"
     warnings: list[str] = []
     decks: list[list[CardDef]] = []
     ids: list[str] = []
@@ -415,6 +437,8 @@ def execute_experiment(prep: PreparedExperiment, defn: ExperimentDef,
                        group_name: str = "", variant: str = "") -> int:
     """跑完实验并增量落库；返回 experiment_id。异常时状态记 aborted 后抛出。"""
     db = ResultsDB(results_path)
+    # matrix 顶层定义不会走到这里（CLI 先走 run_matrix）；子实验必有 games
+    assert defn.games is not None, "execute_experiment 需要单实验模式或 matrix 子实验"
     try:
         exp_id = db.start_experiment(
             name=defn.name, definition_yaml=definition_yaml,
@@ -515,3 +539,48 @@ def run_experiment(defn: ExperimentDef, db_path: str,
     prep = prepare_experiment(defn, db_path, cards_dir=cards_dir)
     return execute_experiment(prep, defn, results_path, workers=workers,
                               definition_yaml=definition_yaml)
+
+
+# ── matrix 展开与执行（task 030 WP1，M6 校准基线）──────────
+
+def expand_matrix(defn: ExperimentDef, pool: TargetPool) -> list[ExperimentDef]:
+    """matrix → 子实验列表：第 k 对（0 起）种子区间
+    [seed_start + k*games_per_pair, seed_start + (k+1)*games_per_pair)。"""
+    if defn.matrix is None:
+        raise ValueError("expand_matrix 需要 matrix 模式实验定义")
+    g = defn.matrix.games_per_pair
+    return [
+        ExperimentDef(
+            name=f"{defn.name}::{a.archetype}×{b.archetype}",
+            games=g,
+            seed_start=defn.seed_start + k * g,
+            decks=DeckSides(
+                a=DeckSourceCfg(source="db", deck_id=a.deck_id),
+                b=DeckSourceCfg(source="db", deck_id=b.deck_id),
+            ),
+            agents=defn.agents,
+            snapshot_date=defn.snapshot_date,
+        )
+        for k, (a, b) in enumerate(pool.matchup_pairs())
+    ]
+
+
+def run_matrix(defn: ExperimentDef, db_path: str,
+               results_path: str | Path = DEFAULT_RESULTS_PATH, *,
+               workers: int = 1, cards_dir: str | Path = DEFAULT_CARDS_DIR,
+               definition_yaml: str = "") -> tuple[list[int], list[str]]:
+    """matrix 模式 prepare + execute 一步走；子实验统一 group_name=defn.name。"""
+    from battlefrontier.data.pool import load_target_pool
+
+    if defn.matrix is None:
+        raise ValueError("run_matrix 需要 matrix 模式实验定义")
+    pool = load_target_pool(defn.matrix.pool)
+    ids: list[int] = []
+    warnings: list[str] = []
+    for sub in expand_matrix(defn, pool):
+        prep = prepare_experiment(sub, db_path, cards_dir=cards_dir)
+        warnings.extend(f"[{sub.name}] {w}" for w in prep.warnings)
+        ids.append(execute_experiment(prep, sub, results_path, workers=workers,
+                                      definition_yaml=definition_yaml,
+                                      group_name=defn.name))
+    return ids, warnings

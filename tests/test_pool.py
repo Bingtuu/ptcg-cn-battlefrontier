@@ -23,12 +23,14 @@ def test_load_real_pool():
 @pytest.mark.parametrize("bad, match", [
     # 缺口径字段
     ({"version": 1, "locked_at": "x", "query": {"window": "w"},
-      "decks": [{"archetype": "a", "wur": 0.1, "n": 5, "deck_id": "s:1"}]}, "query"),
+      "decks": [{"archetype": "a", "en_archetype": "A", "wur": 0.1, "n": 5,
+                 "deck_id": "s:1"}]}, "query"),
     # deck_id 格式错
     ({"version": 1, "locked_at": "x",
       "query": {"window": "w", "division": "master", "basis": "cn", "min_n": 5,
                 "n_tournaments": 6, "snapshot": "s", "name_group_rules_hash": "h"},
-      "decks": [{"archetype": "a", "wur": 0.1, "n": 5, "deck_id": "bad"}]}, "deck_id"),
+      "decks": [{"archetype": "a", "en_archetype": "A", "wur": 0.1, "n": 5,
+                 "deck_id": "bad"}]}, "deck_id"),
     # 卡组为空
     ({"version": 1, "locked_at": "x",
       "query": {"window": "w", "division": "master", "basis": "cn", "min_n": 5,
@@ -38,8 +40,10 @@ def test_load_real_pool():
     ({"version": 1, "locked_at": "x",
       "query": {"window": "w", "division": "master", "basis": "cn", "min_n": 5,
                 "n_tournaments": 6, "snapshot": "s", "name_group_rules_hash": "h"},
-      "decks": [{"archetype": "a", "wur": 0.1, "n": 5, "deck_id": "s:1"},
-                {"archetype": "b", "wur": 0.2, "n": 5, "deck_id": "s:2"}]}, "降序"),
+      "decks": [{"archetype": "a", "en_archetype": "A", "wur": 0.1, "n": 5,
+                 "deck_id": "s:1"},
+                {"archetype": "b", "en_archetype": "B", "wur": 0.2, "n": 5,
+                 "deck_id": "s:2"}]}, "降序"),
 ])
 def test_malformed_pool(tmp_path, bad, match):
     import yaml

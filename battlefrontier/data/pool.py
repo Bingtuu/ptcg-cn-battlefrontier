@@ -25,6 +25,7 @@ class PoolEntry(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     archetype: str = Field(min_length=1)
+    en_archetype: str = Field(min_length=1)  # db EN 对齐段 archetype 名（M6 校准对表键）
     wur: float = Field(gt=0)
     n: int = Field(gt=0)
     deck_id: str
@@ -53,7 +54,16 @@ class TargetPool(BaseModel):
         wurs = [d.wur for d in self.decks]
         if wurs != sorted(wurs, reverse=True):
             raise ValueError("decks 须按 WUR 降序排列")
+        en_names = [d.en_archetype for d in self.decks]
+        if len(en_names) != len(set(en_names)):
+            dupes = sorted(n for n in set(en_names) if en_names.count(n) > 1)
+            raise ValueError(f"en_archetype 重复（映射事故，不猜）: {dupes}")
         return self
+
+    def matchup_pairs(self) -> list[tuple[PoolEntry, PoolEntry]]:
+        """池文件顺序无向对（i<j），镜像不打（D-030-2）。"""
+        return [(a, b) for i, a in enumerate(self.decks)
+                for b in self.decks[i + 1:]]
 
 
 def load_target_pool(path: str | Path) -> TargetPool:

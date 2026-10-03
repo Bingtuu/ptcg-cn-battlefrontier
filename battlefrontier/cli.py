@@ -33,6 +33,23 @@ def _cmd_run(args: argparse.Namespace) -> int:
     defn = load_experiment(exp_path)
     definition_yaml = exp_path.read_text(encoding="utf-8")
     db_path = args.db or load_db_path()
+    if defn.matrix is not None:
+        from battlefrontier.runner.experiment import run_matrix
+
+        ids, warnings = run_matrix(defn, db_path, args.results, workers=args.workers,
+                                   cards_dir=args.cards_dir,
+                                   definition_yaml=definition_yaml)
+        for w in warnings:
+            print(f"[装载告警] {w}")
+        db = ResultsDB(args.results)
+        try:
+            for exp_id in ids:
+                print(_summarize(db, exp_id, db.experiment(exp_id)["name"], defn))
+        finally:
+            db.close()
+        print(f"矩阵完成：{len(ids)} 个配对（结果库 {args.results}）；"
+              f"偏差表用 bfsim calibration {args.experiment} --results {args.results}")
+        return 0
     if defn.variants:
         # 换卡敏感性分组（task 023）：baseline + variants 同种子区间依次跑
         ids, warnings = run_group(defn, db_path, args.results, workers=args.workers,

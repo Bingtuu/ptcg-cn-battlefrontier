@@ -124,6 +124,13 @@ class ResultsDB:
         cols = [d[0] for d in cur.description]
         return dict(zip(cols, row, strict=True))
 
+    def experiments_by_group(self, group_name: str) -> list[dict]:
+        """group_name 下全部实验（id 升序）——calibration 报告按组取数。"""
+        cur = self._conn.execute(
+            "SELECT * FROM experiments WHERE group_name=? ORDER BY id", (group_name,))
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, row, strict=True)) for row in cur.fetchall()]
+
     def games(self, experiment_id: int) -> list[dict]:
         cur = self._conn.execute(
             "SELECT * FROM games WHERE experiment_id=? ORDER BY seed", (experiment_id,))

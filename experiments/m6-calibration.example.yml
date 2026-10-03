@@ -1,0 +1,10 @@
+# M6 校准基线：9 套池 36 配对 × 500 局（task 030）
+# 用法：bfsim run experiments/m6-calibration.example.yml --workers 4 --results results/m6-calibration.db
+name: m6-calibration
+seed_start: 100000
+matrix:
+  pool: config/target-pool.v1.yml
+  games_per_pair: 500
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

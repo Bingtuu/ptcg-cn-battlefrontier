@@ -1,0 +1,13 @@
+# task 035 阶段 B 重点格：多龙巴鲁托喷火龙(heuristic)×赛富豪(MCTS)
+# M9 偏差格 k=27（赛富豪 sim 22.2% vs real 47.9%，Δ-25.6%，real n=562）
+# 种子区间对齐 matrix k=27（113500..113999）；弱侧=赛富豪挂 MCTS（D-035-3 单侧口径）
+# 用法：bfsim run experiments/m8c-spread-gholdengo-dragapult-charizard.example.yml --workers 16 --results results/m8c-spread.db
+name: m8c-spread-gholdengo-dragapult-charizard
+games: 500
+seed_start: 113500
+decks:
+  a: {source: db, deck_id: "mik_moe:655776"}
+  b: {source: db, deck_id: "mik_moe:655513"}
+agents:
+  a: {type: heuristic}
+  b: {type: mcts, params: {worlds: 2, iterations: 50}}

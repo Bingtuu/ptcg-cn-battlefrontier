@@ -1,0 +1,14 @@
+# task 036 D-036-3：沙奈朵(MCTS)×赛富豪(MCTS) 双侧复核
+# M9 最大偏差格 k=5；task 035 单侧 MCTS 残余 -12.9pts（赛富豪侧 52.2% vs real 65.1%）
+# 双侧 MCTS 回答：残余是否来自对照侧 heuristic 沙奈朵操作质量（单侧口径已知局限）
+# 种子区间对齐 matrix k=5（102500..102999，与 task 035 单侧实验同区间可比）
+# 用法：bfsim run experiments/m10-double-mcts-gardevoir-gholdengo.example.yml --workers 16 --results results/m10-double-mcts.db
+name: m10-double-mcts-gardevoir-gholdengo
+games: 500
+seed_start: 102500
+decks:
+  a: {source: db, deck_id: "mik_moe:644634"}
+  b: {source: db, deck_id: "mik_moe:655513"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50}}
+  b: {type: mcts, params: {worlds: 2, iterations: 50}}

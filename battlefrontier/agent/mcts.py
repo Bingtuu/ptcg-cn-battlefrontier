@@ -11,8 +11,9 @@
   ``state.turn >= 根 turn + rollout_turn_cap`` → 0.5。
 - D-034-6/7 随机源：全部随机走自带 _rng 单流——世界克隆与逐迭代克隆的 rng 均
   从 _rng 抽整数派生 RandomSource；零墙钟依赖（预算 = 迭代次数）。
-- D-034-9 挂起根不决定化：根 state.pending_choice 非 None 时直接在真实状态上
-  搜索（挂起池 pool_iids 已被真实对局固定且对选择方是已知信息）。
+- D-039-2（task 039，修订 D-034-9）挂起根部分决定化：根 state.pending_choice
+  非 None 时照常 determinize，freeze = pool_iids ∪ payload——挂起候选池与两段式
+  已选部分对选择方全已知（原位冻结，非泄漏），残余隐藏区不再携带真值进搜索。
 """
 
 from __future__ import annotations
@@ -107,14 +108,20 @@ class MCTSAgent:
         engine = self._engine
         root_player = engine.state.current_player
         root_turn = engine.state.turn
-        # D-034-9：挂起根（pending_choice 非 None）不决定化，直接在真实状态上搜索
-        determinize_root = engine.state.pending_choice is None
+        # D-039-2（task 039，修订 D-034-9）：挂起根也决定化——freeze =
+        # pool_iids ∪ payload（挂起池对选择方全已知，冻结原位非泄漏），
+        # 残余隐藏区（对手手牌/双方牌库序/奖赏）照常重洗；非挂起根 freeze 为空
+        pending = engine.state.pending_choice
+        freeze: frozenset[int] = (
+            frozenset(pending.pool_iids) | frozenset(pending.payload)
+            if pending is not None
+            else frozenset()
+        )
         counts: dict[Action, int] = {}
         for _ in range(self.worlds):
             world_rng = RandomSource(self._rng.randbelow(_SEED_MOD))
             world = engine.clone(rng=world_rng)
-            if determinize_root:
-                world.state = determinize(world.state, root_player, world_rng)
+            world.state = determinize(world.state, root_player, world_rng, freeze=freeze)
             root = _Node(root_player, world.legal_actions(root_player))
             # 逐迭代克隆用固定种子（determinization 含未来随机性一并钉死）：
             # 同行动路径回放必达同状态，树边行动恒合法；世界内全确定，

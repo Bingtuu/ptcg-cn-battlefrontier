@@ -1,20 +1,24 @@
-"""task 034 WP2：MCTS 搜索核心验收测试（D-034-1/4/5/6/7/9）。
+"""task 034 WP2：MCTS 搜索核心验收测试（D-034-1/4/5/6/7/9）+ task 039 修订。
 
 D-034-4 多世界 determinized UCT：同种子同引擎状态 → 同决策（含连续多决策）；
 预算参数生效；跨世界聚合平手取 legal_actions 序靠前者。
-D-034-9 挂起根不决定化：pending_choice 非 None 的根不经过 determinize，
-搜索正常返回合法 choose 行动。
+D-039-2（修订 D-034-9）挂起根部分决定化：pending_choice 非 None 的根照常
+determinize，freeze = pool_iids ∪ payload（已知候选池原位冻结），搜索返回
+合法 choose 且 determinized 世界可正常续跑。
 收敛性：一手即可斩杀的明显优劣局面，大预算收敛到斩杀。
 """
 
+from pathlib import Path
+
 import pytest
-from helpers import engine_at, inst, main_state
+from helpers import basic, energy, engine_at, in_play, inst, main_state
 
 from battlefrontier.agent.mcts import MCTSAgent, _select_action
 from battlefrontier.dsl import parse_card_doc
+from battlefrontier.dsl.loader import load_card_doc
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.rng import RandomSource
-from battlefrontier.engine.state import CardDef, GameState
+from battlefrontier.engine.state import CardDef, GameState, PlayerState
 
 
 def item(name: str) -> CardDef:
@@ -142,45 +146,61 @@ class TestBudgetAndAggregation:
         assert _select_action(legal, {legal[1]: 1}) == legal[1]
 
 
-# ── 挂起根不决定化（D-034-9）──────────────────────────────────────────────
+# ── 挂起根部分决定化（task 039 WP2，D-039-2 修订 D-034-9）────────────────
 
 
 class TestPendingChoiceRoot:
-    def _pending_engine(self):
-        """构造 pending_choice 挂起局面（高级球 cost 段挂起，仿 test_determinize）。"""
+    def _pending_engine(self, stage: str = "cost"):
+        """构造 pending_choice 挂起局面（高级球挂起，仿 test_determinize）。
+
+        stage="cost"：cost 段挂起（own_hand 池弃 2）；stage="deck"：完成第一段
+        后停在牌库检索挂起（own_deck 池，冻结卡落在己方牌库——freeze 实质生效面）。
+        """
         state = main_state(p0_extra_hand=(inst(60, item("高级球")),))
         engine = engine_at(state)
         engine.card_effects = {"高级球": ULTRA_BALL_DOC}
         engine.apply(0, Action(kind="play_trainer", iid=60))
         assert engine.state.phase == "choice" and engine.state.pending_choice is not None
+        if stage == "deck":
+            engine.apply(0, next(a for a in engine.legal_actions(0) if a.kind == "choose"))
+            assert engine.state.phase == "choice"
+            assert engine.state.pending_choice.pool == "own_deck"
         return engine
 
-    def test_pending_root_skips_determinize(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """挂起根不调用 determinize（D-034-9：pool_iids 已被真实对局固定）。"""
-        calls = []
+    def test_pending_root_determinizes_with_freeze(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """挂起根也决定化（D-039-2 修订 D-034-9）：每世界恰好一次，
+        freeze == pool_iids ∪ payload（已知候选池冻结，残余隐藏区照常重洗）。"""
+        calls: list[frozenset[int]] = []
         import battlefrontier.agent.mcts as mcts_mod
 
-        def spy(state, player, rng):
-            calls.append(1)
-            return state
+        real = mcts_mod.determinize
+
+        def spy(state, player, rng, freeze=frozenset()):
+            calls.append(freeze)
+            return real(state, player, rng, freeze=freeze)
 
         monkeypatch.setattr(mcts_mod, "determinize", spy)
-        engine = self._pending_engine()
+        engine = self._pending_engine(stage="deck")
+        pc = engine.state.pending_choice
+        expected = frozenset(pc.pool_iids) | frozenset(pc.payload)
+        assert expected  # own_deck 检索池非空，冻结实质生效
         legal = engine.legal_actions(0)
         assert legal and all(a.kind == "choose" for a in legal)
         agent = _mcts(worlds=3)
         agent.bind_engine(engine)
         action = agent.observe(engine.state.visible_state(0), legal)
         assert action in legal and action.kind == "choose"
-        assert calls == []  # 挂起根一次都不决定化
+        assert calls == [expected] * 3  # 每世界一次，冻结集正确
 
     def test_normal_root_determinizes_per_world(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """非挂起根：每世界恰好决定化一次。"""
-        calls = []
+        """非挂起根：每世界恰好决定化一次，freeze 为空（行为与现状一致）。"""
+        calls: list[frozenset[int]] = []
         import battlefrontier.agent.mcts as mcts_mod
 
-        def spy(state, player, rng):
-            calls.append(1)
+        def spy(state, player, rng, freeze=frozenset()):
+            calls.append(freeze)
             return state
 
         monkeypatch.setattr(mcts_mod, "determinize", spy)
@@ -189,7 +209,34 @@ class TestPendingChoiceRoot:
         agent = _mcts(worlds=3, iterations=2)
         agent.bind_engine(engine)
         agent.observe(engine.state.visible_state(0), legal)
-        assert len(calls) == 3
+        assert calls == [frozenset()] * 3
+
+    def test_pending_root_freeze_keeps_pool_recoverable(self) -> None:
+        """挂起根 determinize 后 pool_iids 全部原位可恢复（同区域同下标），
+        合法选择枚举不变，determinized 世界可正常 choose 续跑。"""
+        from battlefrontier.agent.determinize import determinize
+        from battlefrontier.dsl.chooser import enumerate_choices
+
+        engine = self._pending_engine(stage="deck")
+        pc = engine.state.pending_choice
+        freeze = frozenset(pc.pool_iids) | frozenset(pc.payload)
+        legal_before = engine.legal_actions(0)
+        for seed in range(5):
+            d = determinize(engine.state, 0, RandomSource(seed), freeze=freeze)
+            deck = d.players[0].deck
+            for pos, c in enumerate(deck):
+                if c.iid in freeze:
+                    # 原位保持：真实牌库同下标即该 iid
+                    assert engine.state.players[0].deck[pos].iid == c.iid
+            assert {c.iid for c in deck} == {
+                c.iid for c in engine.state.players[0].deck
+            }  # 牌库多重集合守恒
+            assert enumerate_choices(d.pending_choice) == legal_before  # 合法性不破
+            # determinized 世界续跑：choose 恢复到底不失败
+            w = engine.clone(rng=RandomSource(seed))
+            w.state = d
+            w.apply(0, legal_before[0])
+            assert w.state.pending_choice is None or w.state.phase == "choice"
 
     def test_pending_root_search_resumes_legally(self) -> None:
         """挂起局面完整搜索（真 determinize、真 rollout），返回合法 choose。"""
@@ -248,7 +295,6 @@ class TestConvergence:
 
 
 # ── 接线（task 034 WP3：bind_engine 钩子 / type=mcts 构建 / 确定性）────────
-
 
 class TestWiring:
     def test_play_game_binds_and_completes(self) -> None:
@@ -315,3 +361,146 @@ class TestBindEngine:
         agent = _mcts()
         only = Action(kind="end_turn")
         assert agent.observe(None, [only]) == only  # type: ignore[arg-type]
+
+
+# ── 挂起根端到端：真实 chooser 卡（task 039 WP2 验收 2）────────────────────
+
+PRO_DOC = load_card_doc(Path(__file__).parent.parent / "cards" / "能量输送PRO.yml")
+
+
+def _pro_pending_engine():
+    """能量输送PRO 挂起局面（own_deck any_count+distinct 检索，真实 DSL 文档）。
+
+    牌库混多属性基本能量 + 宝可梦（检索池非空、分桶 >1，冻结实质生效）。
+    """
+    types = ["草", "火", "水", "雷"]
+    deck = tuple(
+        inst(100 + i, energy(f"基本{t}能量", t)) for i, t in enumerate(types * 2)
+    ) + tuple(inst(120 + i, basic(f"妙蛙种子{i}")) for i in range(6))
+    p0 = PlayerState(
+        deck=deck,
+        hand=(inst(50, basic("小火龙")), inst(60, item("能量输送PRO"))),
+        prizes=tuple(inst(200 + i, basic(f"奖{i}")) for i in range(6)),
+        active=in_play(1, basic("妙蛙种子"), 1),
+    )
+    s = main_state().model_copy(update={"players": (p0, main_state().players[1])})
+    engine = engine_at(s)
+    engine.card_effects = {"能量输送PRO": PRO_DOC}
+    engine.apply(0, Action(kind="play_trainer", iid=60))
+    assert engine.state.phase == "choice" and engine.state.pending_choice is not None
+    assert engine.state.pending_choice.pool == "own_deck"
+    return engine
+
+
+class TestPendingRootRealCard:
+    def test_pro_pending_root_search_and_resume(self) -> None:
+        """能量输送PRO 挂起根：MCTS 搜索（真 determinize + freeze）返回合法
+        choose，恢复后效果结算到底（reveal + shuffle_deck 完成回主阶段）。"""
+        engine = _pro_pending_engine()
+        pc = engine.state.pending_choice
+        legal = engine.legal_actions(0)
+        assert legal and all(a.kind == "choose" for a in legal)
+        for seed in (3, 5, 7):
+            agent = _mcts(seed=seed, worlds=2, iterations=6)
+            agent.bind_engine(engine)
+            action = agent.observe(engine.state.visible_state(0), legal)
+            assert action in legal
+            assert set(action.choices) <= set(pc.pool_iids)
+        # 真实引擎零污染，选择一个分支续跑到底
+        engine.apply(0, legal[-1])
+        assert engine.state.phase == "main" and engine.state.pending_choice is None
+
+    def test_pro_full_game_zero_failure(self) -> None:
+        """带 能量输送PRO 的 MCTS 对局零失败（挂起根部分决定化全链路冒烟，
+        D-039-4）：PRO 先手驱动器保证挂起根在每局出现。"""
+        from battlefrontier.runner.play import play_game
+
+        class _ProFirstMCTS(MCTSAgent):
+            """手牌可打 能量输送PRO 则直接打出（制造挂起根），否则走 MCTS。"""
+
+            def observe(self, view, legal_actions):
+                for c in view.own.hand:
+                    if c.card.name == "能量输送PRO":
+                        act = next(
+                            (a for a in legal_actions
+                             if a.kind == "play_trainer" and a.iid == c.iid),
+                            None,
+                        )
+                        if act is not None:
+                            return act
+                return super().observe(view, legal_actions)
+
+        deck = (
+            [basic("妙蛙种子")] * 16 + [basic("小火龙")] * 16
+            + [energy("基本草能量", "草")] * 8 + [energy("基本火能量", "火")] * 8
+            + [energy("基本水能量", "水")] * 8 + [item("能量输送PRO")] * 4
+        )
+        assert len(deck) == 60
+        saw_pro_choose = False
+        for seed in (3, 5, 7):
+            agents = [
+                _ProFirstMCTS(RandomSource(seed), worlds=1, iterations=2),
+                _mcts(seed=seed + 1000, worlds=1, iterations=2),
+            ]
+            r = play_game(deck, deck, seed=seed, card_effects={"能量输送PRO": PRO_DOC},
+                          agents=agents)
+            assert r.phase == "game_over"
+            saw_pro_choose |= any(
+                ev.kind == "choose" and "能量输送PRO" in str(ev.detail.get("effect_id", ""))
+                for ev in r.events
+            )
+        assert saw_pro_choose  # 覆盖断言：至少一局真的走了 PRO 挂起根
+
+
+# ── 串/并行一致性回归（task 039 验收 4，仿 test_experiment 对拍口径）────────
+
+
+class TestSerialParallel:
+    MCTS_YAML = """
+name: mcts-par
+games: 4
+seed_start: 200
+decks:
+  a: {source: db, deck_id: "x"}
+  b: {source: db, deck_id: "y"}
+agents:
+  a: {type: mcts, params: {worlds: 1, iterations: 2}}
+  b: {type: mcts, params: {worlds: 1, iterations: 2}}
+"""
+
+    def test_mcts_experiment_parallel_matches_serial(self, tmp_path) -> None:
+        """type=mcts 实验定义：workers=1 vs workers=2 逐局一致（含 setup 期
+        对手场上入池后的世界采样——每局决策都从布阵阶段开始）。"""
+        from helpers import deck60
+
+        from battlefrontier.runner.experiment import (
+            PreparedExperiment,
+            execute_experiment,
+            load_experiment,
+        )
+        from battlefrontier.runner.results_db import ResultsDB
+
+        yml = tmp_path / "exp.yml"
+        yml.write_text(self.MCTS_YAML, encoding="utf-8")
+        defn = load_experiment(yml)
+        prep = PreparedExperiment(
+            deck_a=deck60(), deck_b=deck60(), card_effects={},
+            deck_a_id="stub", deck_b_id="stub", data_version="test")
+
+        def snapshot(db_path, workers: int):
+            db = ResultsDB(db_path)
+            try:
+                exp_id = execute_experiment(
+                    prep, defn, db_path, workers=workers,
+                    definition_yaml=self.MCTS_YAML)
+                return [
+                    (g["seed"], g["winner"], g["is_draw"], g["turns"], g["events_hash"])
+                    for g in db.games(exp_id)
+                ]
+            finally:
+                db.close()
+
+        serial = snapshot(tmp_path / "s.db", workers=1)
+        parallel = snapshot(tmp_path / "p.db", workers=2)
+        assert len(serial) == 4
+        assert serial == parallel

@@ -4,7 +4,7 @@
 
 ## 当前
 
-**当前**：二期 M7–M10 全部收官（2026-10-13）+ **task 037 引擎性能优化 ✅（2026-10-14）**——MCTS 基准 -38.5%（标准档 2×50 外推 219s→~135s/局/worker），行为零变化（events_hash 100/100 逐局全等 × 双口径、996 绿）。**下一步候选** = Mega 规则调研（D2-6 步骤①，简中 Mega 主系列未发售、调研以 JP/EN 为辅证并标注）/ MCTS 决策分析（性能优化后成本已降，可立项）/ db 侧数据协同（苍响格小样本复核 + 卡池 v2 前置）。
+**当前**：**task 039 MCTS 信息泄漏修复 ✅（2026-10-14）**——code review 设计级遗留两项清零：挂起根改带冻结集的部分 determinize（freeze=pool_iids∪payload，修订 D-034-9→D-039-2）+ setup 期对手背面布阵纳入隐藏区重采样（D-039-3）；1040 绿 + ruff 零告警 + 真实卡组 MCTS 冒烟 4 局零失败。**口径分界**：M8c/M10 历史 MCTS 数字带旧泄漏口径（泄漏只让 MCTS 偏强，归因方向更硬）；修复后 MCTS 胜率口径自此任务起算。task 038 修复包 ✅ 同日落地。**遗留** = DSL 路径串并一致性对拍测试空洞 + flip_heads_count 挂起穿透（下一张 until_tails+chooser 卡前必修）。**下一步候选** = Mega 规则调研（D2-6 步骤①）/ MCTS 决策分析 / db 侧数据协同（苍响格小样本复核 + 卡池 v2 前置）。
 
 **二期 PRD v1.0 已立项（2026-10-03）**：`docs/superpowers/specs/2026-10-03-phase2-prd-design.md`——四条线范围拍定（D2-1~D2-8）：主线 = Agent 升级（task 031 偏差归因 → D2-3 门控 MCTS）；LLM 铺开 = 增量模式暂不申请 API key；引擎收尾四项固定；环境演进 = Mega 调研先行。里程碑 M7（归因）→ M8（决策层升级）→ M9（收尾+调研）→ M10（校准复核）。
 
@@ -26,6 +26,22 @@
 - ✅ M10 二期校准复核——task 036 ✅（2026-10-13：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 13.2% → M9 15.0% 轨迹）；D2-7 归因闭环 ✅——|Δ|≥25% 五格全有解释+证据 id，沙奈朵/玛俐/猛雷鼓三对 CI 双覆盖（|Δ|≤1.3）；沙奈朵格双侧 MCTS 500 局零失败：63.8% vs real 65.1%，单侧残余完整归因「对照侧启发式操作质量」；**二期 M7–M10 全段收官**）
 
 ## 工作记录
+
+### 2026-10-14 task 039：MCTS 信息泄漏修复（带冻结集的部分 determinize）✅
+
+- **来源**：code review R3 组 Important #2/#3（主会话复核成立）——determinize 隐藏区模型覆盖不全的两面
+- **落地**：①D-039-1 冻结集机制 `determinize(..., freeze=)`——冻结 iid 原位保持、其余隐藏区重洗回填，空 freeze 与旧实现逐字节同序；②D-039-2 挂起根不再跳过 determinize（freeze=pool_iids∪payload，候选池对选择方全已知故冻结非泄漏，残余隐藏区不再携带真值进搜索——修订 D-034-9，task 034.md 已加注）；③D-039-3 setup 期（state.py face_down 口径）对手场上卡收回采样池、按基础宝可梦子集重采样发回原数量，entered_play_this_turn 随新场上卡同步（实施期补充细节，主会话裁决批准）
+- **验收**：五条全过——freeze 守恒/确定性、挂起根 pool_iids 可恢复 + 真实卡（能量输送PRO）MCTS 端到端 3 种子零失败、setup 期场上卡跨 world 分布变化且全基础、type=mcts 实验串并对拍逐局一致；1040 绿（1020+20）+ ruff 零告警 + 真实卡组 CLI 冒烟 4 局零失败
+- **口径分界**：M8c/M10 历史 MCTS 数字带旧泄漏口径（泄漏只让 MCTS 偏强，修复后结论方向更硬，不重跑全量）；修复后数字自此任务起算
+- **权威测试变动**：`test_pending_root_skips_determinize` 被 D-039-2 废止改写为 freeze 断言——任务文档授权，非迁就实现
+
+### 2026-10-14 task 038：code review 修复包（缓存契约 + 静默失败族）✅
+
+- **流程**：全库 code review（6 组 reviewer 子代理并行：R1 引擎 / R2 DSL / R3 Agent / R4 Runner+数据 / R5 报告+CLI / R6 测试横向）→ 主会话逐条复核（11 Important 全部读码验证无误报，0 Critical）→ 立项打包修复「立即修 + 静默失败族」6 项（D-038-1~6）→ 子代理 TDD 实施 → 主会话独立复验
+- **修复六项**：①legal_actions 恒等缓存两路径返回副本（4 组同报的别名地雷，MCTS pop(0) 不再触及缓存）；②DSL args 键名白名单 PRIMITIVE_ARGS 44 原语登记 + 装载期校验（拼错键 DslError，不再静默取默认）；③Effect.attack 两级校验（loader 级非 on_attack 禁带 attack + 闸 1 --db 级招式名命中卡面/grant_attack 集合，打错不再静默白板）；④execute_experiment 兜底改 BaseException（Ctrl+C 落 aborted 不再永挂 running）+ 报告层非完成态告警行（告警不排除数据）；⑤sensitivity 双侧 meta 回显 + 版本/种子不一致告警；⑥calibration 组内同名子实验 >1 套抛 ValueError（不猜取最新）
+- **裁决记录**：子代理上报 IONO 合成 fixture 死键 `both_players` 删除——主会话核实实现零读点、真实 cards/奇树.yml 用显式 opponent 选择器，**批准**（删死键非迁就实现）；grant_attack 豁免（招式学习器卡面无招式）为实现期合理发现，接纳
+- **验收**：1020 绿（996+24 新测试）+ ruff 零告警 + 闸 1 dsl-check --db 101/101 零 FAIL（白名单无漏键、招式名校验零误报）
+- **遗留（review 报告未修项）**：设计级两条 MCTS 信息泄漏（挂起根真实隐藏区 rollout mcts.py:110 / 布阵期背面卡不进 determinize 池）+ DSL 路径串并一致性对拍测试空洞 + flip_heads_count 挂起穿透缺环（下一张 until_tails+chooser 卡前必修）——均待拍板立项
 
 ### 2026-10-14 task 037：引擎性能优化（MCTS 规模化瓶颈清偿）✅
 

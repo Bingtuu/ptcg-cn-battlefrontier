@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 
-class Action(BaseModel):
-    """一个合法行动。kind 为开放字符串（词表随阶段机扩展）；iid/target 指向卡实例。"""
+@dataclass(frozen=True, slots=True)
+class Action:
+    """一个合法行动。kind 为开放字符串（词表随阶段机扩展）；iid/target 指向卡实例。
 
-    model_config = ConfigDict(frozen=True)
+    task 037 WP2：pydantic FrozenModel → dataclass——合法行动枚举是引擎最热路径
+    （MCTS rollout 每节点一次，单局百万级构造），pydantic 校验/快构造的双端开销
+    在这里是纯浪费；dataclass frozen 保持同等不可变 + 值相等 + 可哈希语义。
+    """
 
     kind: str
     iid: int | None = None

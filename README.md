@@ -145,7 +145,7 @@ bfsim dsl-check cards/*.yml --db <卡牌数据库>   # 追加校验：卡牌存�
 
 ## 项目状态
 
-一期里程碑 M1–M6 全部完成（2026-10-03）；二期进行中——M7 偏差归因、M8 决策层升级（启发式修复 + **MCTS 已落地**）、M9 引擎收尾均已完成（2026-10-13）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性报告与模拟 vs 真实赛事校准偏差表。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
+一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-13）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS 63.8% vs 真实 65.1% 命中）；其后完成引擎性能优化（MCTS 成本 -38.5%，行为零变化，2026-10-14）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性报告与模拟 vs 真实赛事校准偏差表。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
 
 ## ⚖️ 合规声明
 

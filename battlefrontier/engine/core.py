@@ -287,10 +287,12 @@ class GameEngine:
         # 缓存命中即免去一次全量重枚举。缓存槽持有状态强引用（防 id 复用误判）
         cache = self._legal_cache
         if cache is not None and cache[0] is self.state and cache[1] == player:
-            return cache[2]
+            return list(cache[2])
         actions = self._enumerate_actions(player)
         self._legal_cache = (self.state, player, actions)
-        return actions
+        # 两条路径都返回副本（task 038，D-038-1）：缓存槽内部 list 永不外露——
+        # 调用方（如 MCTS untried.pop(0)）原地变异返回值不得掏空缓存
+        return list(actions)
 
     def _enumerate_actions(self, player: int) -> list[Action]:
         s = self.state

@@ -147,7 +147,9 @@ def _check_doc_against_db(doc, db, legal_ids: frozenset, snapshot_id: str) -> No
 
     ① card_ids 非空（挂载键必填）且全部存在于 db；② 文件内所有 card_ids 的
     归一化 text_raw（去全部空白）完全一致（不一致列出分歧 card_id 分组）；
-    ③ 每个 card_id 在最新 standard 合法性快照（LegalityPool，含再录合法）内。
+    ③ 每个 card_id 在最新 standard 合法性快照（LegalityPool，含再录合法）内；
+    ④ on_attack 效果的 attack 绑定名 ∈ 卡面招式名集合 ∪ 本文件 grant_attack
+    声明授予的招式名（task 038，D-038-3②：打错招式名不再静默退化为白板）。
     """
     from battlefrontier.dsl.loader import DslError
 
@@ -155,12 +157,14 @@ def _check_doc_against_db(doc, db, legal_ids: frozenset, snapshot_id: str) -> No
         raise DslError("card_ids 为空——挂载键必填（装载键 = card_id 精确挂载）")
     texts: dict[str, str] = {}
     marks: dict[str, str] = {}
+    attack_names: set[str] = set()
     for cid in doc.card.card_ids:
         card = db.get_card(cid)
         if card is None:
             raise DslError(f"未知 card_id '{cid}'（db 无此印刷）")
         texts[cid] = "".join(card.text_raw.split())
         marks[cid] = card.regulation_mark
+        attack_names.update(a.name for a in (card.attacks or ()))
     distinct = set(texts.values())
     if len(distinct) > 1:
         groups: dict[str, list[str]] = {}
@@ -176,11 +180,29 @@ def _check_doc_against_db(doc, db, legal_ids: frozenset, snapshot_id: str) -> No
         raise DslError(
             f"印刷不在最新 standard 合法性快照 {snapshot_id}（退环境/未收录）："
             + "、".join(illegal))
+    # 本文件 grant_attack 声明授予的招式名同样合法（招式学习器「进化/退化」：
+    # 道具卡面无招式，招式由 DSL 声明授予持有宝可梦）
+    granted = {
+        node.args["attack"]
+        for eff in doc.effects for node in (*eff.cost, *eff.actions)
+        if node.action == "grant_attack" and node.args.get("attack")
+    }
+    for effect in doc.effects:
+        if (
+            effect.trigger == "on_attack" and effect.attack is not None
+            and effect.attack not in attack_names | granted
+        ):
+            raise DslError(
+                f"on_attack 招式绑定 '{effect.attack}' 不在卡面招式集合"
+                f" {sorted(attack_names)}（打错不猜——绑定落空会静默退化为白板；"
+                f"grant_attack 授予招式须与本文件声明一致 {sorted(granted) or '（无）'}）"
+            )
 
 
 def _cmd_dsl_check(args: argparse.Namespace) -> int:
     """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验；
-    --db 追加装配校验（task 026：card_id 存在 / 文本等价类一致 / 赛制合法）。"""
+    --db 追加装配校验（task 026：card_id 存在 / 文本等价类一致 / 赛制合法；
+    task 038：on_attack 招式绑定名命中卡面招式）。"""
     from battlefrontier.dsl.loader import DslError, load_card_doc
 
     db = None

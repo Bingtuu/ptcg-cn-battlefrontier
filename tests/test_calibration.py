@@ -201,6 +201,43 @@ def test_子实验缺失_ValueError(db_path):
         _report(db_path, [], pool=_pool3())
 
 
+# ── task 038 F4（D-038-4）：非完成态子实验告警 ──────────────
+
+def test_同名子实验重复_ValueError(db_path):
+    """task 038 F6（D-038-6）：组内同名子实验 >1 套 → ValueError 列出重复名
+    （不猜取最新；项目惯例重跑用新库文件）。"""
+    db = ResultsDB(db_path)
+    try:
+        db.start_experiment(name="m6t::A宝×B宝", definition_yaml="y",
+                            code_version="cv", data_version="dv", group_name="m6t")
+    finally:
+        db.close()
+    with pytest.raises(ValueError, match="同名子实验") as exc_info:
+        _report(db_path, [])
+    assert "m6t::A宝×B宝" in str(exc_info.value)
+
+
+def test_非完成态子实验_告警但不排除数据(db_path):
+    """组内含 aborted 子实验 → meta 告警 + 输出告警行；格子数据照常呈现。"""
+    db = ResultsDB(db_path)
+    try:
+        db._conn.execute("UPDATE experiments SET status='aborted'")
+        db._conn.commit()
+    finally:
+        db.close()
+    rep = _report(db_path, [_real("Alpha", "Beta", 100, 0.60)])
+    assert any("aborted" in w and "m6t::A宝×B宝" in w for w in rep.meta["warnings"])
+    out = format_calibration(rep)
+    assert "告警" in out and "aborted" in out
+    assert "A宝 vs B宝" in out and "加权平均" in out  # 告警不排除数据
+
+
+def test_完成态无告警(db_path):
+    rep = _report(db_path, [_real("Alpha", "Beta", 100, 0.60)])
+    assert rep.meta["warnings"] == []
+    assert "告警" not in format_calibration(rep)
+
+
 # ── 验收 6：format_calibration 文本 ───────────────────────
 
 def test_format_含meta全要素与逐格行汇总行(db_path):

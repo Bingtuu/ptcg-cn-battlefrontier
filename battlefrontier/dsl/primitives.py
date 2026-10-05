@@ -25,6 +25,65 @@ from battlefrontier.engine.state import (
     SpecialCondition,
 )
 
+# args 键名白名单（task 038，D-038-2）：逐原语从实现（含引擎声明式读点与
+# chooser 可行性门读点）的 args.get/args[...] 收集；loader 装载期校验
+# node.args 键 ⊆ 本表，未知键 DslError（打错键不再静默取默认，「未知词不猜」）。
+# 词表新原语必须同步在此登记（缺登记 = 装载报错，防漏）；空 frozenset = 该原语
+# 不接受任何 args 键。
+PRIMITIVE_ARGS: dict[str, frozenset[str]] = {
+    # ── 解释执行原语（本文件 @register）──────────────────────
+    "draw": frozenset({"until_hand"}),
+    "discard": frozenset({"any_count"}),
+    "search_deck": frozenset({
+        "any_count", "choose_groups", "distinct", "ordered", "rest", "split", "top_n",
+    }),
+    "shuffle_deck": frozenset(),
+    "recover_from_discard": frozenset({"exclude_cost_discarded", "up_to"}),
+    "attach_energy": frozenset({
+        "damage_counters", "distribute", "energy_up_to", "multi_target",
+        "target_filters", "target_pool",
+    }),
+    "damage": frozenset({"amount", "base", "op", "per"}),
+    "clear_status": frozenset(),
+    "apply_status": frozenset({"status"}),
+    "switch": frozenset(),
+    "move_energy": frozenset({"target_filters"}),
+    "evolve": frozenset({"mode"}),
+    "move_damage_counters": frozenset({"max_counters", "target_pool"}),
+    "copy_attack": frozenset(),
+    "hand_to_deck_bottom": frozenset(),
+    "heal": frozenset({"amount"}),
+    "coin_flip": frozenset({"times", "until_tails"}),
+    "bounce": frozenset({"attachments"}),
+    "ko_self": frozenset(),
+    "place_damage_counters": frozenset({"counters", "distribute"}),
+    "reveal": frozenset(),
+    "lock_attack": frozenset(),
+    "prize_bonus": frozenset({"amount", "scope"}),
+    "transform": frozenset(),
+    "hand_disrupt": frozenset(),
+    "lock_retreat": frozenset(),
+    "lock_play": frozenset({"category"}),
+    "devolve": frozenset(),
+    "modify_damage": frozenset({"amount", "scope", "target_rule_box"}),
+    "discard_stadium": frozenset(),
+    "shuffle_hand_into_deck": frozenset(),
+    "mill": frozenset(),
+    # ── 声明式原语（passive_static，引擎读声明，解释器不执行）────
+    "modify_hp": frozenset({"amount"}),
+    "grant_attack": frozenset({"attack", "discard_at_turn_end"}),
+    "modify_weakness": frozenset({"becomes", "scope", "target_type"}),
+    "modify_retreat_cost": frozenset({"scope", "value"}),
+    "modify_attack_cost": frozenset({"attack", "value"}),
+    "bench_size": frozenset({"value"}),
+    "protection": frozenset({"scope", "target_filters"}),
+    "provide_energy": frozenset({"count", "types"}),
+    "suppress_ability": frozenset({"types"}),
+    "suppress_tool": frozenset(),
+    # ── 词表已有、实现未注册的原语（占位：不接受 args；实现时收紧）──
+    "put_into_play": frozenset(),
+}
+
 
 def _require_no_choose(node: ActionNode, name: str) -> None:
     if node.choose is not None:

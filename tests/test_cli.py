@@ -212,3 +212,38 @@ def test_dsl_check_db_全库扫描全_OK(capsys):
     out = capsys.readouterr().out
     assert rc == 0, out
     assert "FAIL" not in out
+
+
+# ── task 038 F3②（D-038-3）：on_attack 招式名须命中卡面招式 ──
+# 波波 151C-016 卡面招式 = 呼朋引伴 / 撞击
+
+ATTACK_YAML = """\
+card:
+  name_group: 波波
+  card_ids: [151C-016]
+effects:
+  - trigger: on_attack
+    attack: {attack}
+    actions:
+      - {{action: draw, count: 1}}
+"""
+
+
+def _check_attack(tmp_path, attack: str, capsys):
+    p = tmp_path / "atk.yml"
+    p.write_text(ATTACK_YAML.format(attack=attack), encoding="utf-8")
+    rc = main(["dsl-check", str(p), "--db", str(DB_PATH)])
+    return rc, capsys.readouterr().out
+
+
+@needs_db
+def test_dsl_check_db_招式名打错_FAIL(tmp_path, capsys):
+    """on_attack 绑定卡面不存在的招式名 → FAIL（不再静默退化为白板）。"""
+    rc, out = _check_attack(tmp_path, "呼朋引伴噢", capsys)
+    assert rc == 1 and "FAIL" in out and "呼朋引伴噢" in out
+
+
+@needs_db
+def test_dsl_check_db_招式名命中_OK(tmp_path, capsys):
+    rc, out = _check_attack(tmp_path, "呼朋引伴", capsys)
+    assert rc == 0 and "OK" in out

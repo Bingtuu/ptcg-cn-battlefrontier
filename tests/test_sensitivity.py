@@ -117,3 +117,71 @@ def test_format_sensitivity_zero_decided(tmp_path):
     finally:
         db.close()
     assert "不可用" in text or "n=0" in text
+
+
+# ── task 038 F5（D-038-5）：双侧 meta 回显 + 不一致告警 ─────
+
+def test_format_sensitivity_variant_meta_echo(tmp_path):
+    """每个 variant 也回显种子区间/代码版本/数据版本/局数（可复算纪律）。"""
+    base_id, var_id = _seed_db(tmp_path, 65, 35)
+    db = ResultsDB(tmp_path / "r.db")
+    try:
+        text = format_sensitivity(sensitivity_report(db, base_id, [var_id]))
+    finally:
+        db.close()
+    # variant meta 行：与 baseline 同口径字段（种子区间 0..99 / 代码 c / 数据 d / 局数 100）
+    meta_lines = [ln for ln in text.splitlines() if "meta" in ln]
+    assert len(meta_lines) == 2, text
+    assert any(f"#{var_id}" in ln and "v1" in ln and "0..99" in ln
+               and "局数 100" in ln for ln in meta_lines)
+
+
+def test_format_sensitivity_meta_mismatch_warns(tmp_path):
+    """代码版本/数据版本/种子区间不一致 → 告警行（不硬错——跨版本对比合法，但不许静默）。"""
+    db = ResultsDB(tmp_path / "m.db")
+    ids = []
+    for variant, cv, dv, seed0 in (("", "c1", "d1", 0), ("v1", "c2", "d1", 100)):
+        exp_id = db.start_experiment(name="grp", definition_yaml="y",
+                                     code_version=cv, data_version=dv,
+                                     group_name="grp", variant=variant)
+        for seed in range(seed0, seed0 + 10):
+            res = GameResult(winner=seed % 2, is_draw=False, turns=8,
+                             phase="main", first_player=0)
+            db.record_game(exp_id, seed=seed, first_player=0, result=res,
+                           deck_a_id="a", deck_b_id="b")
+        db.finish_experiment(exp_id)
+        ids.append(exp_id)
+    db.close()
+    db = ResultsDB(tmp_path / "m.db")
+    try:
+        text = format_sensitivity(sensitivity_report(db, ids[0], [ids[1]]))
+    finally:
+        db.close()
+    assert "告警" in text
+    assert "c1" in text and "c2" in text      # 代码版本不一致点名
+    assert "0..9" in text and "100..109" in text  # 种子区间不一致点名
+    assert "ΔWR" in text                       # 告警不排除数据
+
+
+def test_format_sensitivity_consistent_meta_no_mismatch_warning(tmp_path):
+    """双侧 meta 一致（同代码/数据版本、同种子区间）→ 无不一致告警。"""
+    base_id, var_id = _seed_db(tmp_path, 65, 35)
+    db = ResultsDB(tmp_path / "r.db")
+    try:
+        text = format_sensitivity(sensitivity_report(db, base_id, [var_id]))
+    finally:
+        db.close()
+    assert "不一致" not in text
+
+
+def test_format_sensitivity_warns_on_aborted(tmp_path):
+    """task 038 F4 口径延伸：非完成态实验（aborted/running）在敏感性报告中告警。"""
+    base_id, var_id = _seed_db(tmp_path, 65, 35)
+    db = ResultsDB(tmp_path / "r.db")
+    try:
+        db.finish_experiment(var_id, status="aborted")
+        text = format_sensitivity(sensitivity_report(db, base_id, [var_id]))
+    finally:
+        db.close()
+    assert "告警" in text and "aborted" in text
+    assert "ΔWR" in text  # 告警不排除数据

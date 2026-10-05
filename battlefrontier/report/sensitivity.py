@@ -16,7 +16,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from battlefrontier.report.winrate import Z_95, WinrateReport, winrate_report
+from battlefrontier.report.winrate import (
+    Z_95,
+    WinrateReport,
+    status_warning,
+    winrate_report,
+)
 from battlefrontier.runner.results_db import ResultsDB
 
 
@@ -114,7 +119,13 @@ def _sig_marker(p: float | None) -> str:
 
 
 def format_sensitivity(rep: SensitivityReport) -> str:
-    """并排表：baseline 一行 + 每 variant 一行（WR/CI/ΔWR/ΔCI/z/p/显著性）。"""
+    """并排表：baseline 一行 + 每 variant 一行（WR/CI/ΔWR/ΔCI/z/p/显著性）。
+
+    meta 双侧回显（task 038，D-038-5）：baseline + 每个 variant 的种子区间/
+    代码版本/数据版本/局数；版本或种子区间不一致 → 告警行（不硬错——跨版本
+    对比是合法用途，但不许静默）；非完成态实验同样告警（D-038-4，告警不
+    排除数据）。
+    """
     base = rep.base
     seeds = (f"{base.seed_min}..{base.seed_max}"
              if base.seed_min is not None else "（无局）")
@@ -125,8 +136,33 @@ def format_sensitivity(rep: SensitivityReport) -> str:
         (f"baseline：A 胜率 {_pct(base.wr_a)}（{base.wins_a}/{base.decided} 决定局，"
          f"平 {base.draws}，失败 {base.games_failed}）"),
     ]
+    base_warning = status_warning(base.name, base.status)
+    if base_warning is not None:
+        lines.append(base_warning)
     for comp in rep.variants:
         r = comp.report
+        vseeds = (f"{r.seed_min}..{r.seed_max}"
+                  if r.seed_min is not None else "（无局）")
+        # 双侧 meta 回显（D-038-5）
+        lines.append(
+            f"  meta[#{comp.experiment_id} {comp.variant}]：种子区间 {vseeds}"
+            f" / 代码 {r.code_version} / 数据 {r.data_version} / 局数 {r.games_total}")
+        # 不一致告警（不硬错）
+        mismatches = []
+        if r.code_version != base.code_version:
+            mismatches.append(
+                f"代码版本不一致（baseline {base.code_version} / variant {r.code_version}）")
+        if r.data_version != base.data_version:
+            mismatches.append(
+                f"数据版本不一致（baseline {base.data_version} / variant {r.data_version}）")
+        if (r.seed_min, r.seed_max) != (base.seed_min, base.seed_max):
+            mismatches.append(
+                f"种子区间不一致（baseline {seeds} / variant {vseeds}）")
+        for m in mismatches:
+            lines.append(f"  ⚠ 告警：#{comp.experiment_id} [{comp.variant}] {m}")
+        warning = status_warning(f"#{comp.experiment_id} [{comp.variant}]", r.status)
+        if warning is not None:
+            lines.append(f"  {warning}")
         if comp.d_ci is None or comp.p is None:
             lines.append(
                 f"  #{comp.experiment_id} [{comp.variant}]：决定局不足"

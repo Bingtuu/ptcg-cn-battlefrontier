@@ -24,7 +24,9 @@ class CardRef(FrozenModel):
 class ActionNode(FrozenModel):
     """动作原语节点：公共字段强校验；原语私有参数走 args 逃逸口。
 
-    逐原语的 args 参数校验随原语实现（task 008+）注册，AST 层不预设。
+    args 键名装载期校验（task 038，D-038-2）：键集合白名单随原语实现登记在
+    dsl/primitives.py PRIMITIVE_ARGS，loader 拦未知键（打错键不静默取默认）；
+    键值的类型/组合校验随原语实现（task 008+）在执行/求值点完成，AST 层不预设。
     count：非负 int，或 counters 词表表达式（含 all）。
     choose：运行时由 Agent 选择的数量（PRD §5.2，chooser 机制 task 009）；
     与 count 互斥——count 是自动量，choose 是交互选择。
@@ -48,7 +50,8 @@ class Effect(FrozenModel):
 
     condition 为开放字符串（条件内容解析归解释器）；limit 取 limits 词表。
     attack：on_attack 触发器的招式绑定（task 012，PRD §5.1）——绑定后该招式的
-    伤害与效果全部由本效果块结算；仅 on_attack 使用，其余触发器须为 None。
+    伤害与效果全部由本效果块结算；仅 on_attack 使用，其余触发器须为 None
+    （loader 层校验，task 038）；绑定名须命中卡面招式名（闸 1 --db 校验）。
     event：仅 trigger_on_event 使用（task 026 WP2），值 = events 词表事件词；
     其余触发器须为 None（loader 层校验）。
     """

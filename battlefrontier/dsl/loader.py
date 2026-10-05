@@ -52,8 +52,30 @@ def load_vocabularies() -> Vocabulary:
     return Vocabulary(_load_vocab_raw())
 
 
+def _check_args_keys(node: ActionNode, source: str) -> None:
+    """args 键名白名单（task 038，D-038-2）：node.args 键必须 ⊆ 原语登记键集
+    （dsl/primitives.py PRIMITIVE_ARGS）——打错键装载即报错，不再静默取默认。
+    局部 import 防循环（primitives ← loader 的 DslError）。"""
+    from battlefrontier.dsl.primitives import PRIMITIVE_ARGS
+
+    allowed = PRIMITIVE_ARGS.get(node.action)
+    if allowed is None:
+        raise DslError(
+            f"{source}: 原语 {node.action} 未登记 args 白名单"
+            f"（dsl/primitives.py PRIMITIVE_ARGS；词表新词须同步登记）"
+        )
+    unknown = sorted(set(node.args) - allowed)
+    if unknown:
+        raise DslError(
+            f"{source}: 原语 {node.action} 不支持 args 键 {unknown}"
+            f"（白名单：{sorted(allowed) or '（无）'}；不猜——"
+            f"拼写核对或扩展请改 dsl/primitives.py PRIMITIVE_ARGS）"
+        )
+
+
 def _check_action(node: ActionNode, vocab: Vocabulary, source: str) -> None:
     vocab.check("actions", node.action, source)
+    _check_args_keys(node, source)
     if node.selector is not None:
         vocab.check("selectors", node.selector, source)
     if isinstance(node.count, str):
@@ -73,6 +95,12 @@ def _validate_vocab(doc: CardEffectDoc, vocab: Vocabulary, source: str) -> None:
         elif effect.event is not None:
             raise DslError(
                 f"{source}: event 字段仅 trigger_on_event 可用（trigger={effect.trigger}）"
+            )
+        # attack 字段仅 on_attack 使用（task 038，D-038-3①：schema docstring 承诺
+        # 落为装载校验；招式名命中卡面校验在闸 1 --db 路径，cli._check_doc_against_db）
+        if effect.attack is not None and effect.trigger != "on_attack":
+            raise DslError(
+                f"{source}: attack 字段仅 on_attack 可用（trigger={effect.trigger}）"
             )
         if effect.limit is not None:
             vocab.check("limits", effect.limit, source)

@@ -499,7 +499,10 @@ def execute_experiment(prep: PreparedExperiment, defn: ExperimentDef,
                         record_error(seed, f"{type(e).__name__}: {e}")
                     else:
                         record(seed, result)
-        except Exception:
+        except BaseException:
+            # task 038（D-038-4）：BaseException 兜底——KeyboardInterrupt/SystemExit
+            # 同样落 aborted（不再永挂 running）后原样重抛；单局 Exception 已在
+            # 内层 record_error 消化，到这里的都是实验级中止
             db.finish_experiment(exp_id, status="aborted")
             raise
         db.finish_experiment(exp_id)

@@ -137,6 +137,28 @@ def test_execute_parallel_matches_serial(tmp_path):
     assert serial == parallel
 
 
+def test_execute_interrupted_marks_aborted(tmp_path, monkeypatch):
+    """task 038 F4（D-038-4）：KeyboardInterrupt/SystemExit 不永挂 running——
+    兜底落 status=aborted 后原样重抛。"""
+    import battlefrontier.runner.experiment as exp_mod
+
+    def boom(deck_a, deck_b, seed, **kw):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(exp_mod, "play_game", boom)
+    defn = _defn(tmp_path)
+    db_path = tmp_path / "i.db"
+    with pytest.raises(KeyboardInterrupt):
+        execute_experiment(_prepared(), defn, db_path, definition_yaml=VALID_YAML)
+    db = ResultsDB(db_path)
+    try:
+        status = db._conn.execute(
+            "SELECT status FROM experiments").fetchone()[0]
+        assert status == "aborted"
+    finally:
+        db.close()
+
+
 def test_execute_records_failed_games(tmp_path, monkeypatch):
     """单局抛错（如 DSL 显式 DslError）不拖垮实验：记 error 行，实验照常 done。"""
     import battlefrontier.runner.experiment as exp_mod

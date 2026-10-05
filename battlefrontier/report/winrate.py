@@ -47,6 +47,7 @@ class Split:
 class WinrateReport:
     experiment_id: int
     name: str
+    status: str           # 实验状态（done=完成；aborted/running 等触发报告告警，task 038）
     code_version: str
     data_version: str
     seed_min: int | None
@@ -84,7 +85,7 @@ def winrate_report(db: ResultsDB, experiment_id: int) -> WinrateReport:
     wins_b = sum(1 for g in decided if g["winner"] == 1)
     seeds = [g["seed"] for g in rows]
     return WinrateReport(
-        experiment_id=exp["id"], name=exp["name"],
+        experiment_id=exp["id"], name=exp["name"], status=exp["status"],
         code_version=exp["code_version"], data_version=exp["data_version"],
         seed_min=min(seeds) if seeds else None,
         seed_max=max(seeds) if seeds else None,
@@ -103,6 +104,14 @@ def _pct(x: float) -> str:
     return f"{x * 100:.1f}%"
 
 
+def status_warning(name: str, status: str) -> str | None:
+    """非完成态实验告警行（task 038，D-038-4）：告警不排除数据——查看部分
+    结果是合法用途，静默才是 bug。完成态（done）返回 None。"""
+    if status == "done":
+        return None
+    return f"⚠ 告警：实验「{name}」status={status}（非完成态，数据为部分结果）"
+
+
 def format_report(r: WinrateReport) -> str:
     """文本报告：meta 全要素回显 + 胜率/CI/先后手/平局/失败。"""
     seeds = f"{r.seed_min}..{r.seed_max}" if r.seed_min is not None else "（无局）"
@@ -119,4 +128,7 @@ def format_report(r: WinrateReport) -> str:
         (f"后攻时 A 胜率 {_pct(r.as_second.wr_a)}（{r.as_second.wins_a}/{r.as_second.decided}，"
          f"CI {_pct(r.as_second.ci_a[0])}..{_pct(r.as_second.ci_a[1])}）"),
     ]
+    warning = status_warning(r.name, r.status)
+    if warning is not None:
+        lines.append(warning)
     return "\n".join(lines)

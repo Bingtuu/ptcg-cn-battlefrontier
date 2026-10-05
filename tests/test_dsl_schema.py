@@ -25,6 +25,8 @@ effects:
 """
 
 # 奇树：双方手牌洗回牌库下方，各抽剩余奖赏卡数（计数表达式 + 多 action + observe）
+# task 038 F2（D-038-2）：args 键名白名单上线后，原示例里静默无效的 both_players
+# 键已删除（hand_to_deck_bottom/draw 均不接受该键；真实 cards/奇树.yml 本就无 args）
 IONO = """
 card:
   name_group: 奇树
@@ -32,8 +34,8 @@ card:
 effects:
   - trigger: on_play
     actions:
-      - {action: hand_to_deck_bottom, selector: own_hand, count: all, args: {both_players: true}}
-      - {action: draw, count: own_remaining_prizes, args: {both_players: true}}
+      - {action: hand_to_deck_bottom, selector: own_hand, count: all}
+      - {action: draw, count: own_remaining_prizes}
     observe: [hand_size_before]
 """
 
@@ -54,7 +56,6 @@ def test_parse_complex_doc_with_counter_expr_and_observe():
     doc = parse_card_doc(IONO)
     (effect,) = doc.effects
     assert effect.actions[0].action == "hand_to_deck_bottom"
-    assert effect.actions[0].args == {"both_players": True}
     assert effect.actions[1].count == "own_remaining_prizes"
     assert effect.observe == ("hand_size_before",)
 
@@ -190,3 +191,82 @@ def test_own_evolve_from_hand_event_word_parses():
         TRIGGER_ON_EVENT.replace("own_play_from_hand_to_bench", "own_evolve_from_hand")
     )
     assert doc.effects[0].event == "own_evolve_from_hand"
+
+
+# ── task 038 F2（D-038-2）：args 键名白名单 ────────────────
+
+ARGS_TYPO = """
+card:
+  name_group: 测试回收
+effects:
+  - trigger: on_play
+    actions:
+      - {action: recover_from_discard, selector: own_discard, choose: 1, destination: hand, args: {upto: true}}
+"""
+
+
+def test_unknown_args_key_rejected():
+    """拼错键（upto 应为 up_to）装载即 DslError——不再静默取默认值。"""
+    with pytest.raises(DslError, match="upto"):
+        parse_card_doc(ARGS_TYPO)
+
+
+def test_unknown_args_key_lists_primitive_and_known_keys():
+    """报错含原语名与白名单（对齐「未知词不猜」提示风格）。"""
+    with pytest.raises(DslError, match="recover_from_discard") as exc_info:
+        parse_card_doc(ARGS_TYPO)
+    assert "up_to" in str(exc_info.value)
+
+
+def test_whitelisted_args_keys_parse():
+    """白名单内键正常装载（recover_from_discard 双键 + search_deck 检视键组）。"""
+    doc = parse_card_doc(ARGS_TYPO.replace("upto: true", "up_to: true"))
+    assert doc.effects[0].actions[0].args == {"up_to": True}
+    doc2 = parse_card_doc("""
+card:
+  name_group: 测试检索
+effects:
+  - trigger: on_play
+    actions:
+      - {action: search_deck, selector: own_deck, choose: 1, destination: hand, args: {top_n: 7, rest: deck_bottom}}
+""")
+    assert doc2.effects[0].actions[0].args == {"top_n": 7, "rest": "deck_bottom"}
+
+
+def test_args_on_no_args_primitive_rejected():
+    """无 args 原语（shuffle_deck）带任何键 → DslError。"""
+    with pytest.raises(DslError, match="shuffle_deck"):
+        parse_card_doc("""
+card:
+  name_group: 测试洗牌
+effects:
+  - trigger: on_play
+    actions:
+      - {action: shuffle_deck, args: {force: true}}
+""")
+
+
+# ── task 038 F3（D-038-3）：Effect.attack 装载校验 ─────────
+
+ATTACK_ON_WRONG_TRIGGER = """
+card:
+  name_group: 测试绑定
+effects:
+  - trigger: on_play
+    attack: 打击
+    actions:
+      - {action: draw, count: 1}
+"""
+
+
+def test_attack_field_on_non_on_attack_rejected():
+    """attack 仅 on_attack 使用（schema docstring 承诺落为装载校验）。"""
+    with pytest.raises(DslError, match="attack"):
+        parse_card_doc(ATTACK_ON_WRONG_TRIGGER)
+
+
+def test_attack_field_on_on_attack_parses():
+    doc = parse_card_doc(
+        ATTACK_ON_WRONG_TRIGGER.replace("trigger: on_play", "trigger: on_attack")
+    )
+    assert doc.effects[0].attack == "打击"

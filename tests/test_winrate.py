@@ -107,6 +107,37 @@ def test_format_report_contains_meta_and_lines(synth_db):
         assert needle in text
 
 
+# ── task 038 F4（D-038-4）：非完成态实验告警行 ──────────────
+
+def test_format_report_warns_on_aborted(tmp_path):
+    """status=aborted（中断）→ 告警行；告警不排除数据（胜率行照常输出）。"""
+    db = ResultsDB(tmp_path / "a.db")
+    exp_id = db.start_experiment(name="half", definition_yaml="x",
+                                 code_version="v", data_version="d")
+    db.record_game(exp_id, seed=1, first_player=0,
+                   result=_result(0, False, 8), deck_a_id="a", deck_b_id="b")
+    db.finish_experiment(exp_id, status="aborted")
+    text = format_report(winrate_report(db, exp_id))
+    assert "告警" in text and "aborted" in text
+    assert "胜率" in text  # 部分数据照常呈现
+    db.close()
+
+
+def test_format_report_warns_on_running(tmp_path):
+    """status=running（历史遗留永挂）→ 同样告警。"""
+    db = ResultsDB(tmp_path / "r.db")
+    exp_id = db.start_experiment(name="stuck", definition_yaml="x",
+                                 code_version="v", data_version="d")
+    text = format_report(winrate_report(db, exp_id))
+    assert "告警" in text and "running" in text
+    db.close()
+
+
+def test_format_report_done_no_warning(synth_db):
+    db, exp_id = synth_db
+    assert "告警" not in format_report(winrate_report(db, exp_id))
+
+
 # ── CLI ──────────────────────────────────────────────────
 
 def test_cli_report(synth_db, capsys):

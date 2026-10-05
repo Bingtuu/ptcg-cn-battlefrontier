@@ -56,20 +56,36 @@ class CalibrationReport:
 
 def calibration_report(db: ResultsDB, defn: ExperimentDef, pool: TargetPool,
                        real_rows: list, real_meta: dict) -> CalibrationReport:
-    """按池无向对聚合子实验 → 72 有向格；真实侧经 (en_archetype, en_opponent) 对表。"""
-    exps = {r["name"]: r for r in db.experiments_by_group(defn.name)}
+    """按池无向对聚合子实验 → 72 有向格；真实侧经 (en_archetype, en_opponent) 对表。
+
+    组内同名子实验 >1 套 → ValueError 列出重复名（task 038，D-038-6：「不猜」
+    口径，与缺子实验同级——静默取最新会混入口径不明的重跑数据；项目惯例
+    重跑用新库文件）。
+    """
+    rows = db.experiments_by_group(defn.name)
+    names = [r["name"] for r in rows]
+    dupes = sorted({n for n in names if names.count(n) > 1})
+    if dupes:
+        raise ValueError(
+            f"结果库组「{defn.name}」存在同名子实验 {dupes}"
+            f"（不猜取最新——重跑请用新库文件）")
+    exps = {r["name"]: r for r in rows}
     real = {(row.archetype, row.opponent): row for row in real_rows}
 
     cells: list[CalibrationCell] = []
     seeds: list[int] = []
     code_versions: list[str] = []
     data_versions: list[str] = []
+    warnings: list[str] = []  # 非完成态子实验告警（task 038，D-038-4；告警不排除数据）
     for a, b in pool.matchup_pairs():
         name = f"{defn.name}::{a.archetype}×{b.archetype}"
         exp = exps.get(name)
         if exp is None:
             raise ValueError(
                 f"结果库组「{defn.name}」缺少子实验「{name}」（不猜——先补跑该配对）")
+        if exp["status"] != "done":
+            warnings.append(
+                f"子实验「{name}」status={exp['status']}（非完成态，数据为部分结果）")
         games = db.games(exp["id"])
         seeds.extend(g["seed"] for g in games)
         code_versions.append(exp["code_version"])
@@ -112,6 +128,7 @@ def calibration_report(db: ResultsDB, defn: ExperimentDef, pool: TargetPool,
         "code_version": code_versions[0] if len(code_versions) == 1 else code_versions,
         "data_version": data_versions[0] if len(data_versions) == 1 else data_versions,
         "real": dict(real_meta),
+        "warnings": warnings,
     }
     return CalibrationReport(group_name=defn.name, cells=tuple(cells),
                              weighted_mean_abs_delta=wmad, ci_coverage=ci_cov,
@@ -146,6 +163,8 @@ def format_calibration(rep: CalibrationReport) -> str:
          f" tiers={rget('tournament_tiers_hash')}"),
         "口径：分母 = 决定局（平局剔除单列）；失败局单列不进分母；Δ = sim − real",
     ]
+    for w in m.get("warnings", []):  # 非完成态子实验告警（task 038，D-038-4）
+        lines.append(f"⚠ 告警：{w}")
     for c in rep.cells:
         sim_part = (f"sim {_pct(c.sim_wr)}"
                     f"（CI {_pct(c.sim_ci[0])}..{_pct(c.sim_ci[1])}，"

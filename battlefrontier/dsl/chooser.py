@@ -38,6 +38,8 @@ class NeedChoice:
     flip：挂起瞬间的掷币结果（task 025 节点门控穿透），冻结进 PendingChoice.flip_result。
     cost_discarded：挂起瞬间的 cost 段弃置 iid（task 026 WP4 穿透），
     冻结进 PendingChoice.cost_discarded（解释器挂起时标注，同 flip）。
+    flip_heads_count：挂起瞬间的掷币正面次数（task 040 F1 穿透），
+    冻结进 PendingChoice.flip_heads_count（解释器挂起时标注，同 flip）。
     """
 
     def __init__(
@@ -65,6 +67,9 @@ class NeedChoice:
         self.discarded_count: int = 0
         # 解释器挂起时标注（ctx.attacker_iid 快照，task 026 WP6 own_ko_by_attack 穿透）
         self.attacker_iid: int | None = None
+        # 解释器挂起时标注（ctx.flip_heads_count 快照，task 040 F1 穿透第六件：
+        # 冻结进 PendingChoice.flip_heads_count，恢复时重建，同 flip 口径）
+        self.flip_heads_count: int | None = None
         # 解释器挂起时标注（扁平步骤段快照，task 032 WP1，D-032-1）：
         # "cost" | "actions"，经 build_pending 透传进 PendingChoice.step_phase
         self.step_phase: str = "actions"
@@ -349,6 +354,7 @@ def build_pending(
             cost_discarded=need.cost_discarded,
             discarded_count=need.discarded_count,
             attacker_iid=need.attacker_iid,
+            flip_heads_count=need.flip_heads_count,
             step_phase=need.step_phase,
             choose_groups=need.choose_groups,
         )
@@ -394,6 +400,7 @@ def build_pending(
         cost_discarded=need.cost_discarded,
         discarded_count=need.discarded_count,
         attacker_iid=need.attacker_iid,
+        flip_heads_count=need.flip_heads_count,
         step_phase=need.step_phase,
         ordered=need.ordered,
         distinct=need.distinct or "",

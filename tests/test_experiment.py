@@ -4,11 +4,16 @@
 games 层 (seed, winner, is_draw, turns, events_hash) 逐局一致。
 """
 
+import json
+from pathlib import Path
+
 import pytest
-from helpers import deck60
+from helpers import deck60, energy
 
 from battlefrontier.agent.heuristic import HeuristicAgent
 from battlefrontier.agent.random_agent import RandomAgent
+from battlefrontier.dsl.loader import CardLibrary, load_card_doc
+from battlefrontier.engine.state import AttackDef, CardDef
 from battlefrontier.runner.experiment import (
     PreparedExperiment,
     build_agents,
@@ -135,6 +140,67 @@ def test_execute_parallel_matches_serial(tmp_path):
         tmp_path / "p.db", execute_experiment(_prepared(), defn, tmp_path / "p.db",
                                               workers=2, definition_yaml=VALID_YAML))
     assert serial == parallel
+
+
+# ── task 040 F2（D-040-2）：DSL 路径串并一致性对拍 ─────────
+
+_CARDS_DIR = Path(__file__).parent.parent / "cards"
+
+
+def _dsl_prepared() -> PreparedExperiment:
+    """真实 DSL 库对拍卡组：检索（能量输送PRO chooser 挂起/恢复）+ 掷币
+    （咕咕 times:3 / 索财灵 until_tails）+ flip_heads_count 计数伤害。
+    CardDef 手工构造，card_id 与 DSL 文档 card_ids 对齐（精确挂载路径，非白板）。"""
+    docs = [load_card_doc(_CARDS_DIR / name) for name in
+            ("能量输送PRO.yml", "咕咕-三刺击.yml", "索财灵-连掷硬币.yml")]
+    effects = CardLibrary.from_docs((d.card.name_group, d) for d in docs)
+    deck = (
+        [CardDef(card_id="CSV9C-154", name="咕咕", supertype="pokemon", hp=70,
+                 stage=0, energy_type="无", retreat_cost=1,
+                 attacks=(AttackDef(name="三刺击", cost=("无",), damage=None),))] * 14
+        + [CardDef(card_id="CSV4C-063", name="索财灵", supertype="pokemon", hp=70,
+                   stage=0, energy_type="超", retreat_cost=1,
+                   attacks=(AttackDef(name="连掷硬币", cost=("无",), damage=None),))] * 14
+        + [CardDef(card_id="CSV9C-176", name="能量输送PRO", supertype="trainer",
+                   trainer_subtype="物品", is_ace_spec=True)] * 4
+        + [energy("基本超能量", "超")] * 28
+    )
+    assert len(deck) == 60
+    return PreparedExperiment(
+        deck_a=deck, deck_b=deck, card_effects=effects,
+        deck_a_id="dsl-stub", deck_b_id="dsl-stub", data_version="test")
+
+
+def test_execute_parallel_matches_serial_dsl_path(tmp_path):
+    """DSL 解释器参与路径的串并对拍（D-040-2；既有白板护栏 card_effects={} 的补盲）：
+    workers=1 vs workers=2 逐局比对 (seed, winner, is_draw, turns, events_hash)。
+    事件流 hash 覆盖 effect_primitive 明细（pool_iids/chosen/掷币结果等），
+    dict 序依赖等串并分叉会立刻体现在 hash 上。"""
+    defn = _defn(tmp_path)
+    serial_db, parallel_db = tmp_path / "ds.db", tmp_path / "dp.db"
+    serial_id = execute_experiment(_dsl_prepared(), defn, serial_db,
+                                   workers=1, definition_yaml=VALID_YAML)
+    parallel_id = execute_experiment(_dsl_prepared(), defn, parallel_db,
+                                     workers=2, definition_yaml=VALID_YAML)
+    serial = _games_snapshot(serial_db, serial_id)
+    parallel = _games_snapshot(parallel_db, parallel_id)
+    assert serial == parallel
+
+    # 有效性自查（D-040-2 验收 2）：无失败局（error 行 winner=None/hash=''，
+    # 放任不管会让对拍假绿），且事件流确含 DSL 解释器产出（effect_primitive
+    # 检索 + 掷币），否则对拍没走 DSL 路径、测试无效
+    db = ResultsDB(serial_db)
+    try:
+        games = db.games(serial_id)
+        assert all(g["error"] is None for g in games)
+        dsl_actions = {
+            json.loads(ev["event_json"])["detail"].get("action")
+            for g in games for ev in db.game_events(g["id"])
+            if json.loads(ev["event_json"])["kind"] == "effect_primitive"
+        }
+    finally:
+        db.close()
+    assert {"search_deck", "coin_flip"} <= dsl_actions
 
 
 def test_execute_interrupted_marks_aborted(tmp_path, monkeypatch):

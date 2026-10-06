@@ -2104,6 +2104,7 @@ class GameEngine:
         cost_discarded: tuple[int, ...] = (),
         discarded_count: int = 0,
         attacker_iid: int | None = None,
+        flip_heads_count: int | None = None,
     ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
@@ -2117,6 +2118,8 @@ class GameEngine:
         ctx.cost_discarded_iids（同 flip 口径，嵌套帧不穿透）。
         discarded_count（task 026 WP5）：挂起冻结的前序弃置张数，恢复时穿透进
         ctx.discarded_this_effect（同 flip 口径，嵌套帧不穿透）。
+        flip_heads_count（task 040 F1，D-040-1）：挂起冻结的掷币正面次数，恢复时
+        穿透进 ctx.flip_heads_count（同 flip 口径，嵌套帧不穿透）。
         宝可梦检查（task 026 WP7，D-WP7-1）：完成路径在排水后、promote/main 恢复
         逻辑前检查拦截——pokemon_check_next 非 None 且 phase 为 pokemon_check/
         choice 时回 _advance_pokemon_check 继续检查推进（检查触发的效果完成不
@@ -2147,7 +2150,8 @@ class GameEngine:
         try:
             need = run_effect(ctx, effect, start=start, choice=choice, carry=carry,
                               flip=flip, cost_discarded=cost_discarded,
-                              discarded_count=discarded_count)
+                              discarded_count=discarded_count,
+                              flip_heads_count=flip_heads_count)
         finally:
             self._in_effect = False
         if need is not None:
@@ -2293,7 +2297,8 @@ class GameEngine:
                              outer_choice=pc.outer_choice, flip=pc.flip_result,
                              cost_discarded=pc.cost_discarded,
                              discarded_count=pc.discarded_count,
-                             attacker_iid=pc.attacker_iid)
+                             attacker_iid=pc.attacker_iid,
+                             flip_heads_count=pc.flip_heads_count)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。

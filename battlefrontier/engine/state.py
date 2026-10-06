@@ -168,6 +168,10 @@ class PendingChoice(FrozenModel):
     # cost_discarded/discarded_count 穿透口径：恢复时重建 ctx.attacker_iid，
     # 供 place_damage_counters 的 opponent_attacker 选择器在恢复后继续读取）
     attacker_iid: int | None = None
+    # 挂起瞬间冻结的本效果掷币正面次数（task 040 F1，D-040-1：恢复时重建
+    # ctx.flip_heads_count，供 damage 的 flip_heads_count 计数词在恢复后继续读取；
+    # 无前置掷币 = None → 恢复后读计数词仍 DslError 不猜，同 last_flip 口径）
+    flip_heads_count: int | None = None
     # 挂起节点所属扁平步骤段（task 032 WP1，D-032-1）："cost" | "actions"，
     # 解释器挂起时标注，经 chooser.build_pending 透传；Agent 据此区分代价支付
     # （cost 取最低评分）与收益选择（actions 取最高评分）

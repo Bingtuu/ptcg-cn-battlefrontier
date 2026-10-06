@@ -765,6 +765,46 @@ effects:
         e.apply(0, Action(kind="attack", attack_index=0))
 
 
+def test_flip_heads_count_suspend_resume_penetration():
+    """task 040 F1（D-040-1）：coin_flip(until_tails) → chooser 挂起 → 恢复后
+    damage 仍读到 flip_heads_count（穿透协议第六件，同 flip/cost_discarded/
+    discarded_count/attacker_iid 口径），不再 DslError 中断整场。
+    seed 2 → 正正正正反（4 正面，同 test_until_tails_seed_locked_sequence_and_damage
+    实测序列；检索在掷币之后，不扰动掷币流），恢复后伤害 4×20=80。"""
+    doc = parse_card_doc("""
+card:
+  name_group: 测试连掷检索
+effects:
+  - trigger: on_attack
+    attack: 连掷检索
+    actions:
+      - {action: coin_flip, args: {until_tails: true}}
+      - {action: search_deck, selector: own_deck, filters: [basic_energy], choose: 1, destination: hand}
+      - {action: damage, selector: opponent_active, count: flip_heads_count, args: {op: "×", per: 20}}
+""")
+    attacker = CardDef(
+        card_id="stub-连掷检索兽", name="连掷检索兽", supertype="pokemon",
+        hp=200, stage=0,
+        attacks=(AttackDef(name="连掷检索", cost=("无",), damage=None),),
+    )
+    deck = (
+        inst(300, energy("草能量", "草")), inst(301, energy("火能量", "火")),
+        inst(302, energy("水能量", "水")),
+    )
+    e = attack_engine(doc, attacker, p0_energies=(inst(9001, energy()),),
+                      p0_deck=deck, seed=2)
+    e.apply(0, Action(kind="attack", attack_index=0))
+    pc = e.state.pending_choice
+    assert pc is not None and pc.pool == "own_deck"
+    assert pc.pool_iids == (300, 301, 302)
+    assert pc.flip_heads_count == 4  # 挂起瞬间冻结第六件
+    e.apply(0, Action(kind="choose", choices=(301,)))
+    p0 = e.state.players[0]
+    assert 301 in [c.iid for c in p0.hand]  # 检索落手
+    assert e.state.players[1].active.damage == 80  # 恢复后穿透重建：4×20
+    assert e.state.phase == "main" and e.state.current_player == 1  # 回合照常推进
+
+
 # ── bounce args.attachments=hand（清单 14-15）─────────────────────────────────
 
 BOUNCE_HAND_DOC = parse_card_doc("""

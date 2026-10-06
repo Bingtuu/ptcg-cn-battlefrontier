@@ -76,7 +76,8 @@ class ExecutionContext:
         # 穿透重建（同 flip/cost_discarded 口径）
         self.discarded_this_effect: int = 0
         # 本效果内掷币正面次数（task 026 WP5 until_tails；计数词 flip_heads_count 读取，
-        # 无前置掷币 = None → DslError 不猜，同 last_flip 口径）
+        # 无前置掷币 = None → DslError 不猜，同 last_flip 口径）；挂起恢复时经
+        # PendingChoice.flip_heads_count 穿透重建（task 040 F1，同 flip 口径）
         self.flip_heads_count: int | None = None
         # 造成本效果的攻击方栈顶 iid（task 026 WP6 own_ko_by_attack 触发效果；
         # place_damage_counters 的 opponent_attacker 选择器读取；非该触发 = None）
@@ -147,6 +148,7 @@ def run_effect(
     flip: bool | None = None,
     cost_discarded: tuple[int, ...] = (),
     discarded_count: int = 0,
+    flip_heads_count: int | None = None,
 ) -> NeedChoice | None:
     """执行效果块：成本 → 动作序列；逐节点发事件（PRD §5.4）。
 
@@ -157,7 +159,9 @@ def run_effect(
     cost_discarded 是挂起瞬间冻结的 cost 段弃置 iid（task 026 WP4，恢复时重建
     ctx.cost_discarded_iids）；
     discarded_count 是挂起瞬间冻结的本效果前序弃置张数（task 026 WP5，恢复时重建
-    ctx.discarded_this_effect）。
+    ctx.discarded_this_effect）；
+    flip_heads_count 是挂起瞬间冻结的本效果掷币正面次数（task 040 F1，恢复时重建
+    ctx.flip_heads_count，同 discarded_count 口径）。
     condition / limit 在本期仅随 effect_start 事件记录，强制约束（特性限次等）
     由引擎在行动枚举/执行层完成（task 011）。
     """
@@ -165,6 +169,7 @@ def run_effect(
     ctx.last_flip = flip
     ctx.cost_discarded_iids = cost_discarded
     ctx.discarded_this_effect = discarded_count
+    ctx.flip_heads_count = flip_heads_count
     ctx.bound_attack = effect.attack
     card_name = ctx.source.card.name
     if start == 0 and choice is None:  # 恢复执行（带 choice）不重复发 effect_start
@@ -210,6 +215,8 @@ def run_effect(
             result.discarded_count = ctx.discarded_this_effect
             # 攻击方栈顶 iid 随挂起冻结（task 026 WP6 own_ko_by_attack 穿透，同三件套口径）
             result.attacker_iid = ctx.attacker_iid
+            # 掷币正面次数随挂起冻结（task 040 F1，D-040-1 穿透第六件，同 flip 口径）
+            result.flip_heads_count = ctx.flip_heads_count
             # 扁平步骤段（cost/actions）随挂起标注（task 032 WP1，D-032-1：
             # Agent 据此区分代价支付/收益选择方向，同四件套穿透口径）
             result.step_phase = phase

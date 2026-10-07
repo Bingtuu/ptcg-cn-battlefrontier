@@ -74,6 +74,7 @@ bfsim run my-first-match.yml --workers 4
 ```bash
 bfsim report 1              # 1 = 实验 id（run 完成时会打印）
 bfsim report 1 --decisions  # 追加「关键决策聚合」分节：每张卡的选择分布与对应胜率
+bfsim report 1 --mcts-consider  # 追加 MCTS 决策分析：行动类别访问份额 / 高熵决策点 / 置信×胜率
 ```
 
 ```
@@ -145,7 +146,7 @@ bfsim dsl-check cards/*.yml --db <卡牌数据库>   # 追加校验：卡牌存�
 
 ## 项目状态
 
-一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-13）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS 63.8% vs 真实 65.1% 命中）；其后完成引擎性能优化（MCTS 成本 -38.5%，行为零变化，2026-10-14）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性报告与模拟 vs 真实赛事校准偏差表。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
+一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-05）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS vs 真实 65.1% 命中）。其后（2026-10-05~07）：引擎性能优化（MCTS 成本 -38.5%，行为零变化）；全库 code review（0 Critical / 11 Important）并全部修复闭环——含 MCTS 信息泄漏修复（带冻结集的部分 determinize）与修复后复核（泄漏贡献噪声级，归因结论更硬）；MCTS 决策分析上线（根节点访问分布导出 + `--mcts-consider` 报告）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性/MCTS 决策分析报告与模拟 vs 真实赛事校准偏差表（1063 项测试绿）。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
 
 ## ⚖️ 合规声明
 

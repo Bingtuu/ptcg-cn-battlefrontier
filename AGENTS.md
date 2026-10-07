@@ -9,7 +9,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 ## 当前状态
 
-一期 M1–M6 全部完成（M6 校准基线 2026-10-03：9 套池 36 无向配对 × 500 局模拟 matchup 矩阵 + 72 格偏差表，加权平均 |Δ| 13.2%）；二期 M7–M10 全部完成（2026-10-13）——MCTS 多世界 determinized UCT 上线（`type: mcts`，迭代预算零墙钟；预算档定案：标准 2×50 / 深档 4×100+ 仅单格深挖），M10 归因闭环（MCTS 增强版偏差表加权 |Δ| 9.7%，|Δ|≥25% 五格全有解释）；其后 task 037 引擎性能优化（2026-10-14：MCTS 成本 -38.5%，行为零变化 events_hash 逐局全等）。卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 996 测试绿。下一步候选（Mega 规则调研 / MCTS 决策分析 / db 侧数据协同）见 `STATUS.md`（事实源，本文件不抄写细节）。
+一期 M1–M6 全部完成（M6 校准基线 2026-10-03：9 套池 36 无向配对 × 500 局模拟 matchup 矩阵 + 72 格偏差表，加权平均 |Δ| 13.2%）；二期 M7–M10 全部完成（2026-10-05）——MCTS 多世界 determinized UCT 上线（`type: mcts`，迭代预算零墙钟；预算档定案：标准 2×50 / 深档 4×100+ 仅单格深挖），M10 归因闭环（MCTS 增强版偏差表加权 |Δ| 9.7%，|Δ|≥25% 五格全有解释）。其后（2026-10-05~07，task 037–042）：引擎性能优化（MCTS 成本 -38.5%，行为零变化 events_hash 逐局全等）；全库 code review（6 组并行 + 主会话复核，0 Critical / 11 Important）全部修复闭环——legal_actions 缓存契约、DSL args 白名单 + attack 绑定校验、中断/报告告警族、**MCTS 信息泄漏修复**（带冻结集的部分 determinize，挂起根 freeze=pool_iids∪payload + setup 期背面布阵入池重采样）、修复后复核（泄漏贡献 1.8/0.4pts 噪声级，归因结论更硬）、flip_heads_count 穿透第六件 + DSL 路径串并对拍护栏；**MCTS 决策分析上线**（task 042：根节点访问分布经 mcts_consider 观测事件入流，`bfsim report --mcts-consider` 三件套）。卡池 v1 九套（`config/target-pool.v1.yml`）缺口 81 张全覆盖清零，DSL 定义库 101 文件，全量 1063 测试绿。下一步候选（Mega 规则调研 / db 侧数据协同 / 历史日期勘误专项）见 `STATUS.md`（事实源，本文件不抄写细节）。
 
 ## 架构分层与边界
 
@@ -19,7 +19,7 @@ BattleFrontier（对战开拓区）：AI 宝可梦卡牌（PTCG 简中环境）�
 
 - **引擎对卡牌内容零硬编码**："这张卡做什么"全部由 DSL 定义、解释器执行；引擎只管规则骨架（阶段机、伤害、奖赏、胜负）。
 - **DSL 定义库是独立资产**：每（卡名 + 文本）等价类一个 YAML（同名多文本**严格拆分**，如 `火恐龙-大字爆炎.yml` / `火恐龙-闪焰之幕.yml`），Pydantic schema 强校验，进版本控制，单卡效果测试不依赖整局模拟。**装载键 = card_id 精确挂载**（`card_ids` 必填，2026-09-06 决议；无名字兜底——防取错印刷），闸 1 校验走 `bfsim dsl-check --db`（card_id 存在性 / 文件内归一化 text_raw 一致 / 赛制合法性）。
-- **Agent 接口统一**：`observe(visible_state, legal_actions) -> action`，启发式 / MCTS / RL 共用；Agent 只见过滤后的可见视图（对手手牌内容不可见），引擎枚举合法行动，AI 永不非法操作。MCTS（task 034）经可选 `bind_engine` 钩子挂接引擎，读真实状态的唯一用途是 determinization 重采样隐藏信息，搜索全程在克隆上进行（信息纪律 + 模拟事件不回流真实事件流）。
+- **Agent 接口统一**：`observe(visible_state, legal_actions) -> action`，启发式 / MCTS / RL 共用；Agent 只见过滤后的可见视图（对手手牌内容不可见），引擎枚举合法行动，AI 永不非法操作。MCTS（task 034）经可选 `bind_engine` 钩子挂接引擎，读真实状态的唯一用途是 determinization 重采样隐藏信息（task 039：挂起根带冻结集部分重采样、setup 期对手背面布阵入池），搜索全程在克隆上进行（信息纪律 + 模拟事件不回流真实事件流）。MCTS 根节点访问分布经 `mcts_consider` 观测事件入流（task 042：events_hash 排除、render 跳过，行为零变化），供 `report --mcts-consider` 决策分析。
 - **数据只进不出**：消费 db 项目只读；模拟结果落本项目独立 SQLite。
 
 ## 技术栈与约束
@@ -56,8 +56,8 @@ CLI 入口 `bfsim`（`pip install -e .` 后可用；开发期等价于 `python -
 # 跑实验（实验定义见 experiments/*.example.yml；--workers 多进程，结果与串行逐局一致）
 bfsim run experiments/gardevoir-mirror.example.yml --workers 4 --results results/exp.db
 
-# 报告（实验 id 由 run 完成时回显；--decisions 追加决策聚合分节）
-bfsim report 1 --results results/exp.db [--decisions]
+# 报告（实验 id 由 run 完成时回显；--decisions 追加决策聚合分节；--mcts-consider 追加 MCTS 决策分析）
+bfsim report 1 --results results/exp.db [--decisions] [--mcts-consider]
 
 # 换卡敏感性（实验定义含 variants 时 run 自动跑整组）
 bfsim sensitivity <base_id> <variant_id>... --results results/exp.db
@@ -68,7 +68,7 @@ bfsim run experiments/m6-calibration.example.yml --workers 8 --results results/e
 # 校准偏差表（模拟矩阵 vs 真实赛事 matchup；参数 = matrix 实验定义路径）
 bfsim calibration experiments/m6-calibration.example.yml --results results/exp.db
 
-# DSL 校验（闸 1）：schema + 词表；--db 追加 card_id 存在性 / 文本等价类一致 / 赛制合法
+# DSL 校验（闸 1）：schema + 词表 + args 键名白名单；--db 追加 card_id 存在性 / 文本等价类一致 / 赛制合法 / on_attack 招式名绑定命中卡面（task 038）
 bfsim dsl-check cards/*.yml --db "C:/Vibe Project/Pokearena/data/ptcg-cn.db"
 ```
 

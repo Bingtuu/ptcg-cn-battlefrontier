@@ -11,16 +11,96 @@ import json
 import multiprocessing as mp
 from dataclasses import dataclass, field
 
+from battlefrontier.agent.mcts import Consideration
 from battlefrontier.agent.random_agent import RandomAgent
+from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import DeckConfigError, GameEngine
 from battlefrontier.engine.events import GameEvent
 from battlefrontier.engine.rng import RandomSource
-from battlefrontier.engine.state import CardDef
+from battlefrontier.engine.state import CardDef, CardInstance, GameState
 
 __all__ = ["DeckConfigError", "GameResult", "play_game", "run_games_parallel"]
 
 # 死循环保护默认回合上限（配置化，不散落硬编码）
 DEFAULT_MAX_TURNS = 200
+
+# 观测事件 kind（task 042，D-042-2）：Agent 搜索内部状态的外化，不影响对局
+# 行为——events_hash 计算排除该类，保持行为校验跨版本可比
+OBSERVATION_KINDS = frozenset({"mcts_consider"})
+
+
+def _find_card(state: GameState, iid: int) -> CardInstance | None:
+    """按 iid 在双方全部区域（手/牌库/弃牌/奖赏/场上整叠/附着/竞技场）找卡实例。"""
+    for p in state.players:
+        for zone in (p.hand, p.deck, p.discard, p.prizes):
+            for c in zone:
+                if c.iid == iid:
+                    return c
+        for m in ([p.active] if p.active else []) + list(p.bench):
+            for c in (*m.stack, *m.attached_energy,
+                      *((m.attached_tool,) if m.attached_tool else ())):
+                if c.iid == iid:
+                    return c
+    if state.stadium is not None and state.stadium.iid == iid:
+        return state.stadium
+    return None
+
+
+def _action_label(engine: GameEngine, player: int, action: Action) -> str:
+    """mcts_consider 行动标签（task 042，D-042-3）：kind：可读参数——
+    attack→招式名、play_trainer/evolve 等→卡名（attach 类附 →目标）、
+    retreat/promote→备战宝可梦名、choose→选中卡名；解析失败回退 kind 原文（不猜）。
+    """
+    s = engine.state
+    if action.kind == "attack":
+        active = s.players[player].active
+        if active is not None:
+            attacks = list(active.current.card.attacks)
+            if active.attached_tool is not None:  # 授予招式接在自身招式后（同枚举序）
+                attacks += list(active.attached_tool.card.attacks)
+            if 0 <= action.attack_index < len(attacks):
+                return f"attack：{attacks[action.attack_index].name}"
+        return "attack"
+    if action.kind in ("retreat", "promote") and action.bench_index is not None:
+        bench = s.players[player].bench
+        if 0 <= action.bench_index < len(bench):
+            return f"{action.kind}：{bench[action.bench_index].current.card.name}"
+        return action.kind
+    if action.kind == "choose":
+        names = [c.card.name for i in action.choices
+                 if (c := _find_card(s, i)) is not None]
+        return f"choose：{'+'.join(names)}" if names else "choose"
+    if action.iid is not None:
+        card = _find_card(s, action.iid)
+        if card is None:
+            return action.kind
+        label = f"{action.kind}：{card.card.name}"
+        if action.target_iid is not None:
+            target = _find_card(s, action.target_iid)
+            if target is not None:
+                label += f"→{target.card.name}"
+        return label
+    return action.kind
+
+
+def _emit_consideration(
+    engine: GameEngine, player: int, c: Consideration
+) -> None:
+    """向引擎事件流追加 mcts_consider 观测事件（seq/turn/phase 与 _emit 同口径）。"""
+    considered = [
+        {"action": _action_label(engine, player, a), "kind": a.kind, "visits": v}
+        for a, v in c.considered
+    ]
+    engine.events.append(GameEvent(
+        seq=len(engine.events), turn=engine.state.turn, phase=engine.state.phase,
+        player=player, kind="mcts_consider",
+        detail={
+            "chosen": _action_label(engine, player, c.chosen),
+            "chosen_visits": dict(c.considered)[c.chosen],
+            "total_visits": c.total_visits,
+            "considered": considered,
+        },
+    ))
 
 
 @dataclass
@@ -62,11 +142,20 @@ def play_game(
         if hasattr(agent, "bind_engine"):  # MCTS 挂接钩子（D-034-1）
             agent.bind_engine(engine)
         view = engine.state.visible_state(player)
-        engine.apply(player, agent.observe(view, actions))
+        action = agent.observe(view, actions)
+        # task 042（D-042-1）：MCTS 根统计外化——读 last_consideration（非 None
+        # 则追加观测事件并清空防重复记账）；heuristic/random 无此属性，零开销
+        consideration = getattr(agent, "last_consideration", None)
+        if consideration is not None:
+            agent.last_consideration = None
+            _emit_consideration(engine, player, consideration)
+        engine.apply(player, action)
 
     s = engine.state
     payload = json.dumps(
-        [ev.model_dump(mode="json") for ev in engine.events],
+        # D-042-2：观测事件（mcts_consider）不进行为校验，payload 过滤
+        [ev.model_dump(mode="json") for ev in engine.events
+         if ev.kind not in OBSERVATION_KINDS],
         ensure_ascii=False, sort_keys=True,
     )
     return GameResult(

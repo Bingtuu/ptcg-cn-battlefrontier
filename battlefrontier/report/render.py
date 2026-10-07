@@ -41,6 +41,9 @@ def render_log(events: list[GameEvent]) -> str:
     """把事件流渲染为逐行中文回合记录。"""
     lines: list[str] = []
     for ev in events:
+        # 观测事件（task 042，D-042-2）：Agent 搜索内部状态外化，回放显式跳过
+        if ev.kind == "mcts_consider":
+            continue
         template = _TEMPLATES.get(ev.kind, ev.kind)
         detail = {"player": ev.player, **ev.detail}
         line = template.format_map(_SafeDict(detail))

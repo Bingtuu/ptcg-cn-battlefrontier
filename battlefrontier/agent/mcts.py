@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 from battlefrontier.agent.determinize import determinize
 from battlefrontier.agent.heuristic import HeuristicAgent
@@ -27,7 +28,7 @@ from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import GameState, VisibleGameState
 
-__all__ = ["MCTSAgent"]
+__all__ = ["Consideration", "MCTSAgent"]
 
 _UCB_C = math.sqrt(2.0)  # UCB1 探索常数（D-034-4）
 _SEED_MOD = 2**63  # 派生种子取值域（_rng 抽整数建 RandomSource）
@@ -63,6 +64,25 @@ def _select_action(legal_actions: list[Action], counts: dict[Action, int]) -> Ac
     return max(legal_actions, key=lambda a: counts.get(a, 0))
 
 
+@dataclass(frozen=True)
+class Consideration:
+    """一次 MCTS 搜索的根统计（task 042，D-042-1）：counts 外化，供 play.py
+    驱动循环在 observe 返回后追加 mcts_consider 观测事件。
+
+    considered 只含被访问过的根行动（counts 键集），按 visits 降序（counts 插入
+    序确定性保证稳定序）；total_visits = Σvisits（≈ worlds × iterations）；
+    chosen = 跨世界聚合选中的行动。唯一合法行动早退路径（无搜索）不产生本记录
+    （last_consideration 置 None）。
+    """
+
+    turn: int
+    phase: str
+    player: int
+    total_visits: int
+    considered: tuple[tuple[Action, int], ...]
+    chosen: Action
+
+
 class MCTSAgent:
     """多世界 determinized UCT Agent（PRD §7.3 / task 034）。
 
@@ -93,6 +113,9 @@ class MCTSAgent:
         self._card_effects = card_effects
         self._engine: GameEngine | None = None
         self._rollout_agent: HeuristicAgent | None = None
+        # task 042（D-042-1）：最近一次搜索的根统计；play.py 驱动循环 observe
+        # 返回后读取并清空（消费式读取防重复记账）。只读 counts，不改搜索行为
+        self.last_consideration: Consideration | None = None
 
     def bind_engine(self, engine: GameEngine) -> None:
         """D-034-1 挂接钩子：驱动循环在 observe 前调用，注入真实引擎引用。"""
@@ -102,7 +125,9 @@ class MCTSAgent:
         if not legal_actions:
             raise ValueError("无合法行动可选")
         if len(legal_actions) == 1:
-            return legal_actions[0]  # 唯一选择不消费随机源（确定性）
+            # 唯一选择不消费随机源（确定性）；无搜索 → 无根统计（D-042-1 口径）
+            self.last_consideration = None
+            return legal_actions[0]
         if self._engine is None:
             raise RuntimeError("MCTSAgent 需先经 bind_engine 挂接引擎（D-034-1）")
         engine = self._engine
@@ -131,7 +156,15 @@ class MCTSAgent:
                 self._iterate(world, root, root_player, root_turn, iter_seed)
             for action, child in root.children.items():
                 counts[action] = counts.get(action, 0) + child.visits
-        return _select_action(legal_actions, counts)
+        chosen = _select_action(legal_actions, counts)
+        # D-042-1：根统计外化（只读 counts，不消费随机源、不改搜索行为）
+        self.last_consideration = Consideration(
+            turn=root_turn, phase=engine.state.phase, player=root_player,
+            total_visits=sum(counts.values()),
+            considered=tuple(sorted(counts.items(), key=lambda kv: -kv[1])),
+            chosen=chosen,
+        )
+        return chosen
 
     # ── 单次 UCT 迭代（选择 → 展开 → rollout → 回传）────────────────────
 

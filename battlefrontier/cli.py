@@ -260,6 +260,13 @@ def _cmd_report(args: argparse.Namespace) -> int:
             )
 
             print(format_decisions(decision_report(db, args.experiment_id)))
+        if args.mcts_consider:
+            from battlefrontier.report.mcts_analysis import (
+                format_mcts_report,
+                mcts_report,
+            )
+
+            print(format_mcts_report(mcts_report(db, args.experiment_id)))
     finally:
         db.close()
     return 0
@@ -279,6 +286,8 @@ def main(argv: list[str] | None = None) -> int:
     rep_p.add_argument("experiment_id", type=int, help="实验 id")
     rep_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
     rep_p.add_argument("--decisions", action="store_true", help="追加决策聚合分节")
+    rep_p.add_argument("--mcts-consider", action="store_true",
+                       help="追加 MCTS 决策分析分节（task 042：访问份额/高熵决策点/分桶胜率）")
     sen_p = sub.add_parser("sensitivity",
                            help="换卡敏感性：baseline vs variants 并排 ΔWR + 显著性检验")
     sen_p.add_argument("base_id", type=int, help="baseline 实验 id")

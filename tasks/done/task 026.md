@@ -117,7 +117,7 @@ conditions（`dsl/chooser.py::_CONDITIONS` / `condition_met` 参数化前缀）�
 top_n 检视）、水莲的照顾（recover hand up-to）、赫普的包包（db 无赫普 owner 数据）、
 奥琳博士的气魄（attach 多目标各附1）等——逐项原因随批末落账更新。
 
-### WP2（trigger_on_event 分发 + place_damage_counters + ko_self）——测试清单定稿（2026-09-07）
+### WP2（trigger_on_event 分发 + place_damage_counters + ko_self）——测试清单定稿（2026-09-20）
 
 设计决议（随落地进 rules-reference 附录 A / STATUS 落账）：
 
@@ -185,10 +185,10 @@ trigger_on_event 引擎分发（`Effect.event` 字段 + `_do_place_bench` 主阶
 收尾硬验：全量 pytest 绿 + ruff 零告警 + 沙奈朵镜像同种子 hash 回归 +
 `dsl-check --db` 全库全 OK + 词表同步（actions +ko_self、新段 events）
 
-### WP3（recover 去向扩展 + top_n 检视 + attach 多目标 + own_evolve_from_hand + reveal）——测试清单定稿（2026-09-14）
+### WP3（recover 去向扩展 + top_n 检视 + attach 多目标 + own_evolve_from_hand + reveal）——测试清单定稿（2026-09-20）
 
 范围按「解锁卡数」排序（task 026 re-scope c 点）：recover 扩展解锁 2 卡居首，其余各 1 卡。
-5 张目标卡的池内机制需求（text_raw 实测 2026-09-07）：
+5 张目标卡的池内机制需求（text_raw 实测 2026-09-20）：
 
 - 夜巡灵 H 标渡魂（招式）：「选择自己弃牌区中最多3张『夜巡灵』，放于备战区」→ recover bench 去向
 - 水莲的照顾：「弃牌区宝可梦（除规则盒）和基本能量合计最多3张，给对手看过后加入手牌」→ recover hand up-to + reveal
@@ -200,7 +200,7 @@ trigger_on_event 引擎分发（`Effect.event` 字段 + `_do_place_bench` 主阶
 
 - **D-WP3-1 多目标各附1的配对口径**：先选能量（up-to N）再选目标宝可梦（up-to N），
   按选择顺序一一配对（FIFO）；N = min（目标数， 能量数， choose) 收缩。官方规则未规定分配顺序，🔲 待核。
-- **D-WP3-2 寻找宝石触发范围**（✅ 用户 2026-09-14 裁决）：判定关键 = 进化卡本身从手牌
+- **D-WP3-2 寻找宝石触发范围**（✅ 用户 2026-09-20 裁决）：判定关键 = 进化卡本身从手牌
   使出——主阶段 `_do_evolve` 与神奇糖果（skip_stage，进化卡从手牌压上）均触发；
   牌库进化（from_deck，招式学习器「进化」）不触发。DSL 手牌进化经
   pending_event_triggers 队列在外层效果完成后排水分发；排水时来源已不在场 → 离场即失效。
@@ -264,9 +264,9 @@ db 同文本等价类实测为准，下列为 db 检索候选）：
 `dsl-check --db` 全库全 OK + 词表同步（events +own_evolve_from_hand；其余词复用既有段）+
 真机冒烟（含多龙奇/夜巡灵/猫头夜鹰的池内卡组镜像 20 局 0 失败）
 
-### WP4（top_n rest=shuffle + attach bench-only/up-to + modify_retreat_cost + cost 弃置排除）——测试清单定稿（2026-09-07）
+### WP4（top_n rest=shuffle + attach bench-only/up-to + modify_retreat_cost + cost 弃置排除）——测试清单定稿（2026-09-20）
 
-范围按「解锁卡数」排序，4 组机制 7 卡（text_raw 实测 2026-09-07）：
+范围按「解锁卡数」排序，4 组机制 7 卡（text_raw 实测 2026-09-20）：
 
 - 米立龙 H 标揽客（特性）：「战斗场上才可使用，每回合1次。查看牌库上方6张，选其中1张支援者，给对手看过后加入手牌。剩余放回牌库并重洗」→ top_n rest=shuffle + self_is_active（WP1 已备）+ trainer_supporter（已备）+ reveal
 - 宝可装置3.0（物品）：「查看牌库上方7张，选其中1张支援者，给对手看过后加入手牌。剩余放回牌库并重洗」→ 同上 on_play 版
@@ -358,9 +358,9 @@ target_pool / energy_up_to / exclude_cost_discarded 为 args 键先例）+ 真�
 （赫普的苍响 = 米立龙 + 宝可装置3.0 + 紧急滑板 + 拉帝亚斯ex；猛雷鼓 = 怒鹦哥ex；
 赛富豪 = 飞天螳螂 + 超级能量回收）
 
-### WP5（任意数量弃置×N 伤害族 + 费用/奖赏修正 + until_tails + bounce 参数 + 变身）——测试清单定稿（2026-09-14）
+### WP5（任意数量弃置×N 伤害族 + 费用/奖赏修正 + until_tails + bounce 参数 + 变身）——测试清单定稿（2026-09-20）
 
-范围按「解锁卡数 + 机制通用性」排序，6 组机制 8 卡（text_raw 实测 2026-09-14）：
+范围按「解锁卡数 + 机制通用性」排序，6 组机制 8 卡（text_raw 实测 2026-09-20）：
 
 - 赛富豪ex 淘金潮 50×（G 标 CSV4C-089 类 7 印刷）：「将自己手牌中任意数量的基本能量放于弃牌区，造成其张数×50伤害」→ discard own_hand 任意数量 + 前序弃置张数计数词
 - 猛雷鼓ex 极雷轰 70×（H 标 CSV7C-154 类 7 印刷）：「将自己场上宝可梦身上附着的任意数量的基本能量放于弃牌区，造成其张数×70伤害」→ discard own_attached_energy 任意数量版；飞溅咆哮 = discard all + draw 6（既有件）
@@ -463,9 +463,9 @@ counters +attached_energy_on_target/+opponent_taken_prizes/+discarded_this_effec
 /+flip_heads_count；其余 args 键先例）+ 真机冒烟（赛富豪 / 猛雷鼓 / 赫普的苍响 /
 喷火龙大比鸟池内卡组）
 
-### WP6（blocked 8 张全清：hand_disrupt + bench_size + 组合检索 + deck_top 有序 + KO 触发/撤退锁 + protection + devolve/学习器）——测试清单定稿（2026-09-14）
+### WP6（blocked 8 张全清：hand_disrupt + bench_size + 组合检索 + deck_top 有序 + KO 触发/撤退锁 + protection + devolve/学习器）——测试清单定稿（2026-09-20）
 
-范围 = coverage-plan 剩余 blocked 8 张全清（池内印刷实测自 deck_cards 2026-09-14）：
+范围 = coverage-plan 剩余 blocked 8 张全清（池内印刷实测自 deck_cards 2026-09-20）：
 
 - 雪童子 惊吓（H 标 CSV7C-057，玛俐雪妖女 ×2）：「不看正面选对手1张手牌，查看正面后放回对手牌库并重洗」→ hand_disrupt 原语 + damage 20
 - 零之大空洞（H 标 CSV9C-207，猛雷鼓厄诡椪 ×2）：太晶在场玩家备战上限 5→8 + 失效缩减括号注 → bench_size 覆写 + 失效缩减结算
@@ -476,7 +476,7 @@ counters +attached_energy_on_target/+opponent_taken_prizes/+discarded_this_effec
 - 火恐龙两文本类（喷火龙大比鸟/多龙喷火龙 各 151C-005×1 + CSV5C-015×1，均 G 标，按同名多文本拆两文件）：151C-005 大字爆炎 90「选自身附着1能量弃置」→ own_attached_energy 扩 choose=1；CSV5C-015 闪焰之幕「不受对手招式的效果影响」→ protection 最小版
 - 招式学习器 退化（G 标 CSV5C-120，玛俐雪妖女 ×1 + 赫普苍响 ×1）：学习器载体（道具即招式、持有者回合结束自弃）+ devolve 原语（对手全场进化宝可梦各退栈顶 1 张回对手手牌）
 
-设计决议（2026-09-14 用户核对设计口径通过；随落地进附录 A 🔲，gate3 核销后翻 ✅）：
+设计决议（2026-09-20 用户核对设计口径通过；随落地进附录 A 🔲，gate3 核销后翻 ✅）：
 
 - **D-WP6-1 hand_disrupt（雪童子）**：「不看正面选择」= 均匀随机 1 张（单一随机源，
   种子确定性不变）；「查看正面」沿用 WP3 reveal 口径（仅落事件流，可见视图不建模）；
@@ -489,7 +489,7 @@ counters +attached_energy_on_target/+opponent_taken_prizes/+discarded_this_effec
   两分支**互斥**（不可 1 基础 + 1 进化混合，文本「或」）；选 0 → no-op 重洗仍执行。
 - **D-WP6-4 赤松**：distinct（属性互异）约束作用于**选择池解析**（同属性池内互斥）；
   拆分去向 = 1 张入手（玩家选定）+ 剩余附着自己宝可梦（目标自选）；选 1 张 → 附着段
-  no-op；选 0 → 全 no-op 重洗。**用户补充场景（2026-09-14）**：牌库仅单一属性能量时
+  no-op；选 0 → 全 no-op 重洗。**用户补充场景（2026-09-20）**：牌库仅单一属性能量时
   可选上限收缩为 1 → 入手 1 / 附着 0 / 重洗执行（约束在选择阶段生效，非拆分后补救）。
 - **D-WP6-5 暗码迷**：「任意2张」= 任意种类的 2 张，从宽 up-to 2（牌库非公开）；
   排列顺序 = **选择顺序即牌顶顺序**（先选的在最顶，FIFO），不做二次排列交互；
@@ -919,7 +919,7 @@ CardLibrary 直通）通过；池内 9 套卡组印刷覆盖回归：唯一未�
 - 奥琳博士的气魄：trait：古代 已备，缺 attach 多目标各附1。
 - coverage-plan 已更新 13 行 blocked 原因（标注 WP1 已备项）+ 3 行 done。
 
-### WP2（2026-09-07 完成）：trigger_on_event 分发 + place_damage_counters + ko_self + 2 卡落地
+### WP2（2026-09-20 完成）：trigger_on_event 分发 + place_damage_counters + ko_self + 2 卡落地
 
 **换上队列与结算顺序**（`engine/state.py` / `engine/core.py`）：
 - 删 `promote_to_main`，新增 `promote_queue: list[PromoteReq]` + `resume_after_promotes` 挂起恢复
@@ -941,7 +941,7 @@ CardLibrary 直通）通过；池内 9 套卡组印刷覆盖回归：唯一未�
 （拍备战完成时检索挂该事件的特性卡并逐个结算）。触发式特性「可使用」放弃选项不建模
 （自动发动 + 尽力而为，D-WP2-3）；池空 no-op、池不足 min 收缩。
 
-**落地 2 卡**（闸 1/2 全过，first_pass 2/2，gate3 已核销 2026-09-07）：
+**落地 2 卡**（闸 1/2 全过，first_pass 2/2，gate3 已核销 2026-09-20）：
 - 彷徨夜灵 H 标（CSV8C-082 咒怨炸弹，card_ids 4 印刷）：ability_manual + once_per_turn +
   ko_self + place_damage_counters opponent_pokemon_any counters:5——WP0 核销不过的缺口卡回库，
   全库唯一卡测试载体恢复，test_loader_cardid 出库断言同步更新
@@ -964,13 +964,13 @@ ko_self 真实触发 27 次；摔角鹰人 trigger 真实对局未自然出现�
 沙铃仙人掌维持 blocked：撤退锁归 task 029、KO 来源追踪未建——无落地卡的原语不先行。
 
 **遗留**：
-- 彷徨夜灵 / 摔角鹰人 gate3 已核销（2026-09-14 用户核对通过，authoring-log human 行 +
+- 彷徨夜灵 / 摔角鹰人 gate3 已核销（2026-09-20 用户核对通过，authoring-log human 行 +
   coverage-plan「已核销」已落账）
-- 附录 A 4 条决议 ✅ 已核（2026-09-14 用户核对通过）
+- 附录 A 4 条决议 ✅ 已核（2026-09-20 用户核对通过）
 - WP3 = 多龙奇（search_deck top_n 检视 + deck_bottom 去向）/ 夜巡灵（recover bench）/
   奥琳博士的气魄（attach 多目标各附1）；猫头夜鹰需 own_evolve_from_hand 事件 + reveal 原语
 
-### WP3（2026-09-14 完成）：recover 去向扩展 + top_n 检视 + attach 多目标 + own_evolve_from_hand + reveal + 5 卡落地
+### WP3（2026-09-20 完成）：recover 去向扩展 + top_n 检视 + attach 多目标 + own_evolve_from_hand + reveal + 5 卡落地
 
 **机制落地**（`dsl/primitives.py` / `dsl/chooser.py` / `engine/core.py`）：
 - `recover_from_discard`：destination=bench（up-to、entered_play_this_turn 登记、备战区
@@ -984,12 +984,12 @@ ko_self 真实触发 27 次；摔角鹰人 trigger 真实对局未自然出现�
 - `own_evolve_from_hand` 事件：`_do_evolve` 挂点；WP2 触发分发抽公共函数
   `_fire_trigger_on_event`（_do_place_bench 行为不变回归）；神奇糖果等手牌来源的
   DSL 效果进化经 pending_event_triggers 队列在外层效果完成后排水触发，
-  牌库来源（招式学习器「进化」）不触发（D-WP3-2，✅ 用户 2026-09-14 裁决）
+  牌库来源（招式学习器「进化」）不触发（D-WP3-2，✅ 用户 2026-09-20 裁决）
 - `reveal` 原语落地（词表既有词）：selector 池 iids+卡名落 reveal 事件，无状态变更
   （D-WP3-4；已知近似：池按 selector+filters 执行时重解析，可能宽于实际移动卡）
 - chooser 双可行性门补 recover/search 新形式（池空 / bench 满不可行；未知形式 DslError）
 
-**落地 5 卡**（闸 1/2 全过，first_pass 5/5，gate3 已核销 2026-09-14）：
+**落地 5 卡**（闸 1/2 全过，first_pass 5/5，gate3 已核销 2026-09-20）：
 - 多龙奇 H 标侦察指令（CSV8C-158 / CSV9.5C-133 / CSVM2bC-006）：ability_manual +
   once_per_turn + search top_n=2 hand rest=deck_bottom
 - 夜巡灵 H 标渡魂（CSV8C-081 / CSV8C-210 / CSV9.5C-069 / SVP-346）：**on_attack 招式** +
@@ -1020,11 +1020,11 @@ use_ability 122 次、奥琳博士打出 36 次、水莲 reveal 10 次、渡魂�
 猫头夜鹰 own_evolve_from_hand 真实触发 1 次。
 
 **规则决议 5 条落 rules-reference 附录 A**：D-WP3-1 FIFO 配对 🔲 /
-D-WP3-2 触发范围 ✅（用户 2026-09-07 裁决：神奇糖果手牌进化触发、牌库进化不触发，
+D-WP3-2 触发范围 ✅（用户 2026-09-20 裁决：神奇糖果手牌进化触发、牌库进化不触发，
 已修正确认为队列排水分发机制）/ D-WP3-3 检视 up-to 🔲 / D-WP3-4 reveal 口径 🔲 +
 效果直放备战区容量截断 🔲。
 
-**裁决修正（2026-09-14）**：D-WP3-2 用户裁决后实现修正——`GameState.pending_event_triggers`
+**裁决修正（2026-09-20）**：D-WP3-2 用户裁决后实现修正——`GameState.pending_event_triggers`
 队列 + `_run_or_suspend` 完成路径排水（先于 promote 翻阶段；来源离场即失效跳过）；
 测试净增 3 条（525 绿），1 条 WP3 初版「神奇糖果不触发」测试被裁决推翻改写为触发用例。
 
@@ -1032,13 +1032,13 @@ D-WP3-2 触发范围 ✅（用户 2026-09-07 裁决：神奇糖果手牌进化�
 （reveal 本期实现，断言语义不变）。
 
 **遗留**：
-- 5 张新卡 gate3 已核销（2026-09-14 用户核对通过，authoring-log human 行 +
+- 5 张新卡 gate3 已核销（2026-09-20 用户核对通过，authoring-log human 行 +
   coverage-plan「已核销」已落账）；猫头夜鹰核销含 D-WP3-2 裁决修正后确认
-- 附录 A 5 条决议 ✅ 已核（2026-09-14 用户核对通过）
+- 附录 A 5 条决议 ✅ 已核（2026-09-20 用户核对通过）
 - WP4 = 暗码迷的解读（deck_top 去向 + 有序排列选择）/ 怒鹦哥ex（attach up-to-N +
   bench-only 目标池）/ gust 门控版 / devolve 等 blocked 项按解锁卡数排序
 
-### WP4（2026-09-14 完成）：top_n rest=shuffle + attach bench-only/up-to + modify_retreat_cost + cost 弃置排除 + lock_attack + 7 卡落地
+### WP4（2026-09-20 完成）：top_n rest=shuffle + attach bench-only/up-to + modify_retreat_cost + cost 弃置排除 + lock_attack + 7 卡落地
 
 **机制落地**：
 - `search_deck` args.rest=shuffle：未选卡与牌库其余合并整库重洗（本节点直接洗牌，
@@ -1053,11 +1053,11 @@ D-WP3-2 触发范围 ✅（用户 2026-09-07 裁决：神奇糖果手牌进化�
 - cost 弃置排除（D-WP4-3）：cost 段 discard iids 记 ExecutionContext 并随挂起冻结
   （PendingChoice.cost_discarded 穿透），recover args.exclude_cost_discarded 剔除；
   playable_feasible 门 cost choose=2 需手牌 ≥2
-- **lock_attack 冷却（用户 2026-09-14 裁决补建）**：InPlayPokemon.attack_locks +
+- **lock_attack 冷却（用户 2026-09-20 裁决补建）**：InPlayPokemon.attack_locks +
   attack_lock_turn；turn N 使用 → N+1 锁生效 → N+2 回合开始解禁；撤退/离场清除、
   进化继承（🔲 待核）；枚举层跳过被锁招式
 
-**裁决修正 2 条（2026-09-14 用户裁决）**：
+**裁决修正 2 条（2026-09-20 用户裁决）**：
 - 招式附加效果落点空**不阻却宣言**（伤害照算、效果 no-op）——WP4 清单 18 原口径
   「无备战不可宣言」被推翻，attack_feasible 门移除，怒鹦哥/飞天螳螂用例翻转；
   落附录 A ✅ 已核
@@ -1065,7 +1065,7 @@ D-WP3-2 触发范围 ✅（用户 2026-09-07 裁决：神奇糖果手牌进化�
   lock_attack 现锁绑定本招式名——单招式卡等价，多招式卡需要时再扩 scope
   （附录 A D-WP4-5 🔲 待核）
 
-**落地 7 卡**（闸 1/2 全过，gate3 已核销 2026-09-14；first_pass 5/7）：
+**落地 7 卡**（闸 1/2 全过，gate3 已核销 2026-09-20；first_pass 5/7）：
 - 米立龙揽客（H 标 10 印刷全收）：ability_manual + once_per_turn + self_is_active +
   top_n=6 trainer_supporter rest=shuffle + reveal；first_pass=false（ability_feasible
   缺 reveal 分支的机制门缺口，引擎侧补齐后全绿，DSL 零修改）
@@ -1097,13 +1097,13 @@ schema；含 2 条宣言门翻转替换）；全量 589 绿（基线 525）+ ruf
 未收窄。
 
 **遗留**：
-- 7 张新卡 gate3 已核销（2026-09-14 用户核对通过，authoring-log human 行 + coverage-plan「已核销」已落账）
-- 附录 A 冷却语义决议 ✅ 已核（2026-09-14 用户核对通过）
+- 7 张新卡 gate3 已核销（2026-09-20 用户核对通过，authoring-log human 行 + coverage-plan「已核销」已落账）
+- 附录 A 冷却语义决议 ✅ 已核（2026-09-20 用户核对通过）
 - WP5 = 暗码迷的解读（deck_top 有序排列选择）/ 小刚的发掘（二选一组合约束）/
   月月熊ex（modify_attack_cost + opponent_taken_prizes 计数词）/ devolve /
   手牌干扰（雪童子）等 blocked 18 项按解锁卡数排序
 
-### WP5（2026-09-14 完成）：any_count 弃置×N + attached_energy_on_target + modify_attack_cost + prize_bonus + until_tails + bounce 附着回手 + transform + 8 卡落地
+### WP5（2026-09-20 完成）：any_count 弃置×N + attached_energy_on_target + modify_attack_cost + prize_bonus + until_tails + bounce 附着回手 + transform + 8 卡落地
 
 **机制落地**：
 - discard `args.any_count=true`（「任意数量」= up-to all，min_choose=0，与 count/choose
@@ -1179,14 +1179,14 @@ pending 33（共 81）——WP4 落账口径 done 29 与文件实测差 3（早�
 PRD §5.1 WP5 补充段已定稿。
 
 **遗留**：
-- 8 张新卡 gate3 已核销（2026-09-14 用户核对通过，authoring-log human 行 +
+- 8 张新卡 gate3 已核销（2026-09-20 用户核对通过，authoring-log human 行 +
   coverage-plan「已核销」已落账）
-- 附录 A D-WP5-1~4 + until_tails 口径 5 条 ✅ 已核（2026-09-14 用户核对通过）
+- 附录 A D-WP5-1~4 + until_tails 口径 5 条 ✅ 已核（2026-09-20 用户核对通过）
 - WP6 = 雪童子（对手手牌盲选回库）/ 零之大空洞（bench_size 覆写 + 失效缩减结算）/
   小刚的发掘（二选一组合约束）/ 赤松（distinct-type + 检索拆分去向）/ 暗码迷的解读
   （deck_top 有序排列）/ 招式学习器 退化（devolve）/ 沙铃仙人掌 / 火恐龙（blocked 8）
 
-### WP6（2026-09-19 完成）：blocked 8 张全清——hand_disrupt + bench_size + choose_groups + distinct 拆分 + deck_top 有序 + own_ko_by_attack/lock_retreat + protection + devolve
+### WP6（2026-09-20 完成）：blocked 8 张全清——hand_disrupt + bench_size + choose_groups + distinct 拆分 + deck_top 有序 + own_ko_by_attack/lock_retreat + protection + devolve
 
 **前情**：上一会话完成 TDD 红阶段（`tests/test_primitives_wp6.py` 49 用例 + 9 个卡 YAML +
 词表 WP6 新词 + PRD §5.1 WP6 段），机制实现为零；本会话接手：子代理实现 → 主会话独立复验 →

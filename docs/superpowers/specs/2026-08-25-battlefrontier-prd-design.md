@@ -120,7 +120,7 @@ effects:
 分发（如主阶段 `place_bench`），效果经解释器结算、可挂起；非 `trigger_on_event` 的效果块
 不得携带 `event` 字段。事件触发效果内造成的昏厥：弃牌与奖赏按文本语序立即结算，换上
 （promote）推迟到效果结算完毕后按队列统一进行，随后回到当前回合方主阶段
-（rules-reference 附录 A，2026-09-07 决议）。
+（rules-reference 附录 A，2026-09-20 决议）。
 
 **检索检视与回收扩展（task 026 WP3 补充）**：`search_deck` 支持 `args.top_n: N`
 = 仅检视牌库上方 N 张作为选择池（私密检视，事件流只落选择结果），未选卡按
@@ -132,7 +132,7 @@ effects:
 Agent 的手牌信息泄露。事件词新增 `own_evolve_from_hand`（主阶段从手牌进化时），
 挂点 `_do_evolve`；进化卡本身从手牌使出的 DSL 效果进化（神奇糖果）同样触发
 （经 pending_event_triggers 队列效果完成后分发），牌库来源（招式学习器
-「进化」）不触发（附录 A，2026-09-14 用户裁决）。
+「进化」）不触发（附录 A，2026-09-20 用户裁决）。
 
 **撤退费修正与成本排除（task 026 WP4 补充）**：`modify_retreat_cost` 为声明式原语
 （passive_static，引擎读声明，解释器不执行；仿 `_effective_hp` 建
@@ -146,7 +146,7 @@ Agent 的手牌信息泄露。事件词新增 `own_evolve_from_hand`（主阶段
 剔除（超级能量回收「无法选择因本效果弃置的能量」）。`lock_attack` 原语
 （task 026 WP4）：on_attack 效果块将本招式锁到来源宝可梦——下个自己回合
 不可宣言、再下个自己回合解禁，撤退/离场清除（附录 A 决议）。招式附加效果的
-落点为空不阻却宣言（伤害照算、效果 no-op；附录 A，2026-09-14 用户裁决）。
+落点为空不阻却宣言（伤害照算、效果 no-op；附录 A，2026-09-20 用户裁决）。
 
 **变量伤害与修正声明扩展（task 026 WP5 补充）**：「任意数量弃置 ×N 伤害」族——
 discard 支持 `args.any_count: true`（up-to all，selector 扩 own_attached_energy
@@ -237,7 +237,7 @@ _effective_attack_cost 道具分支 + 授予招式枚举与执行双落点。能
 来源不受影响；竞技场离场即恢复、动态求值无追溯（HP 加成失效即按新有效 HP
 判昏厥——_do_play_stadium 补 check_knockouts，换上后回出牌方主阶段）；
 道具自身回合末自弃（grant_attack discard_at_turn_end）在消除面内——自弃文本
-= 宝可梦道具的效果，被消除时回合末不弃（2026-10-13 task 033 D-033-2 归正：
+= 宝可梦道具的效果，被消除时回合末不弃（2026-10-03 task 033 D-033-2 归正：
 TPCi Rules Team 2024-07-25 裁决）。
 `lock_play` 原语（含羞苞 痒痒花粉：args.category=item，受击方玩家侧回合标记
 (turn, 施加方)，下个自己回合物品打出枚举门控，撤退/离场不解锁、回合结束

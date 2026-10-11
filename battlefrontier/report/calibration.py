@@ -25,6 +25,11 @@ REAL_DATE_TO = "2025-08-31"
 REAL_AS_OF = "2026-10-03"   # matchup 统计不做时间衰减；as_of 仅为口径钉住回显
 REAL_MIN_N = 30
 
+# D-044-1 低置信标注阈值（M7 建议口径：real n<100 格置信心低）——
+# 报告层自有口径，不动 REAL_MIN_N（SDK 层 min_n 只驱动 low_confidence 标志、
+# 不过滤行）；只标注不改数（D-044-2）。
+REAL_LOW_CONF_N = 100
+
 
 @dataclass(frozen=True)
 class CalibrationCell:
@@ -42,6 +47,7 @@ class CalibrationCell:
     sim_ci: tuple[float, float]
     real_n: int | None      # 真实侧缺格 = None
     real_wr: float | None
+    real_low_confidence: bool | None  # real_n < REAL_LOW_CONF_N；缺格 = None（D-044-1/2）
     delta: float | None     # sim_wr - real_wr
 
 
@@ -106,6 +112,8 @@ def calibration_report(db: ResultsDB, defn: ExperimentDef, pool: TargetPool,
                 sim_decided=len(decided), sim_wins=wins, sim_draws=draws,
                 sim_failed=failed, sim_wr=wr, sim_ci=wilson_ci(wins, len(decided)),
                 real_n=real_n, real_wr=real_wr,
+                real_low_confidence=(real_n < REAL_LOW_CONF_N
+                                     if real_n is not None else None),
                 delta=wr - real_wr if real_wr is not None else None))
 
     cells.sort(key=lambda c: (c.delta is None,
@@ -172,19 +180,22 @@ def format_calibration(rep: CalibrationReport) -> str:
         if c.real_n is None:
             lines.append(f"{c.archetype} vs {c.opponent} | {sim_part} | 真实侧缺数据")
         else:
+            low = " ⚠低置信" if c.real_low_confidence else ""
             lines.append(
                 f"{c.archetype} vs {c.opponent} | {sim_part}"
-                f" | real {_pct(c.real_wr)}（n={c.real_n}） | Δ {_signed_pct(c.delta)}")
+                f" | real {_pct(c.real_wr)}（n={c.real_n}）{low} | Δ {_signed_pct(c.delta)}")
     if rep.weighted_mean_abs_delta is None:
         lines.append("汇总：无双侧有数据格（真实侧全缺，不猜）")
     else:
         valid = [c for c in rep.cells if c.delta is not None]
         covered = sum(1 for c in valid if c.sim_ci[0] <= c.real_wr <= c.sim_ci[1])
         worst = valid[0]  # cells 已按 |Δ| 降序
+        low_conf = sum(1 for c in valid if c.real_low_confidence)
         lines.append(
             f"汇总：加权平均 |Δ| {_pct(rep.weighted_mean_abs_delta)}"
             f"（权重=real_n，{len(valid)} 格）"
             f" / CI 覆盖率 {_pct(rep.ci_coverage)}（{covered}/{len(valid)}）"
+            f" / 低置信格 {low_conf}/{len(valid)}（real n<{REAL_LOW_CONF_N}）"
             f" / 最大偏差：{worst.archetype} vs {worst.opponent}"
             f" Δ {_signed_pct(worst.delta)}")
     return "\n".join(lines)

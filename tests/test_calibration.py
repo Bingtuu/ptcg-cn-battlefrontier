@@ -16,6 +16,7 @@ from battlefrontier.report.calibration import (
     REAL_BASIS,
     REAL_DATE_FROM,
     REAL_DATE_TO,
+    REAL_LOW_CONF_N,
     REAL_MIN_N,
     calibration_report,
     format_calibration,
@@ -236,6 +237,46 @@ def test_完成态无告警(db_path):
     rep = _report(db_path, [_real("Alpha", "Beta", 100, 0.60)])
     assert rep.meta["warnings"] == []
     assert "告警" not in format_calibration(rep)
+
+
+# ── task 044：低置信标注（D-044-1~3）────────────────────────
+
+def test_低置信_阈值边界(db_path):
+    """real n < REAL_LOW_CONF_N 标 True；n == 阈值不标；真实侧缺格为 None。"""
+    assert REAL_LOW_CONF_N == 100
+    rep = _report(db_path, [_real("Alpha", "Beta", 99, 0.60),
+                            _real("Beta", "Alpha", 100, 0.45)])
+    by_en = {(c.en_archetype, c.en_opponent): c for c in rep.cells}
+    assert by_en[("Alpha", "Beta")].real_low_confidence is True   # n=99
+    assert by_en[("Beta", "Alpha")].real_low_confidence is False  # n=100 不标
+    rep2 = _report(db_path, [_real("Alpha", "Beta", 99, 0.60)])
+    by_en2 = {(c.en_archetype, c.en_opponent): c for c in rep2.cells}
+    assert by_en2[("Beta", "Alpha")].real_low_confidence is None  # 缺数据格不标
+
+
+def test_低置信_不改数(db_path):
+    """D-044-2：标注不影响加权 |Δ| / CI 覆盖率 / 排序。"""
+    rep = _report(db_path, [_real("Alpha", "Beta", 99, 0.60),
+                            _real("Beta", "Alpha", 99, 0.45)])
+    assert rep.weighted_mean_abs_delta == pytest.approx(0.05)
+    assert rep.ci_coverage == pytest.approx(0.5)
+    assert (rep.cells[0].en_archetype, rep.cells[0].en_opponent) == ("Beta", "Alpha")
+
+
+def test_format_低置信标注与汇总计数(db_path):
+    rep = _report(db_path, [_real("Alpha", "Beta", 99, 0.60),
+                            _real("Beta", "Alpha", 150, 0.45)])
+    out = format_calibration(rep)
+    lines = {ln.split(" | ")[0]: ln for ln in out.splitlines() if " vs " in ln}
+    assert "⚠低置信" in lines["A宝 vs B宝"]          # n=99 标注
+    assert "⚠低置信" not in lines["B宝 vs A宝"]      # n=150 不标
+    assert "低置信格 1/2（real n<100）" in out        # 汇总计数
+    # 缺数据格不标
+    rep2 = _report(db_path, [_real("Alpha", "Beta", 99, 0.60)])
+    out2 = format_calibration(rep2)
+    line_missing = next(ln for ln in out2.splitlines() if ln.startswith("B宝 vs A宝"))
+    assert "真实侧缺数据" in line_missing and "⚠低置信" not in line_missing
+    assert "低置信格 1/1" in out2  # 分母 = 双侧有数据格
 
 
 # ── 验收 6：format_calibration 文本 ───────────────────────

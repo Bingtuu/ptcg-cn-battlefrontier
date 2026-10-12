@@ -1,0 +1,13 @@
+# 调优定义冒烟示例（task 045）：池内 2 配对 × 20 局、单轮坐标下降，验证链路。
+# 用法：bfsim tune experiments/tune-smoke.example.yml --workers 4
+# 预期轨迹行数 = 49（1 基线 + 8 连续维×5 网格点 + 2 整数维×4 枚举点）
+name: tune-smoke
+pool: config/target-pool.v1.yml
+pairs:
+  - [沙奈朵, 喷火龙 大比鸟]
+  - [沙奈朵, 猛雷鼓 厄诡椪]
+games_per_pair: 20
+split_seed: 20261011
+algorithm: coordinate
+max_rounds: 1
+noise_threshold: 0.01

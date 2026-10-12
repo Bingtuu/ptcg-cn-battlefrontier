@@ -199,6 +199,28 @@ def _check_doc_against_db(doc, db, legal_ids: frozenset, snapshot_id: str) -> No
             )
 
 
+def _cmd_tune(args: argparse.Namespace) -> int:
+    """启发式参数自调优（task 045，D-T1~T4）：坐标下降 + 轨迹 JSONL（不落结果库）。"""
+    from battlefrontier.tune import load_tune, run_tune
+
+    defn_path = Path(args.definition)
+    defn = load_tune(defn_path)
+    db_path = args.db or load_db_path()
+    output = args.output or f"results/tune-{defn.name}.jsonl"
+    result, split = run_tune(defn, db_path, workers=args.workers,
+                             cards_dir=args.cards_dir, output_path=output,
+                             progress=print)
+    print(f"调优「{defn.name}」完成：训练 {len(split.train)} 对 / "
+          f"holdout {len(split.holdout)} 对 × {defn.games_per_pair} 局")
+    print(f"基线 fitness {result.baseline_fitness:.4f} → 最优 {result.best_fitness:.4f}"
+          f"（Δ {result.best_fitness - result.baseline_fitness:+.4f}，"
+          f"{result.rounds_run} 轮 / {result.n_evaluations} 次评估，{result.stop_reason}）")
+    adopted = [(t.dim, t.value) for t in result.trials if t.adopted]
+    print(f"采纳: {adopted if adopted else '（无——默认参数即局部最优）'}")
+    print(f"轨迹: {output}")
+    return 0
+
+
 def _cmd_dsl_check(args: argparse.Namespace) -> int:
     """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验；
     --db 追加装配校验（task 026：card_id 存在 / 文本等价类一致 / 赛制合法；
@@ -303,6 +325,14 @@ def main(argv: list[str] | None = None) -> int:
     chk_p.add_argument("--db", default=None,
                        help="ptcg-cn.db 路径：追加装配校验（card_id 存在性 / "
                             "文本等价类一致 / 最新 standard 赛制合法，task 026）")
+    tune_p = sub.add_parser("tune", help="启发式参数自调优（task 045：坐标下降 + 轨迹 JSONL）")
+    tune_p.add_argument("definition", help="调优定义 YAML 路径")
+    tune_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
+    tune_p.add_argument("--output", default=None,
+                        help="轨迹 JSONL 路径（缺省 results/tune-<name>.jsonl）")
+    tune_p.add_argument("--db", default=None,
+                        help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    tune_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
@@ -315,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_calibration(args)
     if args.cmd == "dsl-check":
         return _cmd_dsl_check(args)
+    if args.cmd == "tune":
+        return _cmd_tune(args)
     print(f"battlefrontier {__import__('battlefrontier').__version__}："
           f"子命令 run 可用（实验定义见 experiments/），其余随里程碑添加")
     return 0

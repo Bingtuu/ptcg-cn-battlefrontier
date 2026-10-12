@@ -3,7 +3,7 @@
 设计文档：`docs/superpowers/specs/2026-10-11-heuristic-tuning-design.md`
 （D-T1~T4 与总体验收标准以它为准）。
 
-- 状态：进行中（2026-10-11 立项）
+- 状态：完成（2026-10-11）
 
 ## 范围
 
@@ -27,3 +27,10 @@
 
 - 正式粗扫跑批（~36 万局，16 workers ~2h）+ 维度敏感性报告 + holdout 验证 + 复校准 + 默认参数回写裁决
 - holdout 门槛是否同时要求训练集提升——跑批前用户拍板（设计文档 §8 开放项）
+
+## 验收结果（2026-10-11，全过）
+
+- **子代理 TDD**：新测试 5 文件 51 例（space 7 / fitness 15 / search 8 / trajectory 4 / defn 12）；全量 1117 绿（1066+51）+ ruff 零告警
+- **主会话独立复验**：tune 五模块 + CLI diff 全量审读（CRN 区间不重叠 / 采纳规则严格大于门槛 / 聚合口径对齐 winrate / `_run_one_experiment` 复用串并同路径）；**确定性独立实证**——子代理 workers=8 轨迹 vs 主会话 workers=2 重跑 49 行逐行全等（除 wall_seconds）；冒烟 2 对 × 20 局 49 次评估 = 预期行数，噪声门槛下零采纳属正确行为（20 局/对 CI 半宽 ~±15pts 大于 1pts 门槛）
+- **主会话裁决（子代理上报偏差 3 项全批准）**：①TuneDef 独立第五个模块 defn.py（归哪都不顺，独立合理）；②通用 seed 字段不实现（坐标下降除 split_seed 外零随机消费，ES 立项再补，YAGNI）；③TuneDef.pairs 显式子集字段（冒烟必需，语义 train=所选/holdout=空/index 保池序）
+- 冒烟产物 results/tune-smoke*.jsonl 留工作区（results/ 已 gitignore）

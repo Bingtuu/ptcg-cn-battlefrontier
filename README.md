@@ -128,7 +128,17 @@ bfsim calibration my-matrix.yml             # 模拟 vs 真实赛事 matchup 偏
 
 偏差表逐格给出模拟胜率（含置信区间）与真实赛事胜率的差值 Δ，按 |Δ| 降序，并附加权平均 |Δ| 等汇总——用于校准模拟与真实环境的偏差。
 
-### 7. 校验卡牌定义
+### 7. 启发式参数自调优
+
+`bfsim tune` 对启发式 AI 的决策参数（评分权重 / 决策开关）做坐标下降搜索：候选参数 vs 默认参数在训练对阵集上配对对局，逐维采纳显著提升（>噪声门槛）的取值：
+
+```bash
+bfsim tune experiments/tune-smoke.example.yml --workers 4
+```
+
+评估全程走与 `bfsim run` 相同的确定性路径（公共随机数种子协议，跨候选共享种子区间降方差）；搜索过程不产生正式结果，轨迹逐次评估落 `results/tune-<名>.jsonl`（含采纳历史与逐维敏感性）。搜索到的参数是否回写为默认值需人工裁决，不在工具内自动执行。
+
+### 8. 校验卡牌定义
 
 每张有效果的卡牌由 `cards/` 下一个 YAML 文件定义（引擎不认识任何具体卡牌，全部行为由数据驱动）。新增或修改卡牌定义后校验：
 
@@ -146,7 +156,7 @@ bfsim dsl-check cards/*.yml --db <卡牌数据库>   # 追加校验：卡牌存�
 
 ## 项目状态
 
-一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-05）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS vs 真实 65.1% 命中）。其后（2026-10-05~07）：引擎性能优化（MCTS 成本 -38.5%，行为零变化）；全库 code review（0 Critical / 11 Important）并全部修复闭环——含 MCTS 信息泄漏修复（带冻结集的部分 determinize）与修复后复核（泄漏贡献噪声级，归因结论更硬）；MCTS 决策分析上线（根节点访问分布导出 + `--mcts-consider` 报告）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性/MCTS 决策分析报告与模拟 vs 真实赛事校准偏差表（1063 项测试绿）。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
+一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-05）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS vs 真实 65.1% 命中）。其后（2026-10-05~07）：引擎性能优化（MCTS 成本 -38.5%，行为零变化）；全库 code review（0 Critical / 11 Important）并全部修复闭环——含 MCTS 信息泄漏修复（带冻结集的部分 determinize）与修复后复核（泄漏贡献噪声级，归因结论更硬）；MCTS 决策分析上线（根节点访问分布导出 + `--mcts-consider` 报告）。其后（2026-10-07~11）：历史日期勘误专项（以 git 为准修正文档错位日期）；苍响格小样本复核（EN 侧数据供给已封顶，样本量不可增长）+ 偏差表低置信标注（真实样本 n<100 格标 ⚠低置信）；**方向 B 启发式参数自调优首任务上线**（tune 子包 + 坐标下降搜索 + `bfsim tune` CLI，设计文档 D-T1~T4）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、启发式参数自调优、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性/MCTS 决策分析报告与模拟 vs 真实赛事校准偏差表（1117 项测试绿）。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
 
 ## ⚖️ 合规声明
 

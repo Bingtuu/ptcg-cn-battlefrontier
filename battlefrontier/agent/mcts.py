@@ -14,6 +14,12 @@
 - D-039-2（task 039，修订 D-034-9）挂起根部分决定化：根 state.pending_choice
   非 None 时照常 determinize，freeze = pool_iids ∪ payload——挂起候选池与两段式
   已选部分对选择方全已知（原位冻结，非泄漏），残余隐藏区不再携带真值进搜索。
+- D-M11-4（task 052 WP3）rollout 浅截断：``eval_cutoff_turns=K``（K>0 且已装载
+  评估器）时，``turn >= root_turn + K`` 在 determinized 克隆上对截断时刻行动方
+  构造可见视图求 V（纯函数，零随机源消耗），按 root_player 映射（root==行动方
+  →V，否则→1−V）；K ≥ rollout_turn_cap 时 0.5 兜底先行，评估器永不触发。
+  默认 K=0 = 禁用（行为零变化）。评估器资产经 ``evaluator_path`` 装载，
+  加载失败 / 特征清单不符显式报错（复用 learn.model.load_model 校验，不猜）。
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import GameState, VisibleGameState
+from battlefrontier.learn.model import LinearModel, load_model, predict
 
 __all__ = ["Consideration", "MCTSAgent"]
 
@@ -89,6 +96,9 @@ class MCTSAgent:
     rng：自带独立随机源（对齐 RandomAgent 偏移先例，D-034-7），引擎随机流零消费；
     worlds / iterations 为搜索预算（D-034-6：禁用墙钟）；rollout_turn_cap 为
     rollout 回合上限（相对根 turn，超限按平局 0.5 计，D-034-5）。
+    eval_cutoff_turns=K（task 052 WP3，D-M11-4）：rollout 浅截断——K>0 时
+    rollout 行过 K 回合即返回评估器估值；默认 0 = 禁用（行为零变化）。
+    evaluator_path：评估器模型资产 JSON 路径；K>0 必填，装载失败显式报错（不猜）。
     """
 
     def __init__(
@@ -99,6 +109,8 @@ class MCTSAgent:
         iterations: int = 100,
         rollout_turn_cap: int = 50,
         card_effects=None,
+        eval_cutoff_turns: int = 0,
+        evaluator_path: str | None = None,
     ) -> None:
         if worlds < 1:
             raise ValueError(f"worlds 须 ≥1（收到 {worlds}）")
@@ -106,10 +118,20 @@ class MCTSAgent:
             raise ValueError(f"iterations 须 ≥1（收到 {iterations}）")
         if rollout_turn_cap < 1:
             raise ValueError(f"rollout_turn_cap 须 ≥1（收到 {rollout_turn_cap}）")
+        if eval_cutoff_turns < 0:
+            raise ValueError(f"eval_cutoff_turns 须 ≥0（收到 {eval_cutoff_turns}）")
+        self._evaluator: LinearModel | None = None
+        if evaluator_path is not None:
+            # 装载即校验（format / 特征清单 / 维度 / std，load_model 不猜纪律）
+            self._evaluator = load_model(evaluator_path)
+        if eval_cutoff_turns > 0 and self._evaluator is None:
+            raise ValueError(
+                "eval_cutoff_turns>0 需要 evaluator_path 指定评估器资产（不猜）")
         self._rng = rng
         self.worlds = worlds
         self.iterations = iterations
         self.rollout_turn_cap = rollout_turn_cap
+        self.eval_cutoff_turns = eval_cutoff_turns
         self._card_effects = card_effects
         self._engine: GameEngine | None = None
         self._rollout_agent: HeuristicAgent | None = None
@@ -232,11 +254,26 @@ class MCTSAgent:
         return self._rollout_agent
 
     def _rollout(self, engine: GameEngine, root_player: int, root_turn: int) -> float:
-        """从展开节点双方 HeuristicAgent 打到底（驱动循环仿 runner/play.py）。"""
+        """从展开节点双方 HeuristicAgent 打到底（驱动循环仿 runner/play.py）。
+
+        D-M11-4 浅截断：eval_cutoff_turns=K>0 且评估器已装载时，
+        ``turn >= root_turn + K`` 返回评估器估值——V 恒从截断时刻行动方视角
+        （visible_state 纯函数求值，零随机源消耗），再按 root_player 映射；
+        判定在 cap 之后，K ≥ rollout_turn_cap 时 0.5 兜底先行，评估器永不触发。
+        """
         agent = self._heuristic()
+        cutoff = (
+            root_turn + self.eval_cutoff_turns
+            if self.eval_cutoff_turns > 0 and self._evaluator is not None
+            else None
+        )
         while engine.state.phase != "game_over":
             if engine.state.turn >= root_turn + self.rollout_turn_cap:
                 return 0.5  # 回合上限按平局计（D-034-5）
+            if cutoff is not None and engine.state.turn >= cutoff:
+                player = engine.state.current_player
+                v = predict(self._evaluator, engine.state.visible_state(player))
+                return v if player == root_player else 1.0 - v
             player = engine.state.current_player
             actions = engine.legal_actions(player)
             if not actions:  # 防御：理论上各阶段必有可选项（仿 play_game）

@@ -112,6 +112,12 @@ class GameResult:
     first_player: int = 0
     events: list[GameEvent] = field(default_factory=list)
     events_hash: str = ""
+    # M11 采集产物（task 050，D-M11-1）：collector 非 None 时 = 该局决策点数据行
+    # （turn/player/features/action/label）；默认 None = 未采集
+    collected_rows: list[dict] | None = None
+    # M11 一致率快照（task 052，D-M11-5）：snapshot_collector 非 None 时 = 该局
+    # 教师实际搜索的决策点快照行（含序列化 GameState + 结构化 Action）；默认 None
+    snapshot_rows: list[dict] | None = None
 
 
 def play_game(
@@ -121,8 +127,18 @@ def play_game(
     max_turns: int = DEFAULT_MAX_TURNS,
     card_effects: dict | None = None,
     agents: list | None = None,
+    collector=None,
+    snapshot_collector=None,
 ) -> GameResult:
-    """两个 Agent 打完整局（默认随机 Agent）。同种子逐事件一致（事件流 hash 可比对）。"""
+    """两个 Agent 打完整局（默认随机 Agent）。同种子逐事件一致（事件流 hash 可比对）。
+
+    collector（task 050，D-M11-1）：可选采集钩子（agent.collect.FeatureCollector），
+    每个决策点在 agent.observe 返回后回调 on_decision，局末调 finish 打标签；
+    None（默认）= 行为零变化（events_hash 回归口径）。
+    snapshot_collector（task 052，D-M11-5）：可选快照钩子
+    （agent.snapshot.SnapshotCollector），在 observe 返回后回调 on_decision
+    （仅教师实际搜索的决策点入缓冲）；None（默认）= 行为零变化。
+    """
     engine = GameEngine(RandomSource(seed), card_effects=card_effects)
     if agents is None:
         agents = [RandomAgent(RandomSource(seed + 1_000_001)),
@@ -149,6 +165,16 @@ def play_game(
         if consideration is not None:
             agent.last_consideration = None
             _emit_consideration(engine, player, consideration)
+        # task 050（D-M11-1）：采集钩子在 observe 返回后回调（view = Agent 所见，
+        # 不含隐藏信息）；None 路径零开销
+        if collector is not None:
+            collector.on_decision(view, player, action)
+        # task 052（D-M11-5）：快照钩子在 observe 返回后回调（engine.state =
+        # 决策点局面；consideration 非 None = 教师实际搜索）；None 路径零开销
+        if snapshot_collector is not None:
+            snapshot_collector.on_decision(
+                engine=engine, player=player, action=action,
+                consideration=consideration, n_legal=len(actions))
         engine.apply(player, action)
 
     s = engine.state
@@ -166,6 +192,10 @@ def play_game(
         first_player=s.first_player,
         events=engine.events,
         events_hash=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+        collected_rows=(
+            collector.finish(s.winner, s.is_draw) if collector is not None else None),
+        snapshot_rows=(
+            snapshot_collector.rows if snapshot_collector is not None else None),
     )
 
 

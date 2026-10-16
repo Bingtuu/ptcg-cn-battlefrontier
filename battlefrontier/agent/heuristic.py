@@ -8,7 +8,8 @@
 确定性纪律：不消费引擎随机源，一切 tie-break 用 iid/下标升序；
 参数全部收敛到 HeuristicParams，默认值即 PRD 通用启发式。
 评估函数与决策规则拆成纯函数（`evaluate` / `pokemon_score`），为 MCTS
-rollout 预留（PRD §7.3）。
+rollout 预留（PRD §7.3）；evaluate 五因子进一步拆为模块级因子函数
+（`factor_*`，task 050 M11 WP1：特征层 A 组取因子原值）。
 """
 
 from __future__ import annotations
@@ -34,7 +35,17 @@ from battlefrontier.engine.state import (
     VisibleGameState,
 )
 
-__all__ = ["HeuristicAgent", "HeuristicParams", "evaluate", "pokemon_score"]
+__all__ = [
+    "HeuristicAgent",
+    "HeuristicParams",
+    "evaluate",
+    "factor_board_score",
+    "factor_deck_diff",
+    "factor_energy_ready_diff",
+    "factor_hand_diff",
+    "factor_prize_diff",
+    "pokemon_score",
+]
 
 # 抗性减伤（rules-manual §6：抗性 -30）
 RESISTANCE_AMOUNT = 30
@@ -88,20 +99,49 @@ def _in_play(active: InPlayPokemon | None, bench: tuple[InPlayPokemon, ...]) -> 
     return ([active] if active else []) + list(bench)
 
 
+def factor_prize_diff(view: VisibleGameState) -> float:
+    """五因子之一：奖赏差（对手奖赏剩得少 = 我方领先）。M11 WP1 特征层共享。"""
+    return float(view.own.prizes_count - view.opponent.prizes_count)
+
+
+def factor_board_score(view: VisibleGameState, params: HeuristicParams) -> float:
+    """五因子之一：场面战力差（双方场上宝可梦 pokemon_score 合计之差）。"""
+    own_in = _in_play(view.own.active, view.own.bench)
+    opp_in = _in_play(view.opponent.active, view.opponent.bench)
+    return (sum(pokemon_score(p, params) for p in own_in)
+            - sum(pokemon_score(p, params) for p in opp_in))
+
+
+def factor_hand_diff(view: VisibleGameState) -> float:
+    """五因子之一：手牌质量差（我方手牌数 - 对手手牌数——对手只出 count）。"""
+    return float(len(view.own.hand) - view.opponent.hand_count)
+
+
+def factor_energy_ready_diff(view: VisibleGameState) -> float:
+    """五因子之一：能量就绪度差（双方场上附着能量总数之差）。"""
+    own_in = _in_play(view.own.active, view.own.bench)
+    opp_in = _in_play(view.opponent.active, view.opponent.bench)
+    return float(sum(len(p.attached_energy) for p in own_in)
+                 - sum(len(p.attached_energy) for p in opp_in))
+
+
+def factor_deck_diff(view: VisibleGameState) -> float:
+    """五因子之一：牌库资源差（双方牌库余量之差）。"""
+    return float(view.own.deck_count - view.opponent.deck_count)
+
+
 def evaluate(view: VisibleGameState, params: HeuristicParams) -> float:
-    """局面评估函数（PRD §7.2 五因子，线性加权；从 current_player 视角）。"""
-    own, opp = view.own, view.opponent
-    own_in, opp_in = _in_play(own.active, own.bench), _in_play(opp.active, opp.bench)
-    board_own = sum(pokemon_score(p, params) for p in own_in)
-    board_opp = sum(pokemon_score(p, params) for p in opp_in)
-    energy_own = sum(len(p.attached_energy) for p in own_in)
-    energy_opp = sum(len(p.attached_energy) for p in opp_in)
+    """局面评估函数（PRD §7.2 五因子，线性加权；从 current_player 视角）。
+
+    task 050（M11 WP1）：五因子拆为模块级纯函数（特征层 A 组取因子原值），
+    evaluate = 因子加权和——行为零变化（test_features 对拍钉死）。
+    """
     return (
-        params.w_prize_diff * (own.prizes_count - opp.prizes_count)  # 对手奖赏剩得少=我方领先
-        + params.w_board * (board_own - board_opp)
-        + params.w_hand * (len(own.hand) - opp.hand_count)
-        + params.w_energy_ready * (energy_own - energy_opp)
-        + params.w_deck * (own.deck_count - opp.deck_count)
+        params.w_prize_diff * factor_prize_diff(view)
+        + params.w_board * factor_board_score(view, params)
+        + params.w_hand * factor_hand_diff(view)
+        + params.w_energy_ready * factor_energy_ready_diff(view)
+        + params.w_deck * factor_deck_diff(view)
     )
 
 

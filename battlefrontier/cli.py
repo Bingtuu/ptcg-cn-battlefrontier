@@ -8,6 +8,7 @@ from pathlib import Path
 from battlefrontier.runner.experiment import (
     DEFAULT_CARDS_DIR,
     DEFAULT_RESULTS_PATH,
+    _code_version,
     execute_experiment,
     load_db_path,
     load_experiment,
@@ -282,6 +283,143 @@ def _cmd_tune_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_collect_features(args: argparse.Namespace) -> int:
+    """M11 数据产线（task 050 WP1，D-M11-1）：卡池全部配对 × 种子区间采集特征 JSONL。
+
+    落 <out>/pair-<index>-<名A>x<名B>.jsonl（不落结果库，D-T4 先例）；
+    失败局剔除并计数上报。正式跑批口径：36 对 × 2800 局 @seed-start 300000。
+    """
+    from battlefrontier.runner.collect import run_collect_pool
+
+    db_path = args.db or load_db_path()
+    summaries, warnings = run_collect_pool(
+        args.pool, db_path, games_per_pair=args.games_per_pair,
+        seed_start=args.seed_start, out_dir=args.out,
+        workers=args.workers, cards_dir=args.cards_dir)
+    for w in warnings:
+        print(f"[装载告警] {w}")
+    total_rows = sum(s.rows for s in summaries)
+    total_failed = sum(s.failed for s in summaries)
+    for s in summaries:
+        print(f"[{s.pair_index:2d}] {s.archetype_a}×{s.archetype_b}：{s.filename} — "
+              f"{s.games} 局 / {s.rows} 行 / 失败剔除 {s.failed}")
+    print(f"采集完成：{len(summaries)} 个配对 × {args.games_per_pair} 局，"
+          f"共 {total_rows} 行，失败剔除 {total_failed} 局（目录 {args.out}）")
+    return 0
+
+
+def _cmd_train_eval(args: argparse.Namespace) -> int:
+    """M11 WP2（task 051，D-M11-3）：collect-features 产物 → 岭回归闭式解训练 → 模型资产 JSON。
+
+    死维度警戒（设计文档 §5）：验证集 MSE 不优于常数基线 → 退出码 2（模型照常产出，
+    如实落账不强行失败）；数据错误 → 退出码 1。
+    """
+    from battlefrontier.learn import (
+        DEFAULT_SPLIT_SEED,
+        DEFAULT_SUBSAMPLE_SEED,
+        load_dataset,
+        save_model,
+        train_model,
+    )
+
+    try:
+        rows = load_dataset(args.data)
+        model = train_model(
+            rows,
+            split_seed=args.split_seed if args.split_seed is not None
+            else DEFAULT_SPLIT_SEED,
+            code_version=args.code_version or _code_version(),
+            pool=args.pool,
+            max_rows_per_game=args.max_rows_per_game,
+            subsample_seed=args.subsample_seed if args.subsample_seed is not None
+            else DEFAULT_SUBSAMPLE_SEED)
+    except (ValueError, OSError) as e:
+        print(f"错误：{e}")
+        return 1
+    save_model(model, args.out)
+    m = model.meta
+    sample_note = (f"，按局抽样 ≤{m['max_rows_per_game']} 行（subsample_seed "
+                   f"{m['subsample_seed']}）" if m["max_rows_per_game"] is not None
+                   else "")
+    print(f"训练完成：{m['rows']} 行（总 {m['rows_total']} 行{sample_note}）/ "
+          f"{m['games']} 局 / {m['pairs']} 配对"
+          f"（种子区间 {m['seed_min']}..{m['seed_max']}，split_seed {m['split_seed']}，"
+          f"训练 {m['train_games']} 局 / 验证 {m['val_games']} 局）")
+    print(f"λ = {m['lambda']}（候选 {{0.1, 1, 10, 100}} 按验证集 MSE 选定）；"
+          f"训练 MSE {m['train_mse']:.6f} / 验证 MSE {m['val_mse']:.6f} / "
+          f"常数基线 MSE {m['baseline_mse']:.6f}")
+    print(f"模型资产: {args.out}")
+    if m["warning"]:
+        print(f"[死维度警戒] {m['warning']}")
+        return 2
+    return 0
+
+
+def _cmd_collect_snapshots(args: argparse.Namespace) -> int:
+    """M11 一致率快照采集（task 052 WP3，D-M11-5）：教师（MCTS）配置跑卡池配对，
+    决策点快照（序列化 GameState + 教师结构化 Action）落 <out>/pair-*.jsonl。
+
+    不落结果库（D-T4 先例）；失败局剔除并计数上报。快照是数据资产——评估侧
+    （agreement）可换受测配置重放同一份快照。
+    """
+    from battlefrontier.runner.snapshot import run_collect_snapshots_pool
+
+    db_path = args.db or load_db_path()
+    teacher = {"worlds": args.worlds, "iterations": args.iterations,
+               "rollout_turn_cap": args.rollout_turn_cap}
+    summaries, warnings = run_collect_snapshots_pool(
+        args.pool, db_path, games_per_pair=args.games_per_pair,
+        seed_start=args.seed_start, out_dir=args.out,
+        workers=args.workers, cards_dir=args.cards_dir, teacher=teacher)
+    for w in warnings:
+        print(f"[装载告警] {w}")
+    total_rows = sum(s.rows for s in summaries)
+    total_failed = sum(s.failed for s in summaries)
+    for s in summaries:
+        print(f"[{s.pair_index:2d}] {s.archetype_a}×{s.archetype_b}：{s.filename} — "
+              f"{s.games} 局 / {s.rows} 快照 / 失败剔除 {s.failed}")
+    print(f"采集完成：{len(summaries)} 个配对 × {args.games_per_pair} 局（教师 "
+          f"{args.worlds}×{args.iterations} cap {args.rollout_turn_cap}），"
+          f"共 {total_rows} 快照，失败剔除 {total_failed} 局（目录 {args.out}）")
+    return 0
+
+
+def _cmd_agreement(args: argparse.Namespace) -> int:
+    """M11 决策一致率评估（task 052 WP3，D-M11-5）：快照文件 × 受测配置重放比对。
+
+    学生种子按（配置指纹 + 快照序号）确定性派生，钉死进报告；--output 落
+    完整 JSON（含逐行明细），缺省只打印摘要。
+    """
+    import json
+
+    from battlefrontier.runner.agreement import agreement_report, run_agreement_file
+
+    if args.eval_cutoff_turns > 0 and args.evaluator is None:
+        print("错误：--eval-cutoff-turns > 0 需要 --evaluator 指定评估器资产（不猜）")
+        return 1
+
+    student = {"worlds": args.worlds, "iterations": args.iterations,
+               "rollout_turn_cap": args.rollout_turn_cap,
+               "eval_cutoff_turns": args.eval_cutoff_turns}
+    if args.evaluator is not None:
+        student["evaluator_path"] = args.evaluator
+    try:
+        report = run_agreement_file(args.snapshots, student)
+    except (ValueError, OSError) as e:
+        print(f"错误：{e}")
+        return 1
+    print(f"快照 {args.snapshots}")
+    print(agreement_report(report))
+    if args.output:
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+        print(f"报告 JSON: {args.output}")
+    return 0
+
+
 def _cmd_dsl_check(args: argparse.Namespace) -> int:
     """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验；
     --db 追加装配校验（task 026：card_id 存在 / 文本等价类一致 / 赛制合法；
@@ -408,6 +546,66 @@ def main(argv: list[str] | None = None) -> int:
     tv_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
     tv_p.add_argument("--output", default=None,
                       help="结果 JSON 路径（缺省 results/tune-<name>-verify.json）")
+    col_p = sub.add_parser(
+        "collect-features",
+        help="M11 数据产线（task 050，D-M11-1）：卡池配对 × 种子区间采集特征 JSONL")
+    col_p.add_argument("--pool", required=True, help="目标卡池 YAML 路径")
+    col_p.add_argument("--games-per-pair", type=int, required=True,
+                       help="每配对局数（正式跑批 2800）")
+    col_p.add_argument("--seed-start", type=int, required=True,
+                       help="种子锚点（pair i → [S+i×N, +N)；正式跑批 300000）")
+    col_p.add_argument("--out", required=True, help="产物目录（pair-*.jsonl）")
+    col_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
+    col_p.add_argument("--db", default=None,
+                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    col_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    te_p = sub.add_parser(
+        "train-eval",
+        help="M11 WP2（task 051，D-M11-3）：collect-features 产物训练线性评估器（岭回归闭式解）")
+    te_p.add_argument("--data", required=True, help="pair-*.jsonl 数据目录")
+    te_p.add_argument("--out", required=True, help="模型资产 JSON 输出路径")
+    te_p.add_argument("--split-seed", type=int, default=None,
+                      help="按局 80/20 划分种子（缺省钉死 20261016，写进 meta）")
+    te_p.add_argument("--pool", default=None, help="卡池 YAML 路径（meta 锚点，可选）")
+    te_p.add_argument("--max-rows-per-game", type=int, default=None,
+                      help="按局行数上限（确定性抽样；缺省 None = 全量。"
+                           "正式数据 744 万行，建议 20 ≈ 2.0M 行，正落 D-M11-1 估算区间）")
+    te_p.add_argument("--subsample-seed", type=int, default=None,
+                      help="按局抽样种子（缺省钉死 20261017，写进 meta）")
+    te_p.add_argument("--code-version", default=None,
+                      help="代码版本 meta 覆盖（缺省取 git short sha；测试注入用）")
+    cs_p = sub.add_parser(
+        "collect-snapshots",
+        help="M11 一致率快照采集（task 052，D-M11-5）：教师 MCTS 跑局落决策点快照 JSONL")
+    cs_p.add_argument("--pool", required=True, help="目标卡池 YAML 路径")
+    cs_p.add_argument("--games-per-pair", type=int, required=True, help="每配对局数")
+    cs_p.add_argument("--seed-start", type=int, required=True,
+                      help="种子锚点（pair i → [S+i×N, +N)，matrix 惯例）")
+    cs_p.add_argument("--out", required=True,
+                      help="产物目录（pair-*.jsonl；正式落 results/m11-eval/）")
+    cs_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
+    cs_p.add_argument("--worlds", type=int, default=2, help="教师 MCTS worlds（基准 2）")
+    cs_p.add_argument("--iterations", type=int, default=50,
+                      help="教师 MCTS iterations（基准 50）")
+    cs_p.add_argument("--rollout-turn-cap", type=int, default=50,
+                      help="教师 rollout 回合上限（默认 50）")
+    cs_p.add_argument("--db", default=None,
+                      help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    cs_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    ag_p = sub.add_parser(
+        "agreement",
+        help="M11 决策一致率评估（task 052，D-M11-5）：快照 × 受测配置重放比对")
+    ag_p.add_argument("snapshots", help="快照 JSONL 路径（collect-snapshots 产物）")
+    ag_p.add_argument("--worlds", type=int, required=True, help="受测 MCTS worlds")
+    ag_p.add_argument("--iterations", type=int, required=True, help="受测 MCTS iterations")
+    ag_p.add_argument("--rollout-turn-cap", type=int, default=50,
+                      help="受测 rollout 回合上限（默认 50）")
+    ag_p.add_argument("--eval-cutoff-turns", type=int, default=0,
+                      help="rollout 浅截断 K（默认 0 = 禁用）")
+    ag_p.add_argument("--evaluator", default=None,
+                      help="评估器模型资产 JSON 路径（K>0 必填，装载即校验）")
+    ag_p.add_argument("--output", default=None,
+                      help="完整报告 JSON 输出路径（含逐行明细；缺省只打印摘要）")
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
@@ -424,6 +622,14 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_tune(args)
     if args.cmd == "tune-verify":
         return _cmd_tune_verify(args)
+    if args.cmd == "collect-features":
+        return _cmd_collect_features(args)
+    if args.cmd == "train-eval":
+        return _cmd_train_eval(args)
+    if args.cmd == "collect-snapshots":
+        return _cmd_collect_snapshots(args)
+    if args.cmd == "agreement":
+        return _cmd_agreement(args)
     print(f"battlefrontier {__import__('battlefrontier').__version__}："
           f"子命令 run 可用（实验定义见 experiments/），其余随里程碑添加")
     return 0

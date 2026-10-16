@@ -73,6 +73,12 @@ bfsim dsl-check cards/*.yml --db "C:/Vibe Project/Pokearena/data/ptcg-cn.db"
 
 # 启发式参数自调优（task 045：坐标下降，轨迹 JSONL 落 results/tune-<name>.jsonl，不落结果库）
 bfsim tune experiments/tune-smoke.example.yml --workers 4
+
+# M11 一致率快照采集（task 052：教师 MCTS 跑局落决策点快照，不落结果库，正式落 results/m11-eval/）
+bfsim collect-snapshots --pool config/target-pool.v1.yml --games-per-pair 10 --seed-start 500000 --out results/m11-eval --workers 4
+
+# M11 决策一致率评估（task 052：快照 × 受测配置重放比对；K>0 须配 --evaluator）
+bfsim agreement results/m11-eval/pair-0-xxx.jsonl --worlds 1 --iterations 25 --eval-cutoff-turns 10 --evaluator models/eval-linear-v1.json
 ```
 
 开发自检（Windows Git Bash，提交前必过）：

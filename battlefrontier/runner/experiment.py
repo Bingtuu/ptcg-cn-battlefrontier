@@ -37,8 +37,10 @@ DEFAULT_CONFIG_PATH = "config/battlefrontier.local.yml"
 
 AGENT_TYPES = ("random", "heuristic", "mcts")
 
-# task 034：mcts params 词表（worlds/iterations/rollout_turn_cap，D-034-6 迭代预算）
-MCTS_PARAMS = ("worlds", "iterations", "rollout_turn_cap")
+# task 034：mcts params 词表（worlds/iterations/rollout_turn_cap，D-034-6 迭代预算）；
+# task 052（D-M11-4）：eval_cutoff_turns + evaluator_path（rollout 浅截断评估器）
+MCTS_PARAMS = ("worlds", "iterations", "rollout_turn_cap",
+               "eval_cutoff_turns", "evaluator_path")
 
 
 # ── 实验定义（§8.1，Pydantic 强校验）──────────────────────
@@ -67,7 +69,8 @@ class DeckSourceCfg(FrozenModel):
 
 class AgentCfg(FrozenModel):
     type: str = "random"
-    params: dict[str, float | int | bool] = {}
+    # task 052（D-M11-4）：值域放宽 str——mcts evaluator_path（评估器资产路径）
+    params: dict[str, float | int | bool | str] = {}
 
     @model_validator(mode="after")
     def _check_agent(self) -> AgentCfg:

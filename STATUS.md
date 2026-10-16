@@ -4,7 +4,7 @@
 
 ## 当前
 
-**当前**：**task 049 M11 任务书立项 ✅（2026-10-16）**——`docs/superpowers/specs/2026-10-16-m11-learned-evaluator-design.md`（D-M11-1~7）：跑局显式采集产线（collector 钩子 + JSONL 侧文件，36 对 × 2800 局 @seed 300000+ ≈ 10.08 万局）/ 特征三组（A 五因子原值 + B 结构量 + C dsl_estimate 衍生增量）/ 岭回归闭式解（numpy 位级确定，D3-3 合规）/ MCTS 浅截断接入（eval_cutoff_turns=K 默认 0 禁用，行为零变化）/ 一致率 = 决策点快照 + 结构化 Action 重放比对 / 双锚 M11 细化（一致率 ≥0.85 + 定点格 CI 覆盖基准；meta 锚 |Δ|≤9.7% 归 M12）。**auto 模式说明：M11 关键选型由主会话按设计依据直决并记录任务档，用户可覆议**。**下一步 = task 050：M11 WP1 实施**（特征层 + collector + 数据产线跑批）。前情：三期 PRD 已批准（task 048）。Mega 线暂缓（2026-10-07 决议）。
+**当前**：**M11 WP1–WP3 完成（task 050/051/052 ✅，2026-10-16/17）**——数据产线 36 对 × 2800 局 = 100,792 局 744 万行（`results/m11-data/`）；学得评估器 `models/eval-linear-v1.json`（岭回归闭式解，λ=0.1，验证 MSE 0.2056 < 常数基线 0.2468，**死维度警戒未触发**，解释方差 ~16.7%；进版本控制 D3-4）；MCTS 浅截断接入（`eval_cutoff_turns` 默认 0 零变化 + `evaluator_path`）+ 一致率 harness（`bfsim collect-snapshots` / `bfsim agreement`，快照落 `results/m11-eval/`，结构化 Action argmax 比对）。**1252 绿 + ruff 零告警（主会话亲验）**。**下一步 = task 053：M11 WP4**（K×预算扫描 + 双锚验收 + M11 报告 → 里程碑验收结论呈报用户拍板，之后才启 M12 立项）。前情：三期 PRD + M11 任务书已批准（task 048/049）。Mega 线暂缓（2026-10-07 决议）。
 
 **二期 PRD v1.0 已立项（2026-10-03）**：`docs/superpowers/specs/2026-10-03-phase2-prd-design.md`——四条线范围拍定（D2-1~D2-8）：主线 = Agent 升级（task 031 偏差归因 → D2-3 门控 MCTS）；LLM 铺开 = 增量模式暂不申请 API key；引擎收尾四项固定；环境演进 = Mega 调研先行。里程碑 M7（归因）→ M8（决策层升级）→ M9（收尾+调研）→ M10（校准复核）。
 
@@ -26,6 +26,29 @@
 - ✅ M10 二期校准复核——task 036 ✅（2026-10-05：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 13.2% → M9 15.0% 轨迹）；D2-7 归因闭环 ✅——|Δ|≥25% 五格全有解释+证据 id，沙奈朵/玛俐/猛雷鼓三对 CI 双覆盖（|Δ|≤1.3）；沙奈朵格双侧 MCTS 500 局零失败：63.8% vs real 65.1%，单侧残余完整归因「对照侧启发式操作质量」；**二期 M7–M10 全段收官**）
 
 ## 工作记录
+
+### 2026-10-17 task 052：M11 WP3 MCTS 截断接入 + 一致率 harness ✅
+
+- **截断接入（D-M11-4）**：`MCTSAgent` 增 `eval_cutoff_turns`（默认 0 = 禁用零变化）+ `evaluator_path`（装载即全量校验不猜）；`_rollout` cap 判定后插截断分支——`turn ≥ root_turn + K` 对截断时刻行动方 visible_state 求 V 再按 root_player 映射（≠ → 1−V）；K ≥ cap 时 0.5 兜底先行评估器永不触发（对拍一致）；评估纯函数零随机源；experiment.py MCTS_PARAMS 透传对齐 card_effects 先例
+- **一致率 harness（D-M11-5）**：`agent/snapshot.py` + `runner/snapshot.py`（只落教师实际搜索决策点，header 行自包含无需 db）+ `runner/agreement.py`（重建 GameState → 受测配置重放 → 结构化 Action 值比对；分母 v1 = main 阶段 attack/play_trainer/end_turn，附录计数分母外类别 + 教师行动不合法安全网；学生种子 = sha256(config_fingerprint:快照序号) 钉死）；CLI `collect-snapshots` / `agreement` 两步独立
+- **口径裁决（主会话）**：`state.turn` = 轮计数（core.py:2309 仅先手方回合开始 +1）→ 设计文档 D-M11-4 加口径补注（K ≈ 2K 单方回合，扫描网格不变；turn_norm 同计数源无分布失真）；AGENTS.md 快照示例种子 400000→500000（避训练区间 300000–400799 重叠）
+- **验收**：36 新测试；主会话复验 = 亲自复跑 **1252 绿 + ruff 零告警** + mcts.py 截断分支亲读 + 冻结面（tune/、learn/、task 050 文件）git diff 实证干净
+- **遗留**：task 053 = WP4 扫描 + 双锚验收 + M11 报告；快照行体积大（全池规模化需留意）
+
+### 2026-10-17 task 051：M11 WP2 训练器 + 模型资产 + 推理接口 ✅
+
+- **交付**：`battlefrontier/learn/`（train.py 岭回归闭式解——环境无 numpy 且 D3-3 不引框架 → 纯 Python 高斯消元部分主元，位级确定；model.py 资产 `bf-linear-eval-v1` + 双入口 predict 键序强制校验）；CLI `bfsim train-eval`；50 新测试
+- **追加裁决（主会话，auto 模式记录）**：D-051-1 按局行数上限（实产 744 万行远超设计 150–200 万估算 → `--max-rows-per-game 20` 按局确定性抽样 ~2.0M 行正落设计区间，meta 落账 rows_total/max_rows_per_game/subsample_seed）；D-051-2 正规方程上三角优化（镜像拷贝确定性保持，参考实现逐位对拍）
+- **正式训练**：100,792 局（80633/20159 按局划分，split_seed 20261016）→ λ=0.1；**验证 MSE 0.20564 < 常数基线 0.24685（解释方差 ~16.7%，死维度警戒未触发 warning=null）**，训练/验证 MSE 紧贴无过拟合迹象；`models/eval-linear-v1.json` 进版本控制（D3-4）；特征重要性前列 = deck_diff / prize_diff / opp_stage2 / own_stage1
+- **验收**：主会话复验 = 亲自复跑 1216 绿 + ruff 零告警 + model.py 契约亲读 + 冻结面实证干净；正式训练 EXIT=0
+- **遗留**：无（学习信号明确，WP3 前提成立）
+
+### 2026-10-16 task 050：M11 WP1 特征层 + 采集钩子 + 数据产线 ✅
+
+- **交付**：`agent/features.py`（FEATURE_NAMES 30 键序钉死：A 组五因子原值 + B 组 25 结构量，对手侧仅 count 守信息纪律；heuristic.evaluate 拆因子零行为变化对拍）+ `agent/collect.py` FeatureCollector + `runner/collect.py` 产线 + CLI `collect-features` + play.py collector 钩子（默认 None 零变化）
+- **正式跑批**：36 对 × 2800 局 = 100,800 局 @seed 300000+ @16 workers ~21min → `results/m11-data/` 36 JSONL 共 **7,440,861 行**（6.7GB，gitignore 覆盖不落库），失败剔除 8 局（0.008%）；装载告警 16 条（波波/索财灵异文本印刷 vanilla 结算，既有口径）；抽样 schema + 标签分布校验通过
+- **验收**：主会话复验 = 亲自复跑 1178 绿 + ruff 零告警 + 冻结面实证干净
+- **遗留**：每局实际决策点 ~74 远超设计估算 → D-051-1 按局行数上限；C 组特征顺延；8 失败局未逐局归因（量级不阻塞）
 
 ### 2026-10-16 task 049：M11 学得评估器任务书立项 ✅（三期首任务）
 

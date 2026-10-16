@@ -1,0 +1,13 @@
+# task 046 复校准：调优采纳参数（deck_low_threshold 6→12，待 WP3 双门槛过线后启用）
+# 全 matrix 36 配对 × 500 局，双侧均为调优参数（校准矩阵两侧同 Agent 口径同 M6）。
+# seed_start 与 M6 基线一致（100000，子实验逐对种子区间逐格对齐 → 配对可比）。
+# 用法：bfsim run experiments/t046-recalibration.example.yml --workers 16 --results results/t046-recalibration.db
+# 对比：bfsim calibration experiments/t046-recalibration.example.yml --results results/t046-recalibration.db
+name: t046-recalibration
+seed_start: 100000
+matrix:
+  pool: config/target-pool.v1.yml
+  games_per_pair: 500
+agents:
+  a: {type: heuristic, params: {deck_low_threshold: 12}}
+  b: {type: heuristic, params: {deck_low_threshold: 12}}

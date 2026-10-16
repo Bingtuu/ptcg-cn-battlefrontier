@@ -1,0 +1,12 @@
+# 调优定义正式粗扫（task 046）：全量 36 配对分层划分（训练 24 + holdout 12），
+# 坐标下降 ≤3 轮，100 局/对，预算 ~36 万局（≈2h @16 workers，M6 吞吐外推）。
+# 用法：bfsim tune experiments/tune-full.example.yml --workers 16
+# 复评：bfsim tune-verify experiments/tune-full.example.yml --workers 16
+name: tune-full
+pool: config/target-pool.v1.yml
+games_per_pair: 100
+split_seed: 20261011      # D-046-3：首个通过分层覆盖校验的种子（holdout 12 对 9 archetype 双侧覆盖）
+holdout_size: 12
+algorithm: coordinate
+max_rounds: 3
+noise_threshold: 0.01     # D-T2：1.0pts 噪声门槛

@@ -221,6 +221,67 @@ def _cmd_tune(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_tune_verify(args: argparse.Namespace) -> int:
+    """top-3 复评 + 双门槛 holdout 验证 + 敏感性报告（task 046，D-046-1/2/4）。
+
+    轨迹 JSONL 重建搜索（不新增 summary 文件）→ top-3 候选在训练+holdout 各
+    复评 games 局/对（CRN 种子派生不变）→ 双门槛裁决 → 结果 JSON 落盘。
+    """
+    import json
+
+    from battlefrontier.data.pool import load_target_pool
+    from battlefrontier.tune import load_tune
+    from battlefrontier.tune.fitness import prepare_pairs, select_pairs, split_pairs
+    from battlefrontier.tune.trajectory import read_trajectory
+    from battlefrontier.tune.verify import (
+        format_verify,
+        run_verify,
+        verify_projection,
+    )
+
+    defn = load_tune(Path(args.definition))
+    db_path = args.db or load_db_path()
+    trajectory = args.trajectory or f"results/tune-{defn.name}.jsonl"
+    output = args.output or f"results/tune-{defn.name}-verify.json"
+    try:
+        rows = read_trajectory(trajectory)
+        pool = load_target_pool(defn.pool)
+        if defn.pairs is not None:
+            split = select_pairs(pool, defn.pairs)
+        else:
+            split = split_pairs(pool, defn.split_seed, defn.holdout_size)
+        if not split.holdout:
+            raise ValueError(
+                "holdout 配对集为空（不猜）：pairs 显式子集模式无 holdout，"
+                "D-046-1 双门槛验证需要划分出 holdout——请用全量划分的调优定义重跑")
+        prepared_all = prepare_pairs([*split.train, *split.holdout], db_path,
+                                     args.cards_dir)
+        train_idx = {p.index for p in split.train}
+        train_prepared = [p for p in prepared_all if p.assignment.index in train_idx]
+        holdout_prepared = [p for p in prepared_all
+                            if p.assignment.index not in train_idx]
+        result = run_verify(rows=rows, noise_threshold=defn.noise_threshold,
+                            train_prepared=train_prepared,
+                            holdout_prepared=holdout_prepared,
+                            games=args.games, workers=args.workers, progress=print)
+    except (ValueError, OSError) as e:
+        print(f"错误：{e}")
+        return 1
+    print(f"调优「{defn.name}」：训练 {len(split.train)} 对 / holdout "
+          f"{len(split.holdout)} 对 × 复评 {args.games} 局/对"
+          f"（轨迹 {trajectory}，{len(rows)} 次评估）")
+    print(format_verify(result, name=defn.name))
+    out_path = Path(output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(verify_projection(result, name=defn.name,
+                                     split_seed=defn.split_seed),
+                   ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8")
+    print(f"结果 JSON: {output}")
+    return 0
+
+
 def _cmd_dsl_check(args: argparse.Namespace) -> int:
     """LLM harness 闸 1（task 024）：DSL 文件 schema + 词表校验；
     --db 追加装配校验（task 026：card_id 存在 / 文本等价类一致 / 赛制合法；
@@ -333,6 +394,20 @@ def main(argv: list[str] | None = None) -> int:
     tune_p.add_argument("--db", default=None,
                         help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     tune_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    tv_p = sub.add_parser(
+        "tune-verify",
+        help="top-3 复评 + 双门槛 holdout 验证 + 敏感性报告（task 046，D-046-1/2）")
+    tv_p.add_argument("definition", help="调优定义 YAML 路径（与 tune 跑批同一份）")
+    tv_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
+    tv_p.add_argument("--trajectory", default=None,
+                      help="轨迹 JSONL 路径（缺省 results/tune-<name>.jsonl）")
+    tv_p.add_argument("--games", type=int, default=500,
+                      help="复评每配对局数（默认 500，D-046-4）")
+    tv_p.add_argument("--db", default=None,
+                      help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    tv_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    tv_p.add_argument("--output", default=None,
+                      help="结果 JSON 路径（缺省 results/tune-<name>-verify.json）")
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
@@ -347,6 +422,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_dsl_check(args)
     if args.cmd == "tune":
         return _cmd_tune(args)
+    if args.cmd == "tune-verify":
+        return _cmd_tune_verify(args)
     print(f"battlefrontier {__import__('battlefrontier').__version__}："
           f"子命令 run 可用（实验定义见 experiments/），其余随里程碑添加")
     return 0

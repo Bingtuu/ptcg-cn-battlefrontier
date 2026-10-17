@@ -1,0 +1,22 @@
+# M11 一致率定点格小池（task 053，D-M11-6：定点格先行）
+# 3 套 = 两定点格（沙奈朵×赛富豪 / 赛富豪×赫普的苍响）+ 沙奈朵×苍响（搭车观察格）。
+# 卡组与锁定信息逐条复制自 config/target-pool.v1.yml（卡池 v1 锚定 D3-5），仅子集化。
+version: 1
+locked_at: "2026-10-17"
+note: "M11 WP4 一致率扫描定点格子集；非新卡池版本，训练/验收锚定卡池 v1 不变"
+query:
+  granularity: archetype
+  window: "2026-05-30..2026-08-28"
+  division: master
+  basis: cn
+  min_n: 5
+  n_tournaments: 6
+  mapping_status: full
+  snapshot: standard-2026-07-16
+  name_group_rules_hash: c47538c37ca8
+  legality_constraint: "代表卡组须通过 standard-2026-07-16 校验（当前环境口径）"
+  substitution: "子集化自 target-pool.v1（task 053 定点格），无替补"
+decks:
+  - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.129, n: 56, deck_id: "mik_moe:644634", note: "复制自 target-pool.v1"}
+  - {archetype: 赛富豪, en_archetype: Gholdengo, wur: 0.027, n: 17, deck_id: "mik_moe:655513", note: "复制自 target-pool.v1"}
+  - {archetype: 赫普的苍响, en_archetype: "Hop's Zacian", wur: 0.004, n: 4, deck_id: "mik_moe:655512", note: "复制自 target-pool.v1"}

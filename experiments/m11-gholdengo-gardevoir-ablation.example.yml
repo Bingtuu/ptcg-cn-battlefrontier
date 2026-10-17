@@ -2,7 +2,7 @@
 # 半预算纯搜索无评估器，分解预算效应（vs 2×50 K=0 基准 m11-postfix.db exp 1）
 # 与评估器净效应（vs 2×25 K=10 学生 m11-anchor.db exp 2）
 # 种子区间 102500..102999，CRN 对齐两者
-# 用法：bfsim run experiments/m11-gholdengo-gardevoir-ablation.example.yml --workers 8 --results results/m11-anchor.db
+# 用法：bfsim run experiments/m11-gholdengo-gardevoir-ablation.example.yml --workers 8 --results results/m11-ablation.db
 name: m11-gholdengo-gardevoir-ablation
 games: 500
 seed_start: 102500

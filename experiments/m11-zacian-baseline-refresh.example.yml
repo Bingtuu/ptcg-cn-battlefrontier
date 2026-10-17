@@ -1,0 +1,12 @@
+# task 054 锚2修正跑批①：苍响格基准刷新——苍响(MCTS 2×50 纯搜索)×赛富豪(heuristic)
+# 当前代码重跑 m8c-zacian-mcts 口径（种子区间 117000..117499，CRN 对齐 m11-zacian-student）
+# 用法：bfsim run experiments/m11-zacian-baseline-refresh.example.yml --workers 8 --results results/m11-anchor.db
+name: m11-zacian-baseline-refresh
+games: 500
+seed_start: 117000
+decks:
+  a: {source: db, deck_id: "mik_moe:655513"}
+  b: {source: db, deck_id: "mik_moe:655512"}
+agents:
+  a: {type: heuristic}
+  b: {type: mcts, params: {worlds: 2, iterations: 50}}

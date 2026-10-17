@@ -1,0 +1,14 @@
+# task 055 M11 锚2 满预算验证格：沙奈朵(学生)×赛富豪(学生) 双侧 MCTS 2×50 + 评估器 K=10
+# 对照基准 = m11-postfix.db exp 1（双侧 MCTS 2×50 K=0 纯搜索，62.0%）
+# 种子区间对齐（102500..102999，与基准/消融/学生格同区间，CRN 对齐）
+# 问题：满预算档（2×50）评估器净效应是否亦为零（task 054 已在 2×25 档证零，此为直接验证）
+# 用法：bfsim run experiments/m11-gholdengo-gardevoir-fullbudget-2x50k10.example.yml --workers 16 --results results/m11-fullbudget.db
+name: m11-gholdengo-gardevoir-fullbudget-2x50k10
+games: 500
+seed_start: 102500
+decks:
+  a: {source: db, deck_id: "mik_moe:644634"}
+  b: {source: db, deck_id: "mik_moe:655513"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50, eval_cutoff_turns: 10, evaluator_path: "models/eval-linear-v1.json"}}
+  b: {type: mcts, params: {worlds: 2, iterations: 50, eval_cutoff_turns: 10, evaluator_path: "models/eval-linear-v1.json"}}

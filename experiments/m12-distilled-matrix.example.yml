@@ -1,0 +1,14 @@
+# M12 WP4 锚 2+3（task 060）：学生（distilled）双侧全 matrix 复校准 + 分钟级口径
+# 前置：task 060 正式训练产物 models/policy-m12-v1.json（bf-distilled-policy-v1）
+# 用法：bfsim run experiments/m12-distilled-matrix.example.yml --workers 16 --results results/m12-distilled-matrix.db
+#       bfsim calibration experiments/m12-distilled-matrix.example.yml --results results/m12-distilled-matrix.db
+# 种子区间锚 700000（避开 M11 训练段 300000–400799 / 锚点段 102500/117000 /
+# M12 教师采集段 600000–601027）
+name: m12-distilled-matrix
+seed_start: 700000
+matrix:
+  pool: config/target-pool.v1.yml
+  games_per_pair: 500
+agents:
+  a: {type: distilled, params: {policy_path: models/policy-m12-v1.json}}
+  b: {type: distilled, params: {policy_path: models/policy-m12-v1.json}}

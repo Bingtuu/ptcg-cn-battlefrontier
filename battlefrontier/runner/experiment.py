@@ -18,6 +18,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from battlefrontier.agent.distilled import DistilledAgent
 from battlefrontier.agent.heuristic import HeuristicAgent, HeuristicParams
 from battlefrontier.agent.mcts import MCTSAgent
 from battlefrontier.agent.random_agent import RandomAgent
@@ -28,6 +29,7 @@ from battlefrontier.dsl import CardLibrary, load_card_dir
 from battlefrontier.dsl.schema import CardEffectDoc
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import CardDef
+from battlefrontier.learn.policy_model import load_policy_model
 from battlefrontier.runner.play import GameResult, play_game
 from battlefrontier.runner.results_db import ResultsDB
 
@@ -35,12 +37,16 @@ DEFAULT_RESULTS_PATH = "results/battlefrontier-results.db"
 DEFAULT_CARDS_DIR = "cards"
 DEFAULT_CONFIG_PATH = "config/battlefrontier.local.yml"
 
-AGENT_TYPES = ("random", "heuristic", "mcts")
+AGENT_TYPES = ("random", "heuristic", "mcts", "distilled")
 
 # task 034：mcts params 词表（worlds/iterations/rollout_turn_cap，D-034-6 迭代预算）；
 # task 052（D-M11-4）：eval_cutoff_turns + evaluator_path（rollout 浅截断评估器）
 MCTS_PARAMS = ("worlds", "iterations", "rollout_turn_cap",
                "eval_cutoff_turns", "evaluator_path")
+
+# task 059（D-M12-5）：distilled params 词表——仅 policy_path（bf-distilled-policy-v1
+# 模型资产 JSON 路径）；worker 内每局重建 Agent = 每局装载一次（与现状同例）
+DISTILLED_PARAMS = ("policy_path",)
 
 
 # ── 实验定义（§8.1，Pydantic 强校验）──────────────────────
@@ -80,6 +86,18 @@ class AgentCfg(FrozenModel):
             unknown = set(self.params) - set(MCTS_PARAMS)
             if unknown:
                 raise ValueError(f"未知 MCTS 参数（不猜）: {sorted(unknown)}")
+            return self
+        if self.type == "distilled":
+            # task 059（D-M12-5）：distilled 专属 params 白名单——不被
+            # HeuristicParams 校验误杀；policy_path 必填且为 str
+            unknown = set(self.params) - set(DISTILLED_PARAMS)
+            if unknown:
+                raise ValueError(f"未知 distilled 参数（不猜）: {sorted(unknown)}")
+            policy_path = self.params.get("policy_path")
+            if not isinstance(policy_path, str) or not policy_path:
+                raise ValueError(
+                    "distilled 需要 params.policy_path（bf-distilled-policy-v1 "
+                    "模型资产 JSON 路径，str，不猜）")
             return self
         unknown = set(self.params) - set(HeuristicParams.__dataclass_fields__)
         if unknown:
@@ -233,6 +251,20 @@ def _build_one(cfg: AgentCfg, seed: int, offset: int, card_effects=None):
         # iterations / rollout_turn_cap 经 params 透传（迭代预算，零墙钟）
         return MCTSAgent(RandomSource(seed + offset), card_effects=card_effects,
                          **cfg.params)
+    if cfg.type == "distilled":
+        # task 059（D-M12-5）：显式分支——不得静默落 RandomAgent 兜底；
+        # policy_path 缺失 / 资产装载失败显式报错（load_policy_model 强校验，不猜）
+        policy_path = cfg.params.get("policy_path")
+        if not isinstance(policy_path, str) or not policy_path:
+            raise ValueError(
+                "distilled 需要 params.policy_path（bf-distilled-policy-v1 "
+                "模型资产 JSON 路径，str，不猜）")
+        try:
+            model = load_policy_model(policy_path)
+        except (OSError, ValueError, TypeError, KeyError) as e:
+            raise ValueError(
+                f"distilled 模型装载失败（{policy_path}）：{e}") from e
+        return DistilledAgent(model)
     return RandomAgent(RandomSource(seed + offset))
 
 

@@ -28,11 +28,18 @@
 
 ## 工作记录
 
+### 2026-10-18 task 059：M12 WP3 distilled Agent 接入（type: distilled）✅
+
+- **新增**：`agent/distilled.py` DistilledAgent（numpy 前向 56→hidden→1 打分 + 合法行动掩码 argmax，ties 取首索引、全程无随机源；构造收 PolicyModel 实例 + 形状复核）；测试 27 个（`tests/test_distilled_agent.py`）
+- **接入五处**：experiment.py（AGENT_TYPES + DISTILLED_PARAMS 白名单 + `_build_one` 显式分支，装载失败显式报错不落 RandomAgent 兜底）／agreement.py replay_student 学生分派（type 缺省 mcts 向后兼容；distilled 无需 determinize）／cli.py `agreement --policy`（与 MCTS 预算 flags 互斥，退出码 1；MCTS 路径 student dict 逐键不变 = M11 fingerprint 兼容）
+- **验收**：全量 pytest **1302 绿**（子代理 + 主会话双跑）+ ruff 零告警；runtime 零 torch grep 复核；默认路径零行为变化（events_hash 回归套件原样全绿 + distilled 双侧镜像同种子两跑逐局全等）；agreement CLI 亲跑冒烟快照一致率 0.2447（1-epoch 冒烟模型，只看管线通）两跑逐字节一致；`bfsim run` 端到端（spawn 载荷路径）2 局零失败 **~5.5s/局**（对照教师 MCTS ~8–13min/局 ≈ 百倍提速，锚 3 分钟级预期坐实）
+- **遗留**：task 060 正式训练（task 057 试点数据）+ 双锚验收；task 058 遗留的全批量训练性能风险在试点规模（~20 万点）正式训练前需评估
+
 ### 2026-10-18 task 058：M12 WP2 状态-行动特征化 + torch 训练管线 ✅
 
 - **新增**：`agent/action_features.py`（行动特征 26 维 = kind one-hot 16 + 数值标量 6 + 目标关系标志 4，纯函数零引擎调用）/ `learn/policy_data.py`（快照→样本：重建 GameState → 行动方 visible view 特征 + 合法行动逐条特征化 + 教师下标，信息纪律，教师不合法显式报错）/ `learn/policy_model.py`（bf-distilled-policy-v1 资产：format/词表键序/权重形状强校验，位级确定落盘）/ `learn/train_policy.py`（torch MLP 打分机 56→64→1，掩码 softmax + 硬标签 NLL，全批量 Adam；唯一 torch import 位）/ CLI `bfsim train-policy`（缺省 epochs 100 / lr 1e-3 / hidden 64 / split_seed 20261018 全钉死写 meta）
 - **设计决策**：D-M12-1 kind 词表 16 类（任务书草稿「15 类」系漏计 choose——choice 阶段占冒烟样本 28%，字母序钉死）；D-M12-2 行动标量只读 Action 结构化字段（Action 无 damage/amount/count，卡面量属 DSL 语义不入特征，目标关系标志经 visible view 解析）；D-M12-3 MLP 缺省结构/超参；D-M12-4 资产格式（训练非复算面 D3-4 落 meta torch_version）
-- **验收**：新增 23 测试全绿（特征键序锁定 / 快照→样本含信息纪律对拍 / 资产往返 + 位级确定 + 装载失败显式报错 / CLI 端到端小样本）；全量 1275 绿 + ruff 零告警；grep 实证 runtime 路径零 torch（仅 learn/train_policy.py）；冒烟训练 984 点/5 局 1 epoch 产物 `results/m12-teacher-pilot/policy-smoke.json`（holdout argmax 0.5455 落 meta）
+- **验收**：新增 23 测试全绿（特征键序锁定 / 快照→样本含信息纪律对拍 / 资产往返 + 位级确定 + 装载失败显式报错 / CLI 端到端小样本）；全量 1275 绿 + ruff 零告警；grep 实证 runtime 路径零 torch（仅 learn/train_policy.py）；冒烟训练 984 点/5 局 1 epoch 产物 `results/policy-smoke-task058.json`（holdout argmax 0.5455 落 meta）
 - **遗留**：WP3 numpy 推理前向 + `type: distilled` Agent 注册（接入面见 `.kimi-code/m12-decision-prep.md` §4）；软标签缺口续挂 task 057 遗留；正式 10³ 试点训练待 task 057 产线收口
 
 ### 2026-10-18 task 055：M11 锚 2 满预算验证格（2×50 K=10）——锚 2 达成收口 ✅（M11 双锚终判呈报中）

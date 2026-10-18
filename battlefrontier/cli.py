@@ -434,6 +434,9 @@ def _cmd_collect_snapshots(args: argparse.Namespace) -> int:
 def _cmd_agreement(args: argparse.Namespace) -> int:
     """M11 决策一致率评估（task 052 WP3，D-M11-5）：快照文件 × 受测配置重放比对。
 
+    学生两类：MCTS（--worlds/--iterations 等预算 flags）或 distilled
+    （task 059，D-M12-5：--policy 指定 bf-distilled-policy-v1 模型资产）——
+    两者互斥，混用显式报错退出码 1（不猜）。
     学生种子按（配置指纹 + 快照序号）确定性派生，钉死进报告；--output 落
     完整 JSON（含逐行明细），缺省只打印摘要。
     """
@@ -441,15 +444,33 @@ def _cmd_agreement(args: argparse.Namespace) -> int:
 
     from battlefrontier.runner.agreement import agreement_report, run_agreement_file
 
-    if args.eval_cutoff_turns > 0 and args.evaluator is None:
-        print("错误：--eval-cutoff-turns > 0 需要 --evaluator 指定评估器资产（不猜）")
-        return 1
-
-    student = {"worlds": args.worlds, "iterations": args.iterations,
-               "rollout_turn_cap": args.rollout_turn_cap,
-               "eval_cutoff_turns": args.eval_cutoff_turns}
-    if args.evaluator is not None:
-        student["evaluator_path"] = args.evaluator
+    if args.policy is not None:
+        # task 059（D-M12-5）：--policy 与 MCTS 预算 flags 互斥（缺省 None 以区分
+        # 「未传」与「传了缺省值」，互斥判定零歧义）
+        mcts_flags = [flag for flag, value in (
+            ("--worlds", args.worlds), ("--iterations", args.iterations),
+            ("--rollout-turn-cap", args.rollout_turn_cap),
+            ("--eval-cutoff-turns", args.eval_cutoff_turns),
+            ("--evaluator", args.evaluator)) if value is not None]
+        if mcts_flags:
+            print(f"错误：--policy（distilled 学生）与 MCTS 预算 flags 互斥（不猜）："
+                  f"{'、'.join(mcts_flags)}")
+            return 1
+        student = {"type": "distilled", "policy_path": args.policy}
+    else:
+        if args.worlds is None or args.iterations is None:
+            print("错误：MCTS 学生需要 --worlds 与 --iterations"
+                  "（distilled 学生改用 --policy 指定模型资产）")
+            return 1
+        if (args.eval_cutoff_turns or 0) > 0 and args.evaluator is None:
+            print("错误：--eval-cutoff-turns > 0 需要 --evaluator 指定评估器资产（不猜）")
+            return 1
+        student = {"worlds": args.worlds, "iterations": args.iterations,
+                   "rollout_turn_cap": args.rollout_turn_cap
+                   if args.rollout_turn_cap is not None else 50,
+                   "eval_cutoff_turns": args.eval_cutoff_turns or 0}
+        if args.evaluator is not None:
+            student["evaluator_path"] = args.evaluator
     try:
         report = run_agreement_file(args.snapshots, student)
     except (ValueError, OSError) as e:
@@ -661,14 +682,21 @@ def main(argv: list[str] | None = None) -> int:
         "agreement",
         help="M11 决策一致率评估（task 052，D-M11-5）：快照 × 受测配置重放比对")
     ag_p.add_argument("snapshots", help="快照 JSONL 路径（collect-snapshots 产物）")
-    ag_p.add_argument("--worlds", type=int, required=True, help="受测 MCTS worlds")
-    ag_p.add_argument("--iterations", type=int, required=True, help="受测 MCTS iterations")
-    ag_p.add_argument("--rollout-turn-cap", type=int, default=50,
-                      help="受测 rollout 回合上限（默认 50）")
-    ag_p.add_argument("--eval-cutoff-turns", type=int, default=0,
-                      help="rollout 浅截断 K（默认 0 = 禁用）")
+    ag_p.add_argument("--worlds", type=int, default=None,
+                      help="受测 MCTS worlds（MCTS 学生必填；与 --policy 互斥）")
+    ag_p.add_argument("--iterations", type=int, default=None,
+                      help="受测 MCTS iterations（MCTS 学生必填；与 --policy 互斥）")
+    ag_p.add_argument("--rollout-turn-cap", type=int, default=None,
+                      help="受测 rollout 回合上限（默认 50；与 --policy 互斥）")
+    ag_p.add_argument("--eval-cutoff-turns", type=int, default=None,
+                      help="rollout 浅截断 K（默认 0 = 禁用；与 --policy 互斥）")
     ag_p.add_argument("--evaluator", default=None,
-                      help="评估器模型资产 JSON 路径（K>0 必填，装载即校验）")
+                      help="评估器模型资产 JSON 路径（K>0 必填，装载即校验；"
+                           "与 --policy 互斥）")
+    ag_p.add_argument("--policy", default=None,
+                      help="distilled 学生（task 059，D-M12-5）："
+                           "bf-distilled-policy-v1 模型资产 JSON 路径；"
+                           "与全部 MCTS 预算 flags 互斥")
     ag_p.add_argument("--output", default=None,
                       help="完整报告 JSON 输出路径（含逐行明细；缺省只打印摘要）")
     args = parser.parse_args(argv)

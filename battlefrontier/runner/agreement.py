@@ -3,7 +3,9 @@
 - 载入快照（runner.snapshot.load_snapshot_file）→ 逐行重建 GameState（Pydantic
   往返）→ 同状态跑受测配置（降预算 + eval_cutoff_turns + 评估器）MCTS 搜索 →
   学生 argmax 结构化 Action 与教师 Action 直接比对（dataclass 值相等，不用
-  字符串标签——choose 类卡名拼接有碰撞风险，D-M11-5）。
+  字符串标签——choose 类卡名拼接有碰撞风险，D-M11-5）。task 059（D-M12-5）起
+  受测配置亦支持 distilled 学生（cfg 带 type: distilled + policy_path，见
+  replay_student）。
 - **分母口径 v1**：main 阶段且教师选定行动 kind ∈ {attack, play_trainer,
   end_turn} 的决策点；choose/promote/setup 等非 main 阶段与其余 main 行动类
   （retreat/evolve/use_ability/attach_energy 等）不进分母，计数进 appendix。
@@ -20,10 +22,12 @@ import hashlib
 import json
 from pathlib import Path
 
+from battlefrontier.agent.distilled import DistilledAgent
 from battlefrontier.agent.mcts import MCTSAgent
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
+from battlefrontier.learn.policy_model import load_policy_model
 from battlefrontier.runner.snapshot import (
     SnapshotFile,
     load_snapshot_file,
@@ -70,18 +74,35 @@ def student_seed(fingerprint: str, snapshot_index: int) -> int:
 
 def replay_student(row: dict, card_effects, cfg: dict, seed: int) -> tuple[Action, list[Action]]:
     """在快照局面重放受测配置：重建引擎（state 置为快照 GameState，clone 同口径）
-    → MCTSAgent（cfg 全量透传）→ bind_engine + observe → 返回 (学生 argmax, 合法行动)。
+    → 学生 Agent → observe → 返回 (学生 argmax, 合法行动)。
 
-    快照 state 含隐藏信息真值，但 observe 入口照常 determinize（对手手牌/牌库序/
-    奖赏重采样，信息纪律）；引擎自身 rng 由 seed 固定（搜索随机源走 agent._rng）。
+    学生两类（cfg["type"] 缺省 = "mcts"，向后兼容 M11 配置口径）：
+    - mcts：MCTSAgent（cfg 全量透传）+ bind_engine——快照 state 含隐藏信息真值，
+      但 observe 入口照常 determinize（对手手牌/牌库序/奖赏重采样，信息纪律）；
+      引擎自身 rng 由 seed 固定（搜索随机源走 agent._rng）。
+    - distilled（task 059，D-M12-5）：DistilledAgent（policy_path 经
+      load_policy_model 强校验装载，缺失/失败显式报错）——observe 只吃
+      visible_state，无需 determinize / bind_engine，天然守信息纪律。
     """
     state = snapshot_state(row)
     player = row["player"]
     engine = GameEngine(RandomSource(seed), card_effects=card_effects)
     engine.state = state
+    legal = engine.legal_actions(player)
+    student_type = cfg.get("type", "mcts")
+    if student_type == "distilled":
+        policy_path = cfg.get("policy_path")
+        if not isinstance(policy_path, str) or not policy_path:
+            raise ValueError(
+                "distilled 学生需要 policy_path（bf-distilled-policy-v1 "
+                "模型资产 JSON 路径，str，不猜）")
+        agent = DistilledAgent(load_policy_model(policy_path))
+        return agent.observe(state.visible_state(player), legal), legal
+    if student_type != "mcts":
+        raise ValueError(
+            f"未知学生 type：{student_type!r}（支持 mcts/distilled，不猜）")
     agent = MCTSAgent(RandomSource(seed), **cfg)
     agent.bind_engine(engine)
-    legal = engine.legal_actions(player)
     return agent.observe(state.visible_state(player), legal), legal
 
 

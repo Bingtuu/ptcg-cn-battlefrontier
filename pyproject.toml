@@ -10,6 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2",
     "pyyaml>=6",
+    # task 056（D3-3 核销，选项 A）：distilled 策略模型推理侧前向（M12）
+    "numpy>=2",
 ]
 
 [project.optional-dependencies]
@@ -17,6 +19,9 @@ dependencies = [
 dev = [
     "pytest>=8",
     "ruff>=0.6",
+    # task 056（D3-3 核销）：M12 蒸馏训练侧（dev-only，训练非复算面 D3-4；
+    # engine/agent runtime 路径零 torch import）
+    "torch>=2",
 ]
 
 [project.scripts]

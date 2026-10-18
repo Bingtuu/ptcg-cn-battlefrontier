@@ -4,8 +4,13 @@
   56 维（状态 30 = FEATURE_NAMES + 行动 26 = ACTION_FEATURE_NAMES），单层隐藏
   64 + ReLU，输出标量 logit；逐决策点合法行动掩码 softmax + 教师下标 NLL
   （试点硬标签；软标签缺口见 task 057 遗留）。
-- **训练**：全批量 Adam（小数据量级不做 mini-batch 洗牌）；按局 (pair_index,
-  seed) 80/20 划分（同局样本不跨集，train.py 先例）；缺省超参全钉死写 meta
+- **训练**：全批量 Adam（小数据量级不做 mini-batch 洗牌），向量化实现——样本
+  预处理一次拍平成大张量 X [Σn_i, 56]（state 行按合法行动数重复拼行动特征）
+  + teacher 全局下标 + 行→样本 id，每 epoch 一次前向后分段 logsumexp
+  （数值稳定两段法：detach 分段 max + exp-sum-log，与逐样本
+  cross_entropy(logits, teacher) = −logit[teacher] + logsumexp(logits) 数学
+  等价，掩码天然满足——只有合法行动进 logits）；按局 (pair_index, seed)
+  80/20 划分（同局样本不跨集，train.py 先例）；缺省超参全钉死写 meta
   （epochs 100 / lr 1e-3 / hidden 64 / split_seed 20261018）。
 - **训练非复算面**（task 056 D3-4）：torch 随机源（初始化/cudnn/BLAS）不锁，
   torch.manual_seed(split_seed) 仅尽力锚定初始化；资产落盘即锁定，推理
@@ -41,6 +46,9 @@ DEFAULT_HIDDEN = 64
 DEFAULT_SPLIT_SEED = 20261018
 TRAIN_RATIO = 0.8
 
+# 自适应线程数粒度：每 _ROWS_PER_THREAD 拍平行配 1 线程（见 train_policy 注释）
+_ROWS_PER_THREAD = 50_000
+
 _INPUT_DIM = len(FEATURE_NAMES) + len(ACTION_FEATURE_NAMES)
 
 
@@ -59,33 +67,63 @@ def _split_by_game(samples: list[PolicySample], split_seed: int,
     return train, val
 
 
-def _sample_tensors(samples: list[PolicySample]):
-    """样本列 → (状态向量列, 行动矩阵列, 教师下标列)（纯 Python 列表，调用侧转张量）。"""
-    states, actions, teachers = [], [], []
-    for s in samples:
-        states.append([s.state[name] for name in FEATURE_NAMES])
-        actions.append([[a[name] for name in ACTION_FEATURE_NAMES]
-                        for a in s.actions])
-        teachers.append(s.teacher_index)
-    return states, actions, teachers
+def _flatten_samples(samples: list[PolicySample]):
+    """样本列 → 拍平大张量 (X [Σn_i, 56], teacher 全局下标, 行→样本 id)。
+
+    一次性预处理（训练外成本）：state 行按合法行动数重复拼行动特征；
+    teacher 全局下标 = 样本段起点 + teacher_index（段内下标）。
+    """
+    flat, teacher_global, ids = [], [], []
+    for i, s in enumerate(samples):
+        st = [s.state[name] for name in FEATURE_NAMES]
+        start = len(flat)
+        for a in s.actions:
+            flat.append(st + [a[name] for name in ACTION_FEATURE_NAMES])
+        ids.extend([i] * (len(flat) - start))
+        teacher_global.append(start + s.teacher_index)
+    x = torch.tensor(flat, dtype=torch.float32)
+    return (x,
+            torch.tensor(teacher_global, dtype=torch.long),
+            torch.tensor(ids, dtype=torch.long))
 
 
-def _score_batch(net, states, actions) -> list:
-    """逐样本打分：state 广播拼每条合法行动 → logit 向量列（变长，不 pad）。"""
-    out = []
-    for st, acts in zip(states, actions, strict=True):
-        n = acts.shape[0]
-        x = torch.cat([st.unsqueeze(0).expand(n, -1), acts], dim=1)
-        out.append(net(x).squeeze(-1))
-    return out
+def _segment_logsumexp(logits, sample_ids, n_samples):
+    """分段 logsumexp（数值稳定：detach 分段 max + exp-sum-log，梯度等价）。"""
+    seg_max = torch.full((n_samples,), float("-inf"), dtype=logits.dtype)
+    seg_max.scatter_reduce_(0, sample_ids, logits.detach(), "amax")
+    shifted = torch.exp(logits - seg_max[sample_ids])
+    seg_sum = torch.zeros(n_samples, dtype=logits.dtype)
+    seg_sum.index_add_(0, sample_ids, shifted)
+    return seg_max + torch.log(seg_sum)
 
 
-def _argmax_accuracy(net, states, actions, teachers) -> float:
-    """掩码 argmax 准确率：logit 最大下标 == 教师下标 的样本比例。"""
-    correct = 0
-    for logits, t in zip(_score_batch(net, states, actions), teachers, strict=True):
-        correct += int(int(logits.argmax().item()) == t)
-    return correct / len(teachers)
+def _vectorized_loss(net, x, teacher_global, sample_ids):
+    """全批量一次前向 + 分段 logsumexp − 教师 logit，按样本均值 NLL。
+
+    与逐样本 cross_entropy(logits, teacher) 数学等价：
+    CE = −logit[teacher] + logsumexp(logits)。
+    """
+    logits = net(x).squeeze(-1)
+    lse = _segment_logsumexp(logits, sample_ids, teacher_global.numel())
+    return (lse - logits[teacher_global]).mean()
+
+
+def _argmax_accuracy(net, x, teacher_global, sample_ids) -> float:
+    """掩码 argmax 准确率：分段首个最大 logit 下标 == 教师下标 的样本比例。"""
+    n_samples = teacher_global.numel()
+    with torch.no_grad():
+        logits = net(x).squeeze(-1)
+        seg_max = torch.full((n_samples,), float("-inf"), dtype=logits.dtype)
+        seg_max.scatter_reduce_(0, sample_ids, logits, "amax")
+        n_rows = logits.numel()
+        pos = torch.arange(n_rows)
+        # 分段内首个最大值（并列取先，与逐样本 argmax 一致）：非最大行置 n_rows
+        first = torch.where(logits == seg_max[sample_ids], pos,
+                            torch.full_like(pos, n_rows))
+        seg_first = torch.full((n_samples,), n_rows, dtype=torch.long)
+        seg_first.scatter_reduce_(0, sample_ids, first, "amin")
+        correct = int((seg_first == teacher_global).sum().item())
+    return correct / n_samples
 
 
 def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
@@ -112,32 +150,30 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         torch.nn.Linear(hidden, 1),
     )
     opt = torch.optim.Adam(net.parameters(), lr=lr)
-    t_states, t_actions, t_teacher = _sample_tensors(train_rows)
-    t_states = [torch.tensor(st, dtype=torch.float32) for st in t_states]
-    t_actions = [torch.tensor(acts, dtype=torch.float32) for acts in t_actions]
+    x_train, teacher_train, ids_train = _flatten_samples(train_rows)
 
-    train_loss = 0.0
-    for _epoch in range(epochs):
-        opt.zero_grad()
-        loss = torch.zeros(())
-        for logits, t in zip(_score_batch(net, t_states, t_actions), t_teacher,
-                             strict=True):
-            loss = loss + torch.nn.functional.cross_entropy(
-                logits.unsqueeze(0), torch.tensor([t]))
-        loss = loss / len(t_teacher)
-        loss.backward()
-        opt.step()
-        train_loss = float(loss.item())
+    # torch 算内并行线程数按拍平行数自适应：小数据多线程是纯同步开销（实测
+    # 1.4 万行 16 线程 193ms vs 1 线程 29ms/epoch），试点规模（~3M 行）则
+    # 多线程占优（16 线程 2.3s vs 1 线程 6.5s/epoch）；训练后恢复原设置。
+    prev_threads = torch.get_num_threads()
+    torch.set_num_threads(
+        max(1, min(prev_threads, x_train.shape[0] // _ROWS_PER_THREAD)))
+    try:
+        train_loss = 0.0
+        for _epoch in range(epochs):
+            opt.zero_grad()
+            loss = _vectorized_loss(net, x_train, teacher_train, ids_train)
+            loss.backward()
+            opt.step()
+            train_loss = float(loss.item())
 
-    with torch.no_grad():
-        train_acc = _argmax_accuracy(net, t_states, t_actions, t_teacher)
+        train_acc = _argmax_accuracy(net, x_train, teacher_train, ids_train)
         val_acc = None
         if val_rows:
-            v_states, v_actions, v_teacher = _sample_tensors(val_rows)
-            v_states = [torch.tensor(st, dtype=torch.float32) for st in v_states]
-            v_actions = [torch.tensor(acts, dtype=torch.float32)
-                         for acts in v_actions]
-            val_acc = _argmax_accuracy(net, v_states, v_actions, v_teacher)
+            x_val, teacher_val, ids_val = _flatten_samples(val_rows)
+            val_acc = _argmax_accuracy(net, x_val, teacher_val, ids_val)
+    finally:
+        torch.set_num_threads(prev_threads)
 
     game_ids = {(s.pair_index, s.seed) for s in samples}
     meta = {

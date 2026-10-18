@@ -80,3 +80,6 @@
   **性能风险**：全批量逐样本构图（_score_batch Python 循环 + 单 loss 汇总
   backward），试点 ~20 万点 × 100 epochs 可能小时级——task 060 正式训练前
   需评估（mini-batch 化 / 减 epochs / 子采样，改则动训练器 TDD 先行）
+  **→ 已解决**（2026-10-18，task 060 前置：向量化重写，见 task 060 任务书
+  范围 0；实测 0.216s/epoch@984 点，提速 ~200×，等价性测试含梯度
+  allclose(atol 1e-5)）

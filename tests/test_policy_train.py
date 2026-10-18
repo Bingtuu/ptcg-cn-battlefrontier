@@ -177,6 +177,86 @@ class TestTrainPolicy:
         assert DEFAULT_SPLIT_SEED == 20261018
 
 
+# ── 向量化等价性（task 058 性能修正）────────────────────────────
+
+
+def _reference_terms(net, rows):
+    """旧逐样本算法的独立参考实现：每样本 cat(state, action) 前向 + cross_entropy。"""
+    import torch
+
+    terms = []
+    for s in rows:
+        st = torch.tensor([s.state[n] for n in FEATURE_NAMES],
+                          dtype=torch.float32)
+        acts = torch.tensor([[a[n] for n in ACTION_FEATURE_NAMES]
+                             for a in s.actions], dtype=torch.float32)
+        x = torch.cat([st.unsqueeze(0).expand(acts.shape[0], -1), acts], dim=1)
+        logits = net(x).squeeze(-1)
+        terms.append(torch.nn.functional.cross_entropy(
+            logits.unsqueeze(0), torch.tensor([s.teacher_index])))
+    return terms
+
+
+class TestVectorizedEquivalence:
+    """向量化 loss/argmax 与旧逐样本算法数值一致（同初始化同数据，atol 1e-5）。"""
+
+    def _net_and_flat(self, samples):
+        import torch
+
+        from battlefrontier.learn.train_policy import (
+            _flatten_samples,
+            _split_by_game,
+        )
+
+        train_rows, _ = _split_by_game(samples, DEFAULT_SPLIT_SEED)
+        torch.manual_seed(DEFAULT_SPLIT_SEED)
+        net = torch.nn.Sequential(
+            torch.nn.Linear(INPUT_DIM, 8),
+            torch.nn.ReLU(),
+            torch.nn.Linear(8, 1),
+        )
+        x, teacher_global, sample_ids = _flatten_samples(train_rows)
+        assert x.shape == (sample_ids.numel(), INPUT_DIM)
+        assert teacher_global.numel() == len(train_rows)
+        return net, train_rows, x, teacher_global, sample_ids
+
+    def test_向量化loss与逐样本数值一致(self, samples) -> None:
+        import torch
+
+        from battlefrontier.learn.train_policy import _vectorized_loss
+
+        net, rows, x, teacher_global, sample_ids = self._net_and_flat(samples)
+        vec = _vectorized_loss(net, x, teacher_global, sample_ids)
+        ref = torch.stack(_reference_terms(net, rows)).mean()
+        assert vec.shape == ()
+        assert abs(float(vec.detach()) - float(ref.detach())) <= 1e-5
+        # 梯度同样一致（累加序差异容忍）
+        g_vec = torch.autograd.grad(vec, list(net.parameters()))
+        g_ref = torch.autograd.grad(ref, list(net.parameters()))
+        for gv, gr in zip(g_vec, g_ref, strict=True):
+            assert torch.allclose(gv, gr, atol=1e-5, rtol=1e-4)
+
+    def test_向量化argmax准确率与逐样本一致(self, samples) -> None:
+        import torch
+
+        from battlefrontier.learn.train_policy import _argmax_accuracy
+
+        net, rows, x, teacher_global, sample_ids = self._net_and_flat(samples)
+        acc = _argmax_accuracy(net, x, teacher_global, sample_ids)
+        with torch.no_grad():
+            correct = 0
+            for s in rows:
+                st = torch.tensor([s.state[n] for n in FEATURE_NAMES],
+                                  dtype=torch.float32)
+                acts = torch.tensor([[a[n] for n in ACTION_FEATURE_NAMES]
+                                     for a in s.actions], dtype=torch.float32)
+                xi = torch.cat([st.unsqueeze(0).expand(acts.shape[0], -1), acts],
+                               dim=1)
+                logits = net(xi).squeeze(-1)
+                correct += int(int(logits.argmax().item()) == s.teacher_index)
+        assert acc == correct / len(rows)
+
+
 # ── CLI ─────────────────────────────────────────────────────
 
 

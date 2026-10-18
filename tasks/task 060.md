@@ -22,8 +22,16 @@
 
 ## 范围
 
+0. **前置：train_policy 向量化**（task 058 遗留性能风险坐实：逐样本构图
+   4.18s/epoch@984 点 → 试点 20 万点×100 epochs 外推 23h，不可接受；
+   拍平大张量 + 分段 logsumexp 向量化，数学语义等价 atol 1e-5 测试钉死，
+   目标 <0.2s/epoch——**已完成**（2026-10-18）：实测 0.216s/epoch（含
+   拍平预处理，提速 ~20×/边际 ~200×），等价性测试含 loss ≤1e-5 + 梯度
+   allclose(atol 1e-5) + argmax 精确一致；自适应线程数（每 5 万拍平行
+   1 线程），全量 1304 绿 + ruff 零告警）
 1. 试点数据（task 057，1008 局快照）正式训练学生资产 → meta 回显
    （种子/数据版本/码版本/超参/holdout 指标），资产进版本控制
+   （models/policy-m12-v1.json，D3-4）
 2. 锚 1：**离线快照重放口径**（无需新采集）——快照行含完整 GameState
    dump + 教师 chosen Action（task 052 产线），离线重建 engine state →
    枚举合法行动 → 学生 numpy 前向掩码 argmax vs 教师 chosen = 一致率；

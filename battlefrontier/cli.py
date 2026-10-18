@@ -355,6 +355,53 @@ def _cmd_train_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_train_policy(args: argparse.Namespace) -> int:
+    """M12 WP2（task 058，D-M12-3/4）：教师快照目录 → MLP 策略打分机蒸馏训练 → 资产 JSON。
+
+    torch dev-only（训练非复算面 D3-4）；缺省超参全钉死写 meta；holdout argmax
+    准确率落 meta；数据错误 → 退出码 1。
+    """
+    from battlefrontier.learn.policy_data import load_policy_samples
+    from battlefrontier.learn.policy_model import save_policy_model
+    from battlefrontier.learn.train_policy import (
+        DEFAULT_EPOCHS,
+        DEFAULT_HIDDEN,
+        DEFAULT_LR,
+        DEFAULT_SPLIT_SEED,
+        train_policy,
+    )
+
+    try:
+        samples = load_policy_samples(args.data)
+        model = train_policy(
+            samples,
+            epochs=args.epochs if args.epochs is not None else DEFAULT_EPOCHS,
+            lr=args.lr if args.lr is not None else DEFAULT_LR,
+            hidden=args.hidden if args.hidden is not None else DEFAULT_HIDDEN,
+            split_seed=args.split_seed if args.split_seed is not None
+            else DEFAULT_SPLIT_SEED,
+            code_version=args.code_version or _code_version(),
+            pool=args.pool)
+    except (ValueError, OSError) as e:
+        print(f"错误：{e}")
+        return 1
+    save_policy_model(model, args.out)
+    m = model.meta
+    print(f"训练完成：{m['rows']} 决策点 / {m['games']} 局 / {m['pairs']} 配对"
+          f"（种子区间 {m['seed_min']}..{m['seed_max']}，split_seed {m['split_seed']}，"
+          f"训练 {m['train_games']} 局 {m['train_rows']} 点 / holdout "
+          f"{m['val_games']} 局 {m['val_rows']} 点）")
+    val_acc = (f"{m['val_argmax_accuracy']:.4f}"
+               if m["val_argmax_accuracy"] is not None else "N/A")
+    print(f"epochs {m['epochs']} / lr {m['lr']} / hidden {m['hidden']}"
+          f"（torch {m['torch_version']}）；训练损失 {m['train_loss']:.6f}；"
+          f"argmax 准确率 训练 {m['train_argmax_accuracy']:.4f} / holdout {val_acc}")
+    print(f"模型资产: {args.out}")
+    if m["warning"]:
+        print(f"[告警] {m['warning']}")
+    return 0
+
+
 def _cmd_collect_snapshots(args: argparse.Namespace) -> int:
     """M11 一致率快照采集（task 052 WP3，D-M11-5）：教师（MCTS）配置跑卡池配对，
     决策点快照（序列化 GameState + 教师结构化 Action）落 <out>/pair-*.jsonl。
@@ -574,6 +621,24 @@ def main(argv: list[str] | None = None) -> int:
                       help="按局抽样种子（缺省钉死 20261017，写进 meta）")
     te_p.add_argument("--code-version", default=None,
                       help="代码版本 meta 覆盖（缺省取 git short sha；测试注入用）")
+    tp_p = sub.add_parser(
+        "train-policy",
+        help="M12 WP2（task 058，D-M12-3/4）：collect-snapshots 产物蒸馏训练策略打分机"
+             "（torch dev-only；bf-distilled-policy-v1）")
+    tp_p.add_argument("--data", required=True,
+                      help="快照 JSONL 目录（collect-snapshots 产物，pair-*.jsonl）")
+    tp_p.add_argument("--out", required=True, help="模型资产 JSON 输出路径")
+    tp_p.add_argument("--epochs", type=int, default=None,
+                      help="训练轮数（缺省钉死 100，写进 meta）")
+    tp_p.add_argument("--lr", type=float, default=None,
+                      help="Adam 学习率（缺省钉死 1e-3，写进 meta）")
+    tp_p.add_argument("--hidden", type=int, default=None,
+                      help="隐藏层宽度（缺省钉死 64，写进 meta）")
+    tp_p.add_argument("--split-seed", type=int, default=None,
+                      help="按局 80/20 划分种子（缺省钉死 20261018，写进 meta）")
+    tp_p.add_argument("--pool", default=None, help="卡池 YAML 路径（meta 锚点，可选）")
+    tp_p.add_argument("--code-version", default=None,
+                      help="代码版本 meta 覆盖（缺省取 git short sha；测试注入用）")
     cs_p = sub.add_parser(
         "collect-snapshots",
         help="M11 一致率快照采集（task 052，D-M11-5）：教师 MCTS 跑局落决策点快照 JSONL")
@@ -626,6 +691,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_collect_features(args)
     if args.cmd == "train-eval":
         return _cmd_train_eval(args)
+    if args.cmd == "train-policy":
+        return _cmd_train_policy(args)
     if args.cmd == "collect-snapshots":
         return _cmd_collect_snapshots(args)
     if args.cmd == "agreement":

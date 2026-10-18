@@ -407,17 +407,27 @@ def _cmd_collect_snapshots(args: argparse.Namespace) -> int:
     决策点快照（序列化 GameState + 教师结构化 Action）落 <out>/pair-*.jsonl。
 
     不落结果库（D-T4 先例）；失败局剔除并计数上报。快照是数据资产——评估侧
-    （agreement）可换受测配置重放同一份快照。
+    （agreement）可换受测配置重放同一份快照。逐对增量落盘（对完成即写，
+    中途 kill 只损失未完成对）；--pair-start N 断点续采（跳过前 N 对，
+    种子映射不变）。
     """
     from battlefrontier.runner.snapshot import run_collect_snapshots_pool
 
+    if args.pair_start < 0:
+        print(f"错误：--pair-start {args.pair_start} 非法（须 ≥ 0，不猜）")
+        return 1
     db_path = args.db or load_db_path()
     teacher = {"worlds": args.worlds, "iterations": args.iterations,
                "rollout_turn_cap": args.rollout_turn_cap}
-    summaries, warnings = run_collect_snapshots_pool(
-        args.pool, db_path, games_per_pair=args.games_per_pair,
-        seed_start=args.seed_start, out_dir=args.out,
-        workers=args.workers, cards_dir=args.cards_dir, teacher=teacher)
+    try:
+        summaries, warnings = run_collect_snapshots_pool(
+            args.pool, db_path, games_per_pair=args.games_per_pair,
+            seed_start=args.seed_start, out_dir=args.out,
+            workers=args.workers, cards_dir=args.cards_dir, teacher=teacher,
+            pair_start=args.pair_start)
+    except (ValueError, OSError) as e:
+        print(f"错误：{e}")
+        return 1
     for w in warnings:
         print(f"[装载告警] {w}")
     total_rows = sum(s.rows for s in summaries)
@@ -675,6 +685,9 @@ def main(argv: list[str] | None = None) -> int:
                       help="教师 MCTS iterations（基准 50）")
     cs_p.add_argument("--rollout-turn-cap", type=int, default=50,
                       help="教师 rollout 回合上限（默认 50）")
+    cs_p.add_argument("--pair-start", type=int, default=0,
+                      help="断点续采：跳过前 N 对（默认 0；种子映射不变，"
+                           "续采产物与全量跑同对文件逐字节全等；负数/越界报错）")
     cs_p.add_argument("--db", default=None,
                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     cs_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")

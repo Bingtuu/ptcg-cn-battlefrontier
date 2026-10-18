@@ -6,15 +6,19 @@ snapshot 行，种子区间 matrix 惯例，串并一致）/ 载入校验（不�
 """
 
 import json
+from pathlib import Path
 
 import pytest
+import yaml
 from helpers import deck60, energy, engine_at, main_state
 
 from battlefrontier.agent.mcts import Consideration, MCTSAgent
 from battlefrontier.agent.snapshot import SnapshotCollector
+from battlefrontier.cli import main as cli_main
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import GameState
+from battlefrontier.runner import snapshot as snapshot_mod
 from battlefrontier.runner.experiment import _unique_docs
 from battlefrontier.runner.play import play_game
 from battlefrontier.runner.snapshot import (
@@ -196,3 +200,132 @@ def test_load_snapshot_file_校验不猜(tmp_path):
     bad.write_text('{"record": "snapshot"}\n', encoding="utf-8")
     with pytest.raises(ValueError, match="header"):
         load_snapshot_file(bad)
+
+
+# ── 增量落盘与断点续采（pair_start）───────────────────────────
+
+
+def test_增量落盘_对完成即写_串行(tmp_path, monkeypatch):
+    """对收满 games_per_pair 局立即写盘：第二对首局被请求时，第一对文件已完整落盘。"""
+    prepared = [_stub_pair(0), _stub_pair(1)]
+    out = tmp_path / "out"
+    checked = []
+
+    def fake_worker(payload):
+        pair_index = payload["pair_index"]
+        if pair_index == 1 and not checked:
+            f0 = out / "pair-0-测试A0x测试B0.jsonl"
+            assert f0.exists()  # 第一对完成即写，不等到全部局结束
+            lines = [json.loads(x) for x in
+                     f0.read_text(encoding="utf-8").splitlines() if x.strip()]
+            assert lines[0]["record"] == "header"
+            assert [r["seed"] for r in lines[1:]] == [410000, 410001]
+            assert not (out / "pair-1-测试A1x测试B1.jsonl").exists()
+            checked.append(True)
+        return payload["seed"], pair_index, [{"seed": payload["seed"]}], None
+
+    monkeypatch.setattr(snapshot_mod, "_run_one_snapshot", fake_worker)
+    summaries = run_collect_snapshots(
+        prepared, games_per_pair=2, seed_start=410000, out_dir=out, workers=1,
+        teacher={"worlds": 1, "iterations": 2})
+    assert checked == [True]  # 第二对确实被处理过（断言分支真实执行）
+    assert [(s.pair_index, s.games, s.rows, s.failed) for s in summaries] == \
+        [(0, 2, 2, 0), (1, 2, 2, 0)]
+
+
+def test_pair_start_种子映射不变(tmp_path, monkeypatch):
+    """pair_start=1：首对首种子 = seed_start + 1×games_per_pair（assignment.index 锚定）。"""
+    prepared = [_stub_pair(0), _stub_pair(1), _stub_pair(2)]
+    payloads_seen = []
+
+    def fake_worker(payload):
+        payloads_seen.append((payload["pair_index"], payload["seed"]))
+        return payload["seed"], payload["pair_index"], [], None
+
+    monkeypatch.setattr(snapshot_mod, "_run_one_snapshot", fake_worker)
+    summaries = run_collect_snapshots(
+        prepared, games_per_pair=2, seed_start=410000, out_dir=tmp_path / "out",
+        workers=1, teacher={"worlds": 1, "iterations": 2}, pair_start=1)
+    assert payloads_seen == [(1, 410002), (1, 410003), (2, 410004), (2, 410005)]
+    assert [s.pair_index for s in summaries] == [1, 2]
+
+
+def test_pair_start_断点续采_拼接字节全等(tmp_path):
+    """pair_start=1 续采的 pair-1 文件与全量跑同文件逐字节全等；pair-0 不重复产出。"""
+    prepared = [_stub_pair(0), _stub_pair(1)]
+    kw = {"games_per_pair": 2, "seed_start": 410000, "workers": 1,
+          "teacher": {"worlds": 1, "iterations": 2, "rollout_turn_cap": 50}}
+    run_collect_snapshots(prepared, out_dir=tmp_path / "full", pair_start=0, **kw)
+    summaries = run_collect_snapshots(prepared, out_dir=tmp_path / "resume",
+                                      pair_start=1, **kw)
+    assert [s.pair_index for s in summaries] == [1]
+    assert not (tmp_path / "resume" / "pair-0-测试A0x测试B0.jsonl").exists()
+    f1 = tmp_path / "resume" / "pair-1-测试A1x测试B1.jsonl"
+    assert f1.read_bytes() == \
+        (tmp_path / "full" / "pair-1-测试A1x测试B1.jsonl").read_bytes()
+    header = json.loads(f1.read_text(encoding="utf-8").splitlines()[0])
+    assert (header["seed_start"], header["seed_end"]) == (410002, 410003)
+
+
+def test_pair_start_越界负数_显式报错(tmp_path):
+    """pair_start 合法区间 [0, len(prepared))，越界/负数显式报错（不猜）。"""
+    prepared = [_stub_pair(0)]
+    kw = {"games_per_pair": 1, "seed_start": 410000, "out_dir": tmp_path / "out",
+          "workers": 1, "teacher": {"worlds": 1, "iterations": 2}}
+    with pytest.raises(ValueError, match="pair_start"):
+        run_collect_snapshots(prepared, pair_start=-1, **kw)
+    with pytest.raises(ValueError, match="pair_start"):
+        run_collect_snapshots(prepared, pair_start=1, **kw)
+
+
+# ── CLI（pair_start）──────────────────────────────────────────
+
+_DB_PATH = Path("C:/Vibe Project/Pokearena/data/ptcg-cn.db")
+
+
+def test_cli_pair_start_负数_退出码1(tmp_path):
+    """--pair-start 负数：CLI 层显式报错退出码 1（不装载卡池，不猜）。"""
+    rc = cli_main(["collect-snapshots", "--pool", "x.yml",
+                   "--games-per-pair", "1", "--seed-start", "410000",
+                   "--out", str(tmp_path), "--pair-start", "-1"])
+    assert rc == 1
+
+
+def _mini_pool(tmp_path, n_decks: int = 3) -> Path:
+    full = yaml.safe_load(Path("config/target-pool.v1.yml").read_text(encoding="utf-8"))
+    mini = dict(full, decks=full["decks"][:n_decks])
+    pool_path = tmp_path / "pool.yml"
+    pool_path.write_text(yaml.safe_dump(mini, allow_unicode=True), encoding="utf-8")
+    return pool_path
+
+
+@pytest.mark.skipif(not _DB_PATH.exists(), reason="本机无 ptcg-cn.db")
+def test_cli_pair_start_越界_退出码1(tmp_path):
+    """3 配对迷你池 --pair-start 3（== len(prepared)）：越界显式报错退出码 1。"""
+    pool_path = _mini_pool(tmp_path)
+    rc = cli_main(["collect-snapshots", "--pool", str(pool_path),
+                   "--games-per-pair", "1", "--seed-start", "420000",
+                   "--out", str(tmp_path / "out"), "--workers", "1",
+                   "--worlds", "1", "--iterations", "2",
+                   "--db", str(_DB_PATH), "--pair-start", "3"])
+    assert rc == 1
+    out = tmp_path / "out"
+    assert not out.exists() or not list(out.glob("pair-*.jsonl"))
+
+
+@pytest.mark.skipif(not _DB_PATH.exists(), reason="本机无 ptcg-cn.db")
+def test_cli_pair_start_续采_真实池(tmp_path):
+    """3 配对迷你池 --pair-start 2：只产 pair-2 文件，header 种子区间 = [S+2, S+2]。"""
+    pool_path = _mini_pool(tmp_path)
+    out = tmp_path / "out"
+    rc = cli_main(["collect-snapshots", "--pool", str(pool_path),
+                   "--games-per-pair", "1", "--seed-start", "420000",
+                   "--out", str(out), "--workers", "1",
+                   "--worlds", "1", "--iterations", "2",
+                   "--db", str(_DB_PATH), "--pair-start", "2"])
+    assert rc == 0
+    files = list(out.glob("pair-*.jsonl"))
+    assert len(files) == 1 and files[0].name.startswith("pair-2-")
+    header = json.loads(files[0].read_text(encoding="utf-8").splitlines()[0])
+    assert (header["pair_index"], header["seed_start"], header["seed_end"]) == \
+        (2, 420002, 420002)

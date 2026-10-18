@@ -13,7 +13,11 @@
   其后每行一个快照（record=snapshot；含序列化 GameState + 教师结构化 Action +
   turn/phase/player/action_kind/n_legal/seed）。逐行 JSON（UTF-8 /
   ensure_ascii=False / sort_keys，TrajectoryWriter 惯例）；行内零非确定量。
-  快照不落结果库（D-T4 先例：JSONL 侧文件即锚点）。
+  快照不落结果库（D-T4 先例：JSONL 侧文件即锚点）。**增量落盘**：imap 保序
+  流式回收，某对收满 games_per_pair 局（成功+失败剔除合计）即写该对文件并
+  释放其缓冲——中途 kill 只损失未完成对，文件系统实时可见进度；
+  ``pair_start`` 断点续采跳过前 N 对（种子按 assignment.index 锚定，
+  续采产物与全量跑逐字节全等）。
 """
 
 from __future__ import annotations
@@ -157,18 +161,45 @@ def _run_one_snapshot(payload: dict) -> tuple[int, int, list[dict] | None, str |
         return payload["seed"], payload["pair_index"], None, f"{type(e).__name__}: {e}"
 
 
+def _flush_pair(pp: PreparedPair, out: Path, rows: list[dict], failed: int, *,
+                games_per_pair: int, seed_start: int,
+                teacher: dict[str, int]) -> PairCollectSummary:
+    """单对完成即写盘（header + 快照行，格式与旧统一写盘逐字节一致）并返回汇总。"""
+    a = pp.assignment
+    filename = pair_filename(a.index, a.archetype_a, a.archetype_b)
+    with TrajectoryWriter(out / filename) as writer:
+        writer.append(snapshot_header(pp, games_per_pair=games_per_pair,
+                                      seed_start=seed_start, teacher=teacher))
+        for row in rows:
+            writer.append({"record": "snapshot", **row})
+    return PairCollectSummary(
+        pair_index=a.index, archetype_a=a.archetype_a, archetype_b=a.archetype_b,
+        filename=filename, games=games_per_pair, rows=len(rows), failed=failed)
+
+
 def run_collect_snapshots(
     prepared: list[PreparedPair] | tuple[PreparedPair, ...],
     games_per_pair: int, seed_start: int,
     out_dir: str | Path, *, workers: int = 1,
     teacher: dict[str, int] | None = None,
+    pair_start: int = 0,
 ) -> list[PairCollectSummary]:
-    """全部配对 × 种子区间教师配置跑局并落快照 JSONL；返回各配对汇总。
+    """配对 × 种子区间教师配置跑局并落快照 JSONL；返回各配对汇总。
 
     teacher = MCTS 预算 dict（worlds/iterations/rollout_turn_cap；默认 2×50，
     D-M11-5 基准配置）。串行与多进程同走 ``_run_one_snapshot``（imap 保序回收）。
+    **增量落盘**：结果流式回收，某对收满 games_per_pair 局（成功+失败剔除合计）
+    即写该对文件并释放其行缓冲——中途 kill 只损失未完成对。
+    ``pair_start`` 断点续采：跳过前 N 对（合法区间 [0, len(prepared))，
+    越界显式报错不猜）；种子按 assignment.index 锚定，续采产物与全量跑
+    同对文件逐字节全等。
     """
     teacher = {"worlds": 2, "iterations": 50} if teacher is None else dict(teacher)
+    if not 0 <= pair_start < len(prepared):
+        raise ValueError(
+            f"pair_start {pair_start} 越界（共 {len(prepared)} 对，"
+            f"合法区间 [0, {len(prepared)})，不猜）")
+    prepared = list(prepared)[pair_start:]
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     payloads: list[dict] = []
@@ -183,38 +214,37 @@ def run_collect_snapshots(
                              "seed": seed, "pair_index": pp.assignment.index,
                              "teacher": teacher})
 
-    results: list[tuple[int, int, list[dict] | None, str | None]] = []
-    if workers > 1:
-        ctx = mp.get_context("spawn")
-        with ctx.Pool(workers) as pool:
-            results.extend(pool.imap(_run_one_snapshot, payloads))
-    else:
-        for payload in payloads:
-            results.append(_run_one_snapshot(payload))
+    prepared_by_index = {pp.assignment.index: pp for pp in prepared}
 
-    rows_by_pair: dict[int, list[dict]] = {pp.assignment.index: [] for pp in prepared}
-    failed_by_pair: dict[int, int] = {pp.assignment.index: 0 for pp in prepared}
-    for _seed, pair_index, rows, error in results:
+    def _results():
+        if workers > 1:
+            ctx = mp.get_context("spawn")
+            with ctx.Pool(workers) as pool:
+                yield from pool.imap(_run_one_snapshot, payloads)
+        else:
+            for payload in payloads:
+                yield _run_one_snapshot(payload)
+
+    rows_by_pair: dict[int, list[dict]] = {}
+    failed_by_pair: dict[int, int] = {}
+    seen_by_pair: dict[int, int] = {}
+    summaries: list[PairCollectSummary] = []
+    for _seed, pair_index, rows, error in _results():
         if error is not None:
-            failed_by_pair[pair_index] += 1  # 失败局剔除（快照整局不落盘）
+            # 失败局剔除（快照整局不落盘），计数上报
+            failed_by_pair[pair_index] = failed_by_pair.get(pair_index, 0) + 1
         else:
             assert rows is not None
-            rows_by_pair[pair_index].extend(rows)
-
-    summaries: list[PairCollectSummary] = []
-    for pp in prepared:
-        a = pp.assignment
-        filename = pair_filename(a.index, a.archetype_a, a.archetype_b)
-        with TrajectoryWriter(out / filename) as writer:
-            writer.append(snapshot_header(
-                pp, games_per_pair=games_per_pair, seed_start=seed_start,
+            rows_by_pair.setdefault(pair_index, []).extend(rows)
+        seen_by_pair[pair_index] = seen_by_pair.get(pair_index, 0) + 1
+        if seen_by_pair[pair_index] == games_per_pair:
+            # 对收满即写盘并释放缓冲（imap 保序 → 对完成序 = prepared 序）
+            summaries.append(_flush_pair(
+                prepared_by_index[pair_index], out,
+                rows_by_pair.pop(pair_index, []),
+                failed_by_pair.pop(pair_index, 0),
+                games_per_pair=games_per_pair, seed_start=seed_start,
                 teacher=teacher))
-            for row in rows_by_pair[a.index]:
-                writer.append({"record": "snapshot", **row})
-        summaries.append(PairCollectSummary(
-            pair_index=a.index, archetype_a=a.archetype_a, archetype_b=a.archetype_b,
-            filename=filename, games=games_per_pair,
-            rows=len(rows_by_pair[a.index]), failed=failed_by_pair[a.index]))
     return summaries
 
 
@@ -224,9 +254,11 @@ def run_collect_snapshots_pool(
     out_dir: str | Path, *, workers: int = 1,
     cards_dir: str | Path = "cards",
     teacher: dict[str, int] | None = None,
+    pair_start: int = 0,
 ) -> tuple[list[PairCollectSummary], list[str]]:
     """卡池装载（tune.fitness.prepare_pairs 复用）+ run_collect_snapshots 一步走。
 
+    ``pair_start`` 断点续采透传（跳过前 N 对，种子映射不变）。
     返回 (各配对汇总, 装载告警列表)。CLI 入口用。
     """
     from battlefrontier.data.pool import load_target_pool
@@ -236,5 +268,6 @@ def run_collect_snapshots_pool(
     warnings = [f"[{p.assignment.archetype_a}×{p.assignment.archetype_b}] {w}"
                 for p in prepared for w in p.warnings]
     summaries = run_collect_snapshots(prepared, games_per_pair, seed_start, out_dir,
-                                      workers=workers, teacher=teacher)
+                                      workers=workers, teacher=teacher,
+                                      pair_start=pair_start)
     return summaries, warnings

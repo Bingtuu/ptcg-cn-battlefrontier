@@ -4,7 +4,7 @@
 
 ## 当前
 
-**当前**：**M12 三锚实测出数，待验收拍板（2026-10-19）**：锚 1 决策一致率 ✅ 相对口径 88.8%（学生 0.3652 / 天花板 0.4115，≥0.85 M11 判例）；锚 2 matrix 复校准 ❌ 加权 |Δ| 16.7% > 9.7%（极化形态：12 格 |Δ|≥20%，真实强侧在学生口径下赢更多；归因假设 = 学生 0.365 一致率的次优决策对弱侧伤害更大）；锚 3 分钟级 ✅ 18000 局 17.3min（教师口径 ~9h 的 ~30× 提速）。确定性硬验收全过（训练 double-run 逐字节全等 / det-check 并行串行 events_hash 逐局全等 / matrix 18000 局失败仅 2 已知形态）。**待用户拍板：锚 2 未达处置（A 部分达成收口+口径修订 / B 学生加强再验 / C 现状收口进 backlog）**。task 057/058/059 ✅；task 060 落账待拍板后归档。前情：M11 里程碑达成（2026-10-18 用户确认）；M12 立项拍板定案（torch dev-only + numpy runtime；D3-4 资产入库 models/policy-m12-v1.json @8439f1e）。Mega 线暂缓（2026-10-07 决议）。
+**当前**：**task 062 蒸馏特征 v2 重训复测进行中（2026-10-21，用户拍板「特征补课→现有数据重训→复测」方案 + 子代理驱动执行）**：根因 = 特征层盲区（零卡面身份/零弃牌构成 → use_ability 不可分 0.009%，task 061 诊断）。v2 = 状态 36 维（+6 弃牌构成）+ 行动 138 维（+112 卡身份 one-hot，卡池 v1 词表），零新采集重训。进度：Task 0–4 ✅（任务书 `tasks/task 062.md` → 特征层 `agent/policy_features.py` c3875c1/5f707ed → 资产 format v2 bd14de3 → 训练管线接入 1e71802/9d7a6e7 → DistilledAgent 推理 v2 分派 8ed969d，v1 路径逐位不变，1367 绿 + ruff 零告警）；下一步 = Task 4 复核收尾 → Task 5 CLI `train-policy --pool` 接线 → Task 6 WP3 正式重训 + 分 kind 一致率（**终止判据 use_ability ≥18%，不达停 WP4 回呈报**）→ Task 7 WP4 matrix 复测 + M12 终判呈报（用户拍板点）。计划 `docs/superpowers/plans/2026-10-19-distilled-features-v2.md`。前情：M11 里程碑达成（2026-10-18 用户确认）；M12 锚 1 ✅/锚 3 ✅/锚 2 ❌ 16.7%（task 060，终判随 task 062 WP4）；M12 资产 v1 `models/policy-m12-v1.json` @8439f1e（D3-4）。Mega 线暂缓（2026-10-07 决议）。
 
 **二期 PRD v1.0 已立项（2026-10-03）**：`docs/superpowers/specs/2026-10-03-phase2-prd-design.md`——四条线范围拍定（D2-1~D2-8）：主线 = Agent 升级（task 031 偏差归因 → D2-3 门控 MCTS）；LLM 铺开 = 增量模式暂不申请 API key；引擎收尾四项固定；环境演进 = Mega 调研先行。里程碑 M7（归因）→ M8（决策层升级）→ M9（收尾+调研）→ M10（校准复核）。
 
@@ -28,7 +28,14 @@
 
 ## 工作记录
 
-### 2026-10-19 task 061（诊断完成待拍板）：M12 锚 2 未达根因诊断
+### 2026-10-21 task 062（进行中）：蒸馏特征 v2（卡身份 + 弃牌构成）重训复测
+
+- **立项**：task 061 诊断根因 = 特征层盲区 → 用户拍板「特征补课 → 现有 171k 点重训（零新采集）→ 分 kind 一致率 + matrix 复测」，执行方式 = 子代理驱动开发；计划 `docs/superpowers/plans/2026-10-19-distilled-features-v2.md`（WP1–WP4 七任务）
+- **设计钉死**：v2 = 状态 36 维（30 + 6 弃牌构成）+ 行动 26+112 维（卡身份 one-hot，词表 = 卡池 v1 九套 CardDef.name 去重字典序 112 个，钉进资产 meta）；`FEATURE_NAMES`/`ACTION_FEATURE_NAMES` 不动（M11/M12 v1 资产装载校验钉死），v2 独立成册 `agent/policy_features.py`；资产 format `bf-distilled-policy-v2` 分派装载，v1 保持可读；同超参同 split_seed 20261018
+- **进度**：Task 0 任务书 ✅（0796e9c）→ Task 1 特征层 ✅（c3875c1 + 复核返修 5f707ed + 主会话复验 8f76b35）→ Task 2 资产 v2 ✅（bd14de3）→ Task 3 训练管线接入 ✅（1e71802 + 质量返修 9d7a6e7：v2 入口 names 一致性校验 + save/load 词表同闸 + 缺键报错上下文化）→ Task 4 DistilledAgent 推理 v2 分派 ✅（8ed969d，v1 路径逐位不变 + 身份维度真实参与前向钉死；全量 1367 绿 + ruff 零告警 + v1 资产 agreement 冒烟正常出数）
+- **下一步**：Task 4 复核收尾 → Task 5 CLI `train-policy --pool` 接线 + 冒烟 → Task 6 WP3 正式重训（`models/policy-m12-v2.json`，double-run 逐字节比对）+ 36 快照分 kind 一致率（**终止判据：use_ability ≥18%，不达停 WP4 回呈报**）→ Task 7 WP4 matrix 复测（seed_start 700000 不变保 CRN）+ M12 终判呈报（用户拍板点）
+
+### 2026-10-19 task 061（诊断完成，处置已拍板 → task 062）：M12 锚 2 未达根因诊断
 
 - **流程**：用户拍板「先诊断后拍板」（替代原 A/B/C 直接三选一）→ 立 task 061（纯分析零代码变更）→ D1 保序性 / D2 价值损失 / D3 一致率关联 / D4 机制对拍四项诊断全产出
 - **根因**：特征层结构性盲区——学生特征零卡面身份 + 零弃牌堆构成（D-M12-2 口径）→ use_ability 特征不可分 → 学生特性弃用（matrix 0.05 次/局 vs 启发式 9.85；教师信号 6.5% 存在但学不出，use_ability 点一致率 0.009%）→ 沙奈朵等特性引擎卡组崩盘（精神拥抱 0.04–0.50/局 vs 启发式 1.05–1.48；局均 20.9 回合 vs 9.4）→ 锚 2 定向失真

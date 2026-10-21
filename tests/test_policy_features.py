@@ -6,12 +6,17 @@
 - 快照→样本转换（learn/policy_data.py）：重建 GameState → 行动方 visible view
   特征（信息纪律：与 feature_vector(visible_state) 逐一相等）→ 合法行动逐条
   特征化 → 教师 chosen 在合法列内的下标；教师行动不合法显式报错（不猜）。
+
+task 062 WP1（D-062-1/2/3）：v2 特征层（agent/policy_features.py）——
+POLICY_STATE_NAMES = FEATURE_NAMES + 弃牌构成 6 维；policy_action_names =
+ACTION_FEATURE_NAMES + 卡身份 one-hot（词表序即键序）；resolve_action_card_names
+可见视图反查（iid 不可见跳过，attack/retreat = 己方战斗场）。
 """
 
 from __future__ import annotations
 
 import pytest
-from helpers import basic, deck60, in_play, main_state
+from helpers import basic, deck60, energy, in_play, inst, main_state
 
 from battlefrontier.agent.action_features import (
     ACTION_FEATURE_NAMES,
@@ -19,9 +24,18 @@ from battlefrontier.agent.action_features import (
     action_features,
 )
 from battlefrontier.agent.features import FEATURE_NAMES, feature_vector
+from battlefrontier.agent.policy_features import (
+    POLICY_STATE_NAMES,
+    build_card_vocab,
+    policy_action_features,
+    policy_action_names,
+    policy_state_features,
+    resolve_action_card_names,
+)
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
+from battlefrontier.engine.state import CardDef, Supertype
 from battlefrontier.learn.policy_data import (
     PolicySample,
     load_policy_samples,
@@ -205,3 +219,162 @@ class TestLoadPolicySamples:
     def test_空目录显式报错(self, tmp_path) -> None:
         with pytest.raises(ValueError, match=r"pair-\*\.jsonl"):
             load_policy_samples(tmp_path)
+
+
+# ── task 062 WP1：v2 特征层（卡身份 one-hot + 弃牌构成）──────
+
+VOCAB = ("博士的研究", "基本能量", "沙奈朵ex")
+
+
+def _trainer(name: str) -> CardDef:
+    return CardDef(card_id=f"stub-{name}", name=name, supertype=Supertype.TRAINER)
+
+
+def _with_discard(state, *, own=(), opp=()):
+    p0 = state.players[0].model_copy(update={"discard": own})
+    p1 = state.players[1].model_copy(update={"discard": opp})
+    return state.model_copy(update={"players": (p0, p1)})
+
+
+def _hand_with(state, cards):
+    p0 = state.players[0].model_copy(
+        update={"hand": state.players[0].hand + tuple(cards)})
+    return state.model_copy(update={"players": (p0, state.players[1])})
+
+
+class TestPolicyStateNames:
+    def test_键序等于M11清单加弃牌尾序(self) -> None:
+        assert POLICY_STATE_NAMES[:30] == FEATURE_NAMES
+        assert POLICY_STATE_NAMES[30:] == (
+            "own_discard_count", "own_discard_energy_count",
+            "own_discard_pokemon_count", "opp_discard_count",
+            "opp_discard_energy_count", "opp_discard_pokemon_count")
+        assert len(set(POLICY_STATE_NAMES)) == len(POLICY_STATE_NAMES) == 36
+
+    def test_行动键序等于26维加卡身份词表序(self) -> None:
+        names = policy_action_names(VOCAB)
+        assert names[:26] == ACTION_FEATURE_NAMES
+        assert names[26:] == tuple(f"card_{n}" for n in VOCAB)
+
+
+class TestDiscardComposition:
+    def test_双方弃牌分类计数(self) -> None:
+        state = _with_discard(
+            main_state(),
+            own=(inst(600, energy()), inst(601, energy()),
+                 inst(602, basic("妙蛙种子")), inst(603, _trainer("博士的研究"))),
+            opp=(inst(604, _trainer("宝可梦交替")),))
+        view = state.visible_state(0)
+        feats = policy_state_features(view)
+        assert tuple(feats) == POLICY_STATE_NAMES
+        assert feats["own_discard_count"] == 4.0
+        assert feats["own_discard_energy_count"] == 2.0
+        assert feats["own_discard_pokemon_count"] == 1.0
+        assert feats["opp_discard_count"] == 1.0
+        assert feats["opp_discard_energy_count"] == 0.0
+        assert feats["opp_discard_pokemon_count"] == 0.0
+        # M11 特征原样携带
+        assert feats["turn_norm"] == pytest.approx(min(view.turn, 50) / 50)
+        for name in FEATURE_NAMES:
+            assert feats[name] == feature_vector(view)[name]
+
+    def test_键序确定性(self) -> None:
+        view = main_state().visible_state(0)
+        first, second = policy_state_features(view), policy_state_features(view)
+        assert tuple(first) == tuple(second) == POLICY_STATE_NAMES
+        assert first == second
+
+
+class TestResolveActionCardNames:
+    def test_use_ability_场上宝可梦栈顶(self) -> None:
+        state = main_state()
+        poke = in_play(7, basic("沙奈朵ex"))
+        p0 = state.players[0].model_copy(update={"bench": (poke,)})
+        state = state.model_copy(update={"players": (p0, state.players[1])})
+        view = state.visible_state(0)
+        assert resolve_action_card_names(
+            Action(kind="use_ability", iid=7), view) == ("沙奈朵ex",)
+
+    def test_attack与retreat为己方战斗场(self) -> None:
+        view = main_state().visible_state(0)
+        for kind in ("attack", "retreat"):
+            assert resolve_action_card_names(
+                Action(kind=kind), view) == ("妙蛙种子",)
+
+    def test_无战斗场为空(self) -> None:
+        state = main_state()
+        p0 = state.players[0].model_copy(update={"active": None})
+        state = state.model_copy(update={"players": (p0, state.players[1])})
+        view = state.visible_state(0)
+        assert resolve_action_card_names(Action(kind="attack"), view) == ()
+
+    def test_play_trainer_手牌iid(self) -> None:
+        state = _hand_with(main_state(), [inst(52, _trainer("博士的研究"))])
+        view = state.visible_state(0)
+        assert resolve_action_card_names(
+            Action(kind="play_trainer", iid=52), view) == ("博士的研究",)
+
+    def test_choose多iid含不可见跳过(self) -> None:
+        state = _hand_with(main_state(), [inst(52, _trainer("博士的研究"))])
+        view = state.visible_state(0)
+        assert resolve_action_card_names(
+            Action(kind="choose", choices=(52, 99999)), view) == ("博士的研究",)
+
+
+class TestPolicyActionFeatures:
+    def test_onehot命中与键序(self) -> None:
+        state = _hand_with(main_state(), [inst(52, _trainer("博士的研究"))])
+        view = state.visible_state(0)
+        feats = policy_action_features(
+            Action(kind="play_trainer", iid=52), view, VOCAB)
+        assert tuple(feats) == policy_action_names(VOCAB)
+        assert feats["kind_play_trainer"] == 1.0
+        assert feats["card_博士的研究"] == 1.0
+        assert feats["card_沙奈朵ex"] == 0.0
+        assert feats["card_基本能量"] == 0.0
+
+    def test_choose_multi_hot(self) -> None:
+        state = _hand_with(main_state(), [
+            inst(52, _trainer("博士的研究")), inst(53, energy())])
+        view = state.visible_state(0)
+        feats = policy_action_features(
+            Action(kind="choose", choices=(52, 53)), view, VOCAB)
+        assert feats["card_博士的研究"] == 1.0
+        assert feats["card_基本能量"] == 1.0
+        assert feats["card_沙奈朵ex"] == 0.0
+
+    def test_词表外卡名显式报错(self) -> None:
+        view = main_state().visible_state(0)  # 手牌 iid=50 = 小火龙（不在 VOCAB）
+        with pytest.raises(ValueError, match="词表"):
+            policy_action_features(
+                Action(kind="play_trainer", iid=50), view, VOCAB)
+
+
+class TestBuildCardVocab:
+    def test_去重与字典序(self, monkeypatch, tmp_path) -> None:
+        pool_yml = tmp_path / "pool.yml"
+        pool_yml.write_text(
+            "version: 1\nlocked_at: '2026-10-19'\n"
+            "query: {window: t, division: t, basis: t, min_n: 1,"
+            " n_tournaments: 1, snapshot: t, name_group_rules_hash: t}\n"
+            "decks:\n"
+            "  - {archetype: 卡组A, en_archetype: deckA, wur: 0.6, n: 10,"
+            " deck_id: 'stub:1'}\n"
+            "  - {archetype: 卡组B, en_archetype: deckB, wur: 0.5, n: 10,"
+            " deck_id: 'stub:2'}\n",
+            encoding="utf-8")
+
+        from battlefrontier.agent import policy_features
+        from battlefrontier.data.deck import LoadedDeck
+
+        def fake_load_deck(db_path, deck_id):
+            cards = {
+                "stub:1": [basic("妙蛙种子"), basic("小火龙"), energy()],
+                "stub:2": [basic("小火龙"), _trainer("博士的研究")],
+            }[deck_id]
+            return LoadedDeck(cards=cards)
+
+        monkeypatch.setattr(policy_features, "load_deck", fake_load_deck)
+        vocab = build_card_vocab(pool_yml, "dummy.db")
+        assert vocab == tuple(sorted({"妙蛙种子", "小火龙", "基本能量", "博士的研究"}))
+        assert len(vocab) == len(set(vocab))

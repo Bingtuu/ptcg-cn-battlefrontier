@@ -20,7 +20,7 @@ task 061 根因诊断：M12 蒸馏学生特征零卡面身份、零弃牌构成 
   当前形态（越界 = 空 tuple，不猜；引擎实际枚举 shrink_bench 走
   choices iid，bench_index 为 None 时回落通用 iid 反查）；use_stadium =
   在场竞技场（无场 = 空 tuple）。其余无 iid 无 choices 且非上述类的行动
-  （end_turn / confirm_setup / place_active / place_bench 等）= 卡身份
+  （end_turn / confirm_setup 等）= 卡身份
   one-hot 全零（行动本身无卡面主体，如实表达）。
 
 模块纪律：纯函数、零引擎调用、零随机源（`build_card_vocab` 为训练侧词表

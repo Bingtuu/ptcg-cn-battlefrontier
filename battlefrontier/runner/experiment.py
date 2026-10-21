@@ -96,7 +96,7 @@ class AgentCfg(FrozenModel):
             policy_path = self.params.get("policy_path")
             if not isinstance(policy_path, str) or not policy_path:
                 raise ValueError(
-                    "distilled 需要 params.policy_path（bf-distilled-policy-v1 "
+                    "distilled 需要 params.policy_path（bf-distilled-policy-v1/v2 "
                     "模型资产 JSON 路径，str，不猜）")
             return self
         unknown = set(self.params) - set(HeuristicParams.__dataclass_fields__)
@@ -257,7 +257,7 @@ def _build_one(cfg: AgentCfg, seed: int, offset: int, card_effects=None):
         policy_path = cfg.params.get("policy_path")
         if not isinstance(policy_path, str) or not policy_path:
             raise ValueError(
-                "distilled 需要 params.policy_path（bf-distilled-policy-v1 "
+                "distilled 需要 params.policy_path（bf-distilled-policy-v1/v2 "
                 "模型资产 JSON 路径，str，不猜）")
         try:
             model = load_policy_model(policy_path)

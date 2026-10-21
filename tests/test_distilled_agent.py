@@ -12,6 +12,9 @@
 - 自身确定性：同实验定义同种子区间两跑 (seed, winner, is_draw, turns,
   events_hash) 逐局全等（test_experiment 既有确定性口径）。
 - CLI：agreement --policy 端到端 + 与 MCTS 预算 flags 互斥（退出码 1）。
+- task 062 WP2c（D-062-4）：特征版本分派——meta.feature_version（缺省 v1）；
+  v2 走 POLICY_STATE_NAMES / policy_action_names(card_vocab) 特征（卡身份维度
+  真实参与前向，argmax 随身份翻转），v1 路径逐位不变；v2 缺 card_vocab 显式报错。
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ import json
 from pathlib import Path
 
 import pytest
-from helpers import deck60, main_state
+from helpers import deck60, inst, main_state
 
 from battlefrontier.agent.action_features import (
     ACTION_FEATURE_NAMES,
@@ -28,8 +31,13 @@ from battlefrontier.agent.action_features import (
 )
 from battlefrontier.agent.distilled import DistilledAgent
 from battlefrontier.agent.features import FEATURE_NAMES
+from battlefrontier.agent.policy_features import (
+    POLICY_STATE_NAMES,
+    policy_action_names,
+)
 from battlefrontier.cli import main as cli_main
 from battlefrontier.engine.actions import Action
+from battlefrontier.engine.state import CardDef, Supertype
 from battlefrontier.learn.policy_model import (
     PolicyModel,
     load_policy_model,
@@ -158,6 +166,101 @@ class TestObserveDeterminism:
         first = agent.observe(view, legal)
         assert agent.observe(view, legal) == first
         assert DistilledAgent(_toy_model("attach_energy")).observe(view, legal) == first
+
+
+# ── task 062 WP2c：v2 特征分派 ─────────────────────────────
+
+_V2_VOCAB = ("博士的研究", "宝可梦交替")  # 小词表，字典序钉死
+_V2_IN_DIM = len(POLICY_STATE_NAMES) + len(policy_action_names(_V2_VOCAB))
+
+
+def _trainer(name: str) -> CardDef:
+    return CardDef(card_id=f"stub-{name}", name=name, supertype=Supertype.TRAINER)
+
+
+def _v2_identity_model(prefer_card: str) -> PolicyModel:
+    """v2 玩具打分机：单行 w1 仅在 card_<prefer_card> 列置 1（行动段偏移
+    len(POLICY_STATE_NAMES) + len(ACTION_FEATURE_NAMES)），score = relu(onehot)。"""
+    w1_row = [0.0] * _V2_IN_DIM
+    w1_row[len(POLICY_STATE_NAMES) + len(ACTION_FEATURE_NAMES)
+           + _V2_VOCAB.index(prefer_card)] = 1.0
+    return PolicyModel(
+        hidden=1,
+        weights={"w1": (tuple(w1_row),), "b1": (0.0,),
+                 "w2": ((1.0,),), "b2": (0.0,)},
+        meta={"feature_version": "v2"},
+        card_vocab=_V2_VOCAB)
+
+
+class TestDistilledV2:
+    def test_身份维度真实参与前向(self) -> None:
+        """同状态两行动仅卡身份不同（同 kind play_trainer、结构化字段同形）：
+        w1 对应 card_* 列权重不同 → argmax 随身份翻转。"""
+        state = main_state(p0_extra_hand=(
+            inst(52, _trainer("博士的研究")),
+            inst(53, _trainer("宝可梦交替"))))
+        view = state.visible_state(0)
+        legal = [Action(kind="play_trainer", iid=52),
+                 Action(kind="play_trainer", iid=53)]
+        prefer_a = DistilledAgent(_v2_identity_model("博士的研究"))
+        prefer_b = DistilledAgent(_v2_identity_model("宝可梦交替"))
+        assert prefer_a.observe(view, legal) == legal[0]
+        assert prefer_b.observe(view, legal) == legal[1]
+
+    def test_v2权重形状不符显式报错(self) -> None:
+        """v2 输入维度 = 36 + (26 + 词表大小)；w1 列数不符显式报错（不猜）。"""
+        bad = PolicyModel(
+            hidden=1,
+            weights={"w1": (tuple(0.0 for _ in range(_V2_IN_DIM - 1)),),
+                     "b1": (0.0,), "w2": ((1.0,),), "b2": (0.0,)},
+            meta={"feature_version": "v2"},
+            card_vocab=_V2_VOCAB)
+        with pytest.raises(ValueError, match="形状"):
+            DistilledAgent(bad)
+
+    def test_v2缺card_vocab显式报错(self) -> None:
+        """meta feature_version=v2 但 card_vocab=None → ValueError（不猜）。"""
+        model = PolicyModel(
+            hidden=1,
+            weights={"w1": (tuple(0.0 for _ in range(_IN_DIM)),), "b1": (0.0,),
+                     "w2": ((1.0,),), "b2": (0.0,)},
+            meta={"feature_version": "v2"})
+        assert model.card_vocab is None
+        with pytest.raises(ValueError, match="card_vocab"):
+            DistilledAgent(model)
+
+    def test_未知feature_version显式报错(self) -> None:
+        model = PolicyModel(
+            hidden=1,
+            weights={"w1": (tuple(0.0 for _ in range(_IN_DIM)),), "b1": (0.0,),
+                     "w2": ((1.0,),), "b2": (0.0,)},
+            meta={"feature_version": "v3"})
+        with pytest.raises(ValueError, match="feature_version"):
+            DistilledAgent(model)
+
+
+class TestDistilledV1Unchanged:
+    def test_v1资产装载后observe不变(self, tmp_path) -> None:
+        """v1 玩具模型 save → load（v1 装载路径，card_vocab None）→ observe
+        与装载前逐位一致。"""
+        model = _toy_model("attack")
+        path = tmp_path / "toy-v1.json"
+        save_policy_model(model, path)
+        loaded = load_policy_model(path)
+        assert loaded.card_vocab is None
+        view = main_state().visible_state(0)
+        legal = _legal_main()
+        assert DistilledAgent(loaded).observe(view, legal) \
+            == DistilledAgent(model).observe(view, legal) \
+            == Action(kind="attack", attack_index=0)
+
+    def test_v1在库资产可装载可推理(self) -> None:
+        """models/policy-m12-v1.json（M12 锚 1 资产）装载 + observe 出合法行动。"""
+        model = load_policy_model("models/policy-m12-v1.json")
+        assert model.card_vocab is None
+        agent = DistilledAgent(model)
+        legal = _legal_main()
+        assert agent.observe(main_state().visible_state(0), legal) in legal
 
 
 # ── 注册三处（experiment.py）────────────────────────────────────

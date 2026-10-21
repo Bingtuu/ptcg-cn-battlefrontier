@@ -96,6 +96,19 @@ class TestPolicyModelV2:
         with pytest.raises(ValueError, match="card_vocab"):
             save_policy_model(model, tmp_path / "m.json")
 
+    def test_词表未按字典序落盘显式报错(self, tmp_path) -> None:
+        """save/load 同闸：未去重+字典序的词表 save 侧即拒绝（与 _load_v2 同校验）。"""
+        model = replace(_toy_v2_model(),
+                        card_vocab=("沙奈朵ex", "博士的研究", "基本超能量"))
+        with pytest.raises(ValueError, match="字典序"):
+            save_policy_model(model, tmp_path / "m.json")
+
+    def test_词表重复落盘显式报错(self, tmp_path) -> None:
+        model = replace(_toy_v2_model(),
+                        card_vocab=("博士的研究", "博士的研究", "基本超能量", "沙奈朵ex"))
+        with pytest.raises(ValueError, match="去重"):
+            save_policy_model(model, tmp_path / "m.json")
+
     def test_v2词表未按字典序显式报错(self, tmp_path) -> None:
         path = tmp_path / "m.json"
 

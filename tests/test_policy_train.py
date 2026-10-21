@@ -235,6 +235,33 @@ class TestTrainPolicyV2:
         with pytest.raises(ValueError, match="混搭"):
             train_policy(samples, epochs=1, hidden=4, **kwargs)
 
+    def test_v2_state_names不符显式报错(self, samples_v2) -> None:
+        """v2 分支 state_names 须与 POLICY_STATE_NAMES 逐一相等（不猜）。"""
+        with pytest.raises(ValueError, match="state_names"):
+            train_policy(samples_v2, epochs=1, hidden=4,
+                         state_names=tuple(reversed(POLICY_STATE_NAMES)),
+                         action_names=V2_ACTION_NAMES, card_vocab=STUB_VOCAB)
+
+    def test_v2_action_names不符显式报错(self, samples_v2) -> None:
+        """v2 分支 action_names 须与 policy_action_names(card_vocab) 逐一相等。"""
+        with pytest.raises(ValueError, match="action_names"):
+            train_policy(samples_v2, epochs=1, hidden=4,
+                         state_names=POLICY_STATE_NAMES,
+                         action_names=tuple(reversed(V2_ACTION_NAMES)),
+                         card_vocab=STUB_VOCAB)
+
+    def test_样本缺特征键显式报错(self) -> None:
+        """样本 dict 缺键 → ValueError 带缺失键名与样本上下文（不猜）。"""
+        from battlefrontier.learn.policy_data import PolicySample
+        from battlefrontier.learn.train_policy import _flatten_samples
+
+        bad = PolicySample(pair_index=3, seed=456,
+                           state={"turn_norm": 0.5},
+                           actions=(dict.fromkeys(V2_ACTION_NAMES, 0.0),),
+                           teacher_index=0)
+        with pytest.raises(ValueError, match="缺特征键"):
+            _flatten_samples([bad], POLICY_STATE_NAMES, V2_ACTION_NAMES)
+
 
 # ── 向量化等价性（task 058 性能修正）────────────────────────────
 

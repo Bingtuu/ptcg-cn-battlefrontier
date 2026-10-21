@@ -55,15 +55,24 @@ class PolicyModel:
     card_vocab: tuple[str, ...] | None = None
 
 
+def _check_vocab_sorted_unique(card_vocab: tuple[str, ...]) -> None:
+    """card_vocab 去重 + 字典序钉死校验（save/load 同闸，不猜）。"""
+    if card_vocab != tuple(sorted(set(card_vocab))):
+        raise ValueError(
+            f"card_vocab 未去重 + 字典序钉死（不猜）：{card_vocab!r}")
+
+
 def save_policy_model(model: PolicyModel, path: str | Path) -> None:
     """模型资产落盘（UTF-8 / ensure_ascii=False / indent=2 / sort_keys，位级确定）。
 
     card_vocab 为 None → v1 旧路径原样（既有资产逐字节兼容）；非 None → v2，
     特征清单按 policy_features 推导，payload 增 card_vocab。card_vocab 为空
-    tuple 显式报错（save 不能产出 load 拒绝的资产，不猜）。
+    tuple 或未去重+字典序钉死 显式报错（save 不能产出 load 拒绝的资产，不猜）。
     """
     if model.card_vocab is not None and not model.card_vocab:
         raise ValueError("card_vocab 为空 tuple——save 不能产出 load 拒绝的资产（不猜）")
+    if model.card_vocab is not None:
+        _check_vocab_sorted_unique(model.card_vocab)
     if model.card_vocab is None:
         payload = {
             "format": POLICY_FORMAT,
@@ -158,9 +167,7 @@ def _load_v2(payload: dict) -> PolicyModel:
         raise ValueError(
             f"模型 card_vocab 缺失/为空/非字符串清单（不猜）：{raw_vocab!r}")
     card_vocab = tuple(raw_vocab)
-    if card_vocab != tuple(sorted(set(card_vocab))):
-        raise ValueError(
-            f"模型 card_vocab 未去重 + 字典序钉死（不猜）：{card_vocab!r}")
+    _check_vocab_sorted_unique(card_vocab)
     if tuple(payload["state_feature_names"]) != POLICY_STATE_NAMES:
         raise ValueError(
             "模型状态特征清单与 POLICY_STATE_NAMES 不符（训练/推理非同一份清单——不猜）")

@@ -33,6 +33,10 @@ import torch
 
 from battlefrontier.agent.action_features import ACTION_FEATURE_NAMES
 from battlefrontier.agent.features import FEATURE_NAMES
+from battlefrontier.agent.policy_features import (
+    POLICY_STATE_NAMES,
+    policy_action_names,
+)
 from battlefrontier.learn.policy_data import PolicySample
 from battlefrontier.learn.policy_model import PolicyModel
 
@@ -71,6 +75,16 @@ def _split_by_game(samples: list[PolicySample], split_seed: int,
     return train, val
 
 
+def _names_diff(actual: tuple[str, ...], expected: tuple[str, ...]) -> str:
+    """键序差异描述（长度不符或首个不同位）。"""
+    if len(actual) != len(expected):
+        return f"长度 {len(actual)} != 期望 {len(expected)}"
+    for i, (a, e) in enumerate(zip(actual, expected, strict=True)):
+        if a != e:
+            return f"第 {i} 位 {a!r} != 期望 {e!r}"
+    return ""
+
+
 def _flatten_samples(samples: list[PolicySample],
                      state_names: tuple[str, ...] = FEATURE_NAMES,
                      action_names: tuple[str, ...] = ACTION_FEATURE_NAMES):
@@ -78,14 +92,20 @@ def _flatten_samples(samples: list[PolicySample],
 
     一次性预处理（训练外成本）：state 行按合法行动数重复拼行动特征；
     teacher 全局下标 = 样本段起点 + teacher_index（段内下标）。
-    键序由 state_names/action_names 钉死（v1 缺省 = M11 清单，v2 = v2 清单）。
+    键序由 state_names/action_names 钉死（v1 缺省 = M11 清单，v2 = v2 清单）；
+    样本缺键 → ValueError 带缺失键名与样本上下文（不猜）。
     """
     flat, teacher_global, ids = [], [], []
     for i, s in enumerate(samples):
-        st = [s.state[name] for name in state_names]
+        try:
+            st = [s.state[name] for name in state_names]
+            rows = [st + [a[name] for name in action_names] for a in s.actions]
+        except KeyError as e:
+            raise ValueError(
+                f"样本缺特征键 {e.args[0]!r}（样本 #{i} pair {s.pair_index} "
+                f"seed {s.seed}；训练键序与样本特征版本不符——不猜）") from e
         start = len(flat)
-        for a in s.actions:
-            flat.append(st + [a[name] for name in action_names])
+        flat.extend(rows)
         ids.extend([i] * (len(flat) - start))
         teacher_global.append(start + s.teacher_index)
     x = torch.tensor(flat, dtype=torch.float32)
@@ -167,6 +187,15 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         action_names = ACTION_FEATURE_NAMES
         feature_version = "v1"
     else:
+        expected_action = policy_action_names(card_vocab)
+        if tuple(state_names) != POLICY_STATE_NAMES:
+            raise ValueError(
+                "v2 state_names 与 POLICY_STATE_NAMES 不符（训练/资产非同一份"
+                f"清单——不猜）：{_names_diff(tuple(state_names), POLICY_STATE_NAMES)}")
+        if tuple(action_names) != expected_action:
+            raise ValueError(
+                "v2 action_names 与 policy_action_names(card_vocab) 不符（训练/"
+                f"资产非同一份清单——不猜）：{_names_diff(tuple(action_names), expected_action)}")
         feature_version = "v2"
     input_dim = len(state_names) + len(action_names)
     train_rows, val_rows = _split_by_game(samples, split_seed)

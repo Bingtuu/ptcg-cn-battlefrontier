@@ -1,0 +1,14 @@
+# task 062 WP4 锚 2+3 复测：v2 学生（distilled，卡身份+弃牌构成特征）双侧全 matrix 复校准
+# 前置：task 062 WP3 正式训练产物 models/policy-m12-v2.json（bf-distilled-policy-v2）
+# 用法：bfsim run experiments/m12-distilled-matrix-v2.example.yml --workers 18 --results results/m12-distilled-matrix-v2.db
+#       bfsim calibration experiments/m12-distilled-matrix-v2.example.yml --results results/m12-distilled-matrix-v2.db
+# 种子区间锚 700000 与 v1 matrix 相同（同种子锚 = 与 v1 matrix CRN 成对可比；
+# 避开 M11 训练段 300000–400799 / 锚点段 102500/117000 / M12 教师采集段 600000–601027）
+name: m12-distilled-matrix-v2
+seed_start: 700000
+matrix:
+  pool: config/target-pool.v1.yml
+  games_per_pair: 500
+agents:
+  a: {type: distilled, params: {policy_path: models/policy-m12-v2.json}}
+  b: {type: distilled, params: {policy_path: models/policy-m12-v2.json}}

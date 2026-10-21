@@ -360,6 +360,8 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
 
     torch dev-only（训练非复算面 D3-4）；缺省超参全钉死写 meta；holdout argmax
     准确率落 meta；数据错误 → 退出码 1。
+    task 062 WP2d（D-062-2/4）：提供 --pool 时构建卡身份词表触发 v2 特征训练
+    （资产 bf-distilled-policy-v2）；不提供 = v1 旧行为逐位不变。
     """
     from battlefrontier.learn.policy_data import load_policy_samples
     from battlefrontier.learn.policy_model import save_policy_model
@@ -372,7 +374,20 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
     )
 
     try:
-        samples = load_policy_samples(args.data)
+        card_vocab = None
+        state_names = None
+        action_names = None
+        if args.pool is not None:
+            from battlefrontier.agent.policy_features import (
+                POLICY_STATE_NAMES,
+                build_card_vocab,
+                policy_action_names,
+            )
+
+            card_vocab = build_card_vocab(args.pool, load_db_path())
+            state_names = POLICY_STATE_NAMES
+            action_names = policy_action_names(card_vocab)
+        samples = load_policy_samples(args.data, card_vocab=card_vocab)
         model = train_policy(
             samples,
             epochs=args.epochs if args.epochs is not None else DEFAULT_EPOCHS,
@@ -381,7 +396,9 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
             split_seed=args.split_seed if args.split_seed is not None
             else DEFAULT_SPLIT_SEED,
             code_version=args.code_version or _code_version(),
-            pool=args.pool)
+            pool=args.pool,
+            state_names=state_names, action_names=action_names,
+            card_vocab=card_vocab)
     except (ValueError, OSError) as e:
         print(f"错误：{e}")
         return 1
@@ -396,6 +413,8 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
     print(f"epochs {m['epochs']} / lr {m['lr']} / hidden {m['hidden']}"
           f"（torch {m['torch_version']}）；训练损失 {m['train_loss']:.6f}；"
           f"argmax 准确率 训练 {m['train_argmax_accuracy']:.4f} / holdout {val_acc}")
+    if card_vocab is not None:
+        print(f"特征版本 v2：卡身份词表 {len(card_vocab)} 张（卡池 {args.pool}）")
     print(f"模型资产: {args.out}")
     if m["warning"]:
         print(f"[告警] {m['warning']}")
@@ -655,7 +674,7 @@ def main(argv: list[str] | None = None) -> int:
     tp_p = sub.add_parser(
         "train-policy",
         help="M12 WP2（task 058，D-M12-3/4）：collect-snapshots 产物蒸馏训练策略打分机"
-             "（torch dev-only；bf-distilled-policy-v1）")
+             "（torch dev-only；缺省 bf-distilled-policy-v1，--pool 触发 v2，task 062）")
     tp_p.add_argument("--data", required=True,
                       help="快照 JSONL 目录（collect-snapshots 产物，pair-*.jsonl）")
     tp_p.add_argument("--out", required=True, help="模型资产 JSON 输出路径")
@@ -667,7 +686,10 @@ def main(argv: list[str] | None = None) -> int:
                       help="隐藏层宽度（缺省钉死 64，写进 meta）")
     tp_p.add_argument("--split-seed", type=int, default=None,
                       help="按局 80/20 划分种子（缺省钉死 20261018，写进 meta）")
-    tp_p.add_argument("--pool", default=None, help="卡池 YAML 路径（meta 锚点，可选）")
+    tp_p.add_argument("--pool", default=None,
+                      help="卡池 YAML 路径：提供时构建卡身份词表触发 v2 特征训练"
+                           "（bf-distilled-policy-v2，task 062，D-062-2）；"
+                           "缺省 = v1 旧口径（逐位不变）")
     tp_p.add_argument("--code-version", default=None,
                       help="代码版本 meta 覆盖（缺省取 git short sha；测试注入用）")
     cs_p = sub.add_parser(

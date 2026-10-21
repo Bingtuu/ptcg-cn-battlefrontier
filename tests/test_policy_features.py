@@ -320,6 +320,41 @@ class TestResolveActionCardNames:
         assert resolve_action_card_names(
             Action(kind="choose", choices=(52, 99999)), view) == ("博士的研究",)
 
+    def _own_bench_view(self, poke) -> object:
+        state = main_state()
+        p0 = state.players[0].model_copy(update={"bench": (poke,)})
+        state = state.model_copy(update={"players": (p0, state.players[1])})
+        return state.visible_state(0)
+
+    def test_promote与shrink_bench_备战区索引身份(self) -> None:
+        view = self._own_bench_view(in_play(7, basic("沙奈朵ex")))
+        for kind in ("promote", "shrink_bench"):
+            assert resolve_action_card_names(
+                Action(kind=kind, bench_index=0), view) == ("沙奈朵ex",)
+
+    def test_promote越界为空(self) -> None:
+        view = self._own_bench_view(in_play(7, basic("沙奈朵ex")))
+        for kind in ("promote", "shrink_bench"):
+            assert resolve_action_card_names(
+                Action(kind=kind, bench_index=5), view) == ()
+
+    def test_shrink_bench_choices反查(self) -> None:
+        """引擎实际枚举 shrink_bench 用 choices=(栈顶 iid,)（core.py），走通用 iid 反查。"""
+        view = self._own_bench_view(in_play(7, basic("沙奈朵ex")))
+        assert resolve_action_card_names(
+            Action(kind="shrink_bench", choices=(7,)), view) == ("沙奈朵ex",)
+
+    def test_use_stadium_有场(self) -> None:
+        state = main_state().model_copy(
+            update={"stadium": inst(700, _trainer("巨大炉灶"))})
+        view = state.visible_state(0)
+        assert resolve_action_card_names(
+            Action(kind="use_stadium"), view) == ("巨大炉灶",)
+
+    def test_use_stadium_无场为空(self) -> None:
+        view = main_state().visible_state(0)
+        assert resolve_action_card_names(Action(kind="use_stadium"), view) == ()
+
 
 class TestPolicyActionFeatures:
     def test_onehot命中与键序(self) -> None:
@@ -376,5 +411,6 @@ class TestBuildCardVocab:
 
         monkeypatch.setattr(policy_features, "load_deck", fake_load_deck)
         vocab = build_card_vocab(pool_yml, "dummy.db")
-        assert vocab == tuple(sorted({"妙蛙种子", "小火龙", "基本能量", "博士的研究"}))
+        # 字面量期望序钉死「Python 字典序（Unicode 码点序）」口径
+        assert vocab == ("博士的研究", "基本能量", "妙蛙种子", "小火龙")
         assert len(vocab) == len(set(vocab))

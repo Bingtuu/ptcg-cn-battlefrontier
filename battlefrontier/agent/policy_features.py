@@ -14,14 +14,22 @@ task 061 根因诊断：M12 蒸馏学生特征零卡面身份、零弃牌构成 
 - **D-062-3 行动→卡名解析**：只读 VisibleGameState 可见区域反查（信息纪律，
   与 features.py / action_features.py 同口径）——己方手牌 / 双方场上
   （stack + attached_energy + attached_tool）/ 双方弃牌 / pending_pool；
-  iid 不在可见区 = 跳过（身份合法地不可见，如实表达，非报错）；attack /
-  retreat 无 iid，身份 = 己方战斗场当前形态。
+  iid 不在可见区 = 跳过（身份合法地不可见，如实表达，非报错）。
+  无 iid 类行动的专门口径：attack / retreat = 己方战斗场当前形态；
+  promote / shrink_bench（bench_index 非 None 时）= 己方备战区对应位
+  当前形态（越界 = 空 tuple，不猜；引擎实际枚举 shrink_bench 走
+  choices iid，bench_index 为 None 时回落通用 iid 反查）；use_stadium =
+  在场竞技场（无场 = 空 tuple）。其余无 iid 无 choices 且非上述类的行动
+  （end_turn / confirm_setup / place_active / place_bench 等）= 卡身份
+  one-hot 全零（行动本身无卡面主体，如实表达）。
 
 模块纪律：纯函数、零引擎调用、零随机源（`build_card_vocab` 为训练侧词表
 构建工具，只做文件/db 装载，不参与对局路径）。
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from battlefrontier.agent.action_features import ACTION_FEATURE_NAMES, action_features
 from battlefrontier.agent.features import FEATURE_NAMES, feature_vector
@@ -65,7 +73,7 @@ def policy_action_names(card_vocab: tuple[str, ...]) -> tuple[str, ...]:
     return ACTION_FEATURE_NAMES + tuple(f"card_{n}" for n in card_vocab)
 
 
-def build_card_vocab(pool_path, db_path) -> tuple[str, ...]:
+def build_card_vocab(pool_path: str | Path, db_path: str) -> tuple[str, ...]:
     """卡身份词表 = 卡池各代表卡组全部卡名去重 + 字典序排序（D-062-2）。"""
     pool = load_target_pool(pool_path)
     names: set[str] = set()
@@ -109,6 +117,8 @@ def resolve_action_card_names(
     """行动 → 涉及卡名（可见视图反查，D-062-3）。
 
     attack / retreat（无 iid）= 己方战斗场当前形态（无战斗场 = 空 tuple）；
+    promote / shrink_bench（bench_index 非 None）= 己方备战区对应位当前形态
+    （越界 = 空 tuple，不猜）；use_stadium = 在场竞技场（无场 = 空 tuple）；
     其余行动 = action.iid + action.choices 各 iid 反查；iid 不在可见区
     跳过（身份合法地不可见，非报错）。
     """
@@ -116,6 +126,16 @@ def resolve_action_card_names(
         if view.own.active is None:
             return ()
         return (view.own.active.current.card.name,)
+    if action.kind in ("promote", "shrink_bench") and action.bench_index is not None:
+        # 越界 = 空 tuple（不猜）；bench_index 为 None（如引擎 shrink_bench 实际
+        # 走 choices iid 枚举）时回落下方通用 iid 反查
+        if not 0 <= action.bench_index < len(view.own.bench):
+            return ()
+        return (view.own.bench[action.bench_index].current.card.name,)
+    if action.kind == "use_stadium":
+        if view.stadium is None:
+            return ()
+        return (view.stadium.card.name,)
     mapping = _visible_card_names(view)
     names: list[str] = []
     if action.iid is not None and action.iid in mapping:

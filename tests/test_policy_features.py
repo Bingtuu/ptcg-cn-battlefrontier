@@ -225,6 +225,70 @@ class TestLoadPolicySamples:
 
 VOCAB = ("博士的研究", "基本能量", "沙奈朵ex")
 
+# stub 卡组全卡名词表（deck60：妙蛙种子/妙蛙草/小火龙/基本能量），v2 样本/训练用
+STUB_VOCAB = tuple(sorted({c.name for c in deck60()}))
+
+
+class TestRowToSampleV2:
+    """task 062 WP2b：card_vocab 非 None → v2 特征路径；None → v1 逐位不变。"""
+
+    def test_v2样本键序与教师下标(self, snapshot_file) -> None:
+        row = next(r for r in snapshot_file.rows if r["phase"] == "main")
+        sample = row_to_sample(row, pair_index=0,
+                               card_effects=snapshot_file.card_effects(),
+                               card_vocab=STUB_VOCAB)
+        state = snapshot_state(row)
+        view = state.visible_state(row["player"])
+        assert tuple(sample.state) == POLICY_STATE_NAMES
+        assert sample.state == policy_state_features(view)
+        engine = GameEngine(RandomSource(row["seed"]),
+                            card_effects=snapshot_file.card_effects())
+        engine.state = state
+        legal = engine.legal_actions(row["player"])
+        assert len(sample.actions) == len(legal) == row["n_legal"]
+        for feats, action in zip(sample.actions, legal, strict=True):
+            assert tuple(feats) == policy_action_names(STUB_VOCAB)
+            assert feats == policy_action_features(action, view, STUB_VOCAB)
+        assert legal[sample.teacher_index] == teacher_action(row)
+        assert (sample.pair_index, sample.seed) == (0, row["seed"])
+
+    def test_v1缺省路径逐位不变(self, snapshot_file) -> None:
+        """不传 card_vocab → v1 口径；v2 样本共享的 M11 特征段与 v1 逐位一致。"""
+        row = snapshot_file.rows[0]
+        card_effects = snapshot_file.card_effects()
+        v1 = row_to_sample(row, pair_index=0, card_effects=card_effects)
+        assert tuple(v1.state) == FEATURE_NAMES
+        assert all(tuple(a) == ACTION_FEATURE_NAMES for a in v1.actions)
+        v2 = row_to_sample(row, pair_index=0, card_effects=card_effects,
+                           card_vocab=STUB_VOCAB)
+        assert {k: v2.state[k] for k in FEATURE_NAMES} == v1.state
+        for a1, a2 in zip(v1.actions, v2.actions, strict=True):
+            assert {k: a2[k] for k in ACTION_FEATURE_NAMES} == a1
+        assert v2.teacher_index == v1.teacher_index
+
+    def test_全阶段行v2可转换(self, snapshot_file) -> None:
+        """冒烟全量行（含 choice/setup/promote 阶段）v2 路径逐行转换不炸。"""
+        card_effects = snapshot_file.card_effects()
+        for row in snapshot_file.rows:
+            sample = row_to_sample(row, pair_index=0, card_effects=card_effects,
+                                   card_vocab=STUB_VOCAB)
+            assert 0 <= sample.teacher_index < len(sample.actions)
+
+    def test_load透传card_vocab(self, snapshot_file, tmp_path) -> None:
+        import json
+
+        path = tmp_path / "pair-0-测试Ax测试B.jsonl"
+        lines = [{"record": "header", **snapshot_file.header}] + \
+            [{**r, "record": "snapshot"} for r in snapshot_file.rows]
+        path.write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False, sort_keys=True) for r in lines)
+            + "\n", encoding="utf-8")
+        samples = load_policy_samples(tmp_path, card_vocab=STUB_VOCAB)
+        assert len(samples) == len(snapshot_file.rows)
+        assert all(tuple(s.state) == POLICY_STATE_NAMES for s in samples)
+        assert all(tuple(a) == policy_action_names(STUB_VOCAB)
+                   for s in samples for a in s.actions)
+
 
 def _trainer(name: str) -> CardDef:
     return CardDef(card_id=f"stub-{name}", name=name, supertype=Supertype.TRAINER)

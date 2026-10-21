@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -26,7 +28,7 @@ from battlefrontier.learn.policy_model import (
     save_policy_model,
 )
 
-VOCAB = ("沙奈朵ex", "基本超能量", "博士的研究")
+VOCAB = ("博士的研究", "基本超能量", "沙奈朵ex")  # 字典序钉死（WP2b 装载校验口径）
 V2_IN_DIM = len(POLICY_STATE_NAMES) + len(policy_action_names(VOCAB))
 
 
@@ -80,6 +82,44 @@ class TestPolicyModelV2:
         assert model.card_vocab is None
         assert model.hidden > 0
 
+    def test_v1在库资产逐字节锚(self, tmp_path) -> None:
+        """真实在库资产 load → save → 字节全等（v1 落盘路径零漂移锚，WP2a 复核遗留）。"""
+        src = Path("models/policy-m12-v1.json")
+        model = load_policy_model(src)
+        out = tmp_path / "roundtrip.json"
+        save_policy_model(model, out)
+        assert out.read_bytes() == src.read_bytes()
+
+    def test_空card_vocab落盘显式报错(self, tmp_path) -> None:
+        """card_vocab == () → save 显式报错（save 不能产出 load 拒绝的文件）。"""
+        model = replace(_toy_v2_model(), card_vocab=())
+        with pytest.raises(ValueError, match="card_vocab"):
+            save_policy_model(model, tmp_path / "m.json")
+
+    def test_v2词表未按字典序显式报错(self, tmp_path) -> None:
+        path = tmp_path / "m.json"
+
+        def unsorted(p):
+            vocab = ["沙奈朵ex", "博士的研究", "基本超能量"]  # 非字典序（博<基<沙）
+            p["card_vocab"] = vocab
+            p["action_feature_names"] = list(policy_action_names(tuple(vocab)))
+
+        _save_mutated_v2(path, unsorted)
+        with pytest.raises(ValueError, match="字典序"):
+            load_policy_model(path)
+
+    def test_v2词表重复显式报错(self, tmp_path) -> None:
+        path = tmp_path / "m.json"
+
+        def duped(p):
+            vocab = ["博士的研究", "博士的研究", "基本超能量", "沙奈朵ex"]
+            p["card_vocab"] = vocab
+            p["action_feature_names"] = list(policy_action_names(tuple(vocab)))
+
+        _save_mutated_v2(path, duped)
+        with pytest.raises(ValueError, match="去重"):
+            load_policy_model(path)
+
     def test_v1落盘位级确定(self, tmp_path) -> None:
         from battlefrontier.agent.action_features import ACTION_FEATURE_NAMES
         from battlefrontier.agent.features import FEATURE_NAMES
@@ -119,8 +159,9 @@ class TestPolicyModelV2:
 
     def test_v2词表与行动清单不符显式报错(self, tmp_path) -> None:
         path = tmp_path / "m.json"
+        # 字典序合法但与 action_feature_names 联动不符的词表
         _save_mutated_v2(path, lambda p: p.__setitem__(
-            "card_vocab", ["梦幻ex", "基本超能量", "博士的研究"]))
+            "card_vocab", ["博士的研究", "基本超能量", "梦幻ex"]))
         with pytest.raises(ValueError, match="action_feature_names"):
             load_policy_model(path)
 

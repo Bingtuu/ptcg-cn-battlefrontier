@@ -1,17 +1,23 @@
 """M12 蒸馏策略训练器（task 058 WP2，D-M12-3/4）：torch MLP 打分机 + 教师硬标签 NLL。
 
 - **模型**（D-M12-3）：score(state ⊕ action) = W2·relu(W1·x + b1) + b2，输入
-  56 维（状态 30 = FEATURE_NAMES + 行动 26 = ACTION_FEATURE_NAMES），单层隐藏
+  维度 = len(state_names) + len(action_names)（v1 缺省 = 状态 30 FEATURE_NAMES
+  + 行动 26 ACTION_FEATURE_NAMES = 56；v2 = POLICY_STATE_NAMES 36 +
+  policy_action_names(card_vocab)，task 062 WP2b 去 56 硬编码），单层隐藏
   64 + ReLU，输出标量 logit；逐决策点合法行动掩码 softmax + 教师下标 NLL
   （试点硬标签；软标签缺口见 task 057 遗留）。
 - **训练**：全批量 Adam（小数据量级不做 mini-batch 洗牌），向量化实现——样本
-  预处理一次拍平成大张量 X [Σn_i, 56]（state 行按合法行动数重复拼行动特征）
-  + teacher 全局下标 + 行→样本 id，每 epoch 一次前向后分段 logsumexp
+  预处理一次拍平成大张量 X [Σn_i, in_dim]（state 行按合法行动数重复拼行动
+  特征）+ teacher 全局下标 + 行→样本 id，每 epoch 一次前向后分段 logsumexp
   （数值稳定两段法：detach 分段 max + exp-sum-log，与逐样本
   cross_entropy(logits, teacher) = −logit[teacher] + logsumexp(logits) 数学
   等价，掩码天然满足——只有合法行动进 logits）；按局 (pair_index, seed)
   80/20 划分（同局样本不跨集，train.py 先例）；缺省超参全钉死写 meta
   （epochs 100 / lr 1e-3 / hidden 64 / split_seed 20261018）。
+- **特征版本**（task 062 WP2b）：state_names / action_names / card_vocab
+  三者要么全 None（v1，行为逐位不变）要么全提供（v2），混搭显式 ValueError
+  （不猜）；meta 增 feature_version（"v1"/"v2"），v2 时 PolicyModel 携带
+  card_vocab（落盘 format=bf-distilled-policy-v2）。
 - **训练非复算面**（task 056 D3-4）：torch 随机源（初始化/cudnn/BLAS）不锁，
   torch.manual_seed(split_seed) 仅尽力锚定初始化；资产落盘即锁定，推理
   确定性不受损。meta 落 torch_version 锚定训练环境。
@@ -49,8 +55,6 @@ TRAIN_RATIO = 0.8
 # 自适应线程数粒度：每 _ROWS_PER_THREAD 拍平行配 1 线程（见 train_policy 注释）
 _ROWS_PER_THREAD = 50_000
 
-_INPUT_DIM = len(FEATURE_NAMES) + len(ACTION_FEATURE_NAMES)
-
 
 def _split_by_game(samples: list[PolicySample], split_seed: int,
                    ) -> tuple[list[PolicySample], list[PolicySample]]:
@@ -67,18 +71,21 @@ def _split_by_game(samples: list[PolicySample], split_seed: int,
     return train, val
 
 
-def _flatten_samples(samples: list[PolicySample]):
-    """样本列 → 拍平大张量 (X [Σn_i, 56], teacher 全局下标, 行→样本 id)。
+def _flatten_samples(samples: list[PolicySample],
+                     state_names: tuple[str, ...] = FEATURE_NAMES,
+                     action_names: tuple[str, ...] = ACTION_FEATURE_NAMES):
+    """样本列 → 拍平大张量 (X [Σn_i, in_dim], teacher 全局下标, 行→样本 id)。
 
     一次性预处理（训练外成本）：state 行按合法行动数重复拼行动特征；
     teacher 全局下标 = 样本段起点 + teacher_index（段内下标）。
+    键序由 state_names/action_names 钉死（v1 缺省 = M11 清单，v2 = v2 清单）。
     """
     flat, teacher_global, ids = [], [], []
     for i, s in enumerate(samples):
-        st = [s.state[name] for name in FEATURE_NAMES]
+        st = [s.state[name] for name in state_names]
         start = len(flat)
         for a in s.actions:
-            flat.append(st + [a[name] for name in ACTION_FEATURE_NAMES])
+            flat.append(st + [a[name] for name in action_names])
         ids.extend([i] * (len(flat) - start))
         teacher_global.append(start + s.teacher_index)
     x = torch.tensor(flat, dtype=torch.float32)
@@ -130,11 +137,16 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
                  lr: float = DEFAULT_LR, hidden: int = DEFAULT_HIDDEN,
                  split_seed: int = DEFAULT_SPLIT_SEED,
                  code_version: str = "",
-                 pool: str | None = None) -> PolicyModel:
+                 pool: str | None = None,
+                 state_names: tuple[str, ...] | None = None,
+                 action_names: tuple[str, ...] | None = None,
+                 card_vocab: tuple[str, ...] | None = None) -> PolicyModel:
     """样本列 → 训练完成的 PolicyModel（meta 全量落账，含 holdout argmax 准确率）。
 
     全批量 Adam：每 epoch 全训练集一次前向/反向。训练非复算面（D3-4）：
     torch.manual_seed(split_seed) 锚定初始化，其余随机源不锁。
+    state_names/action_names/card_vocab 全 None = v1（M11 键序，行为逐位不变）；
+    全提供 = v2（task 062，meta feature_version="v2" + 资产携带 card_vocab）。
     """
     if not samples:
         raise ValueError("样本为空（不猜）")
@@ -142,15 +154,31 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         raise ValueError(f"epochs 须 ≥ 1：{epochs}（不猜）")
     if hidden < 1:
         raise ValueError(f"hidden 须 ≥ 1：{hidden}（不猜）")
+    version_args = (state_names, action_names, card_vocab)
+    if any(a is not None for a in version_args) \
+            and not all(a is not None for a in version_args):
+        raise ValueError(
+            "state_names / action_names / card_vocab 须全 None（v1）或全提供（v2）"
+            f"——混搭不猜：state_names={'有' if state_names is not None else '无'} "
+            f"action_names={'有' if action_names is not None else '无'} "
+            f"card_vocab={'有' if card_vocab is not None else '无'}")
+    if card_vocab is None:
+        state_names = FEATURE_NAMES
+        action_names = ACTION_FEATURE_NAMES
+        feature_version = "v1"
+    else:
+        feature_version = "v2"
+    input_dim = len(state_names) + len(action_names)
     train_rows, val_rows = _split_by_game(samples, split_seed)
     torch.manual_seed(split_seed)
     net = torch.nn.Sequential(
-        torch.nn.Linear(_INPUT_DIM, hidden),
+        torch.nn.Linear(input_dim, hidden),
         torch.nn.ReLU(),
         torch.nn.Linear(hidden, 1),
     )
     opt = torch.optim.Adam(net.parameters(), lr=lr)
-    x_train, teacher_train, ids_train = _flatten_samples(train_rows)
+    x_train, teacher_train, ids_train = _flatten_samples(
+        train_rows, state_names, action_names)
 
     # torch 算内并行线程数按拍平行数自适应：小数据多线程是纯同步开销（实测
     # 1.4 万行 16 线程 193ms vs 1 线程 29ms/epoch），试点规模（~3M 行）则
@@ -170,7 +198,8 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         train_acc = _argmax_accuracy(net, x_train, teacher_train, ids_train)
         val_acc = None
         if val_rows:
-            x_val, teacher_val, ids_val = _flatten_samples(val_rows)
+            x_val, teacher_val, ids_val = _flatten_samples(
+                val_rows, state_names, action_names)
             val_acc = _argmax_accuracy(net, x_val, teacher_val, ids_val)
     finally:
         torch.set_num_threads(prev_threads)
@@ -179,6 +208,7 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
     meta = {
         "code_version": code_version,
         "epochs": epochs,
+        "feature_version": feature_version,
         "games": len(game_ids),
         "hidden": hidden,
         "lr": lr,
@@ -208,4 +238,5 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
             "w2": tuple(tuple(float(v) for v in row) for row in w2.tolist()),
             "b2": tuple(float(v) for v in b2.tolist()),
         }
-    return PolicyModel(hidden=hidden, weights=weights, meta=meta)
+    return PolicyModel(hidden=hidden, weights=weights, meta=meta,
+                       card_vocab=card_vocab)

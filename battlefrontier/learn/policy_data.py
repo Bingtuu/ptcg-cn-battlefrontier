@@ -8,6 +8,10 @@
   runner.agreement.replay_student。
 - **不猜**：教师行动不在合法列 / 数据目录无 pair-*.jsonl / 快照行格式不符
   均显式报错（快照格式校验走 runner.snapshot.load_snapshot_file 既有闸）。
+- **v2 特征路径**（task 062 WP2b，D-062-1/4）：`card_vocab=None` → v1 口径
+  （feature_vector / action_features，行为逐位不变，v1 回归锚）；非 None →
+  agent.policy_features 的 `policy_state_features` / `policy_action_features`
+  （卡身份 one-hot + 弃牌构成）。
 - 本模块零 torch/numpy（训练侧 torch 仅限 learn/train_policy.py，task 056
   防回流基准）。
 """
@@ -19,6 +23,10 @@ from pathlib import Path
 
 from battlefrontier.agent.action_features import action_features
 from battlefrontier.agent.features import feature_vector
+from battlefrontier.agent.policy_features import (
+    policy_action_features,
+    policy_state_features,
+)
 from battlefrontier.dsl import CardLibrary
 from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
@@ -35,7 +43,8 @@ __all__ = ["PolicySample", "load_policy_samples", "row_to_sample"]
 class PolicySample:
     """单决策点训练样本：状态特征 + 合法行动特征列（引擎枚举序）+ 教师下标。
 
-    state 键序 = FEATURE_NAMES；actions 每条键序 = ACTION_FEATURE_NAMES。
+    state/actions 键序随特征版本：v1 = FEATURE_NAMES / ACTION_FEATURE_NAMES；
+    v2 = POLICY_STATE_NAMES / policy_action_names(card_vocab)（task 062）。
     (pair_index, seed) 为局 id（按局划分训练/验证用，同局样本不跨集）。
     """
 
@@ -47,8 +56,13 @@ class PolicySample:
 
 
 def row_to_sample(row: dict, *, pair_index: int,
-                  card_effects: CardLibrary | dict) -> PolicySample:
-    """快照行 → PolicySample；教师行动不在合法行动列显式报错（不猜）。"""
+                  card_effects: CardLibrary | dict,
+                  card_vocab: tuple[str, ...] | None = None) -> PolicySample:
+    """快照行 → PolicySample；教师行动不在合法行动列显式报错（不猜）。
+
+    card_vocab=None → v1 特征路径（v1 回归锚，行为逐位不变）；非 None →
+    v2（policy_state_features / policy_action_features，词表外卡名不猜）。
+    """
     state = snapshot_state(row)
     player = row["player"]
     view = state.visible_state(player)
@@ -60,20 +74,30 @@ def row_to_sample(row: dict, *, pair_index: int,
         raise ValueError(
             f"教师行动 {teacher!r} 不在合法行动列（pair {pair_index} seed "
             f"{row.get('seed')} turn {row.get('turn')} phase {row.get('phase')}；不猜）")
+    if card_vocab is None:
+        state_feats = feature_vector(view)
+        action_feats = tuple(action_features(a, view) for a in legal)
+    else:
+        state_feats = policy_state_features(view)
+        action_feats = tuple(policy_action_features(a, view, card_vocab)
+                             for a in legal)
     return PolicySample(
         pair_index=pair_index,
         seed=int(row["seed"]),
-        state=feature_vector(view),
-        actions=tuple(action_features(a, view) for a in legal),
+        state=state_feats,
+        actions=action_feats,
         teacher_index=legal.index(teacher),
     )
 
 
-def load_policy_samples(data_dir: str | Path) -> list[PolicySample]:
+def load_policy_samples(data_dir: str | Path,
+                        card_vocab: tuple[str, ...] | None = None
+                        ) -> list[PolicySample]:
     """读目录下全部 pair-*.jsonl 快照（文件名排序保确定序），逐行转样本。
 
     快照格式校验（header/format/行类型）走 load_snapshot_file 既有闸；
-    card_effects 从各文件 header 重建（自包含，无需 db）。
+    card_effects 从各文件 header 重建（自包含，无需 db）。card_vocab 透传
+    row_to_sample（None = v1 口径）。
     """
     files = sorted(Path(data_dir).glob("pair-*.jsonl"))
     if not files:
@@ -85,5 +109,6 @@ def load_policy_samples(data_dir: str | Path) -> list[PolicySample]:
         pair_index = int(snap.header["pair_index"])
         for row in snap.rows:
             samples.append(row_to_sample(row, pair_index=pair_index,
-                                         card_effects=card_effects))
+                                         card_effects=card_effects,
+                                         card_vocab=card_vocab))
     return samples

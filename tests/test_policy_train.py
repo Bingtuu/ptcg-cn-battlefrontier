@@ -17,6 +17,10 @@ from helpers import deck60
 
 from battlefrontier.agent.action_features import ACTION_FEATURE_NAMES
 from battlefrontier.agent.features import FEATURE_NAMES
+from battlefrontier.agent.policy_features import (
+    POLICY_STATE_NAMES,
+    policy_action_names,
+)
 from battlefrontier.cli import main as cli_main
 from battlefrontier.learn.policy_model import (
     POLICY_FORMAT,
@@ -175,6 +179,61 @@ class TestTrainPolicy:
         assert DEFAULT_LR == 1e-3
         assert DEFAULT_HIDDEN == 64
         assert DEFAULT_SPLIT_SEED == 20261018
+
+
+# ── task 062 WP2b：v2 特征训练接入 ───────────────────────────
+
+STUB_VOCAB = tuple(sorted({c.name for c in deck60()}))
+V2_ACTION_NAMES = policy_action_names(STUB_VOCAB)
+V2_INPUT_DIM = len(POLICY_STATE_NAMES) + len(V2_ACTION_NAMES)
+
+
+@pytest.fixture(scope="module")
+def samples_v2(snapshot_dir):
+    from battlefrontier.learn.policy_data import load_policy_samples
+
+    return load_policy_samples(snapshot_dir, card_vocab=STUB_VOCAB)
+
+
+class TestTrainPolicyV2:
+    def test_v2训练meta词表与形状(self, samples_v2, tmp_path) -> None:
+        model = train_policy(samples_v2, epochs=2, hidden=8, code_version="test-v2",
+                             state_names=POLICY_STATE_NAMES,
+                             action_names=V2_ACTION_NAMES,
+                             card_vocab=STUB_VOCAB)
+        assert model.meta["feature_version"] == "v2"
+        assert model.card_vocab == STUB_VOCAB
+        assert model.hidden == 8
+        assert len(model.weights["w1"]) == 8
+        assert all(len(r) == V2_INPUT_DIM for r in model.weights["w1"])
+        assert len(model.weights["w2"]) == 1 and len(model.weights["w2"][0]) == 8
+        assert 0.0 <= model.meta["train_argmax_accuracy"] <= 1.0
+        # v2 资产可落盘回读（format 分派走 policy_model 既有校验）
+        out = tmp_path / "policy-v2.json"
+        save_policy_model(model, out)
+        loaded = load_policy_model(out)
+        assert loaded == model
+        assert loaded.card_vocab == STUB_VOCAB
+
+    def test_v1缺省路径feature_version(self, samples) -> None:
+        """不传 state/action/card_vocab → v1 口径逐位不变，meta feature_version=v1。"""
+        model = train_policy(samples, epochs=1, hidden=4)
+        assert model.meta["feature_version"] == "v1"
+        assert model.card_vocab is None
+        assert all(len(r) == INPUT_DIM for r in model.weights["w1"])
+
+    @pytest.mark.parametrize("kwargs", [
+        {"card_vocab": STUB_VOCAB},
+        {"state_names": POLICY_STATE_NAMES},
+        {"action_names": V2_ACTION_NAMES},
+        {"state_names": POLICY_STATE_NAMES, "action_names": V2_ACTION_NAMES},
+        {"state_names": POLICY_STATE_NAMES, "card_vocab": STUB_VOCAB},
+        {"action_names": V2_ACTION_NAMES, "card_vocab": STUB_VOCAB},
+    ])
+    def test_参数混搭显式报错(self, samples, kwargs) -> None:
+        """state_names/action_names/card_vocab 三者要么全 None（v1）要么全提供（v2）。"""
+        with pytest.raises(ValueError, match="混搭"):
+            train_policy(samples, epochs=1, hidden=4, **kwargs)
 
 
 # ── 向量化等价性（task 058 性能修正）────────────────────────────

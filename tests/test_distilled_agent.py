@@ -229,6 +229,31 @@ class TestDistilledV2:
         with pytest.raises(ValueError, match="card_vocab"):
             DistilledAgent(model)
 
+    def test_v2行动特征每行动只算一次(self, monkeypatch) -> None:
+        """性能护栏（task 062 WP4 matrix 实测暴露）：policy_action_features
+        调用次数 == len(legal_actions)——曾在 [f(a)[name] for name in names]
+        内层循环按 138 个键名重复调用同一纯函数（137 observe 实测 129444 次
+        调用、~47ms/observe，matrix 慢 ~10 倍）。"""
+        import battlefrontier.agent.distilled as distilled_mod
+
+        calls = 0
+        real = distilled_mod.policy_action_features
+
+        def spy(a, view, vocab):
+            nonlocal calls
+            calls += 1
+            return real(a, view, vocab)
+
+        monkeypatch.setattr(distilled_mod, "policy_action_features", spy)
+        state = main_state(p0_extra_hand=(
+            inst(52, _trainer("博士的研究")),
+            inst(53, _trainer("宝可梦交替"))))
+        view = state.visible_state(0)
+        legal = [Action(kind="play_trainer", iid=52),
+                 Action(kind="play_trainer", iid=53)]
+        DistilledAgent(_v2_identity_model("博士的研究")).observe(view, legal)
+        assert calls == len(legal)
+
     def test_未知feature_version显式报错(self) -> None:
         model = PolicyModel(
             hidden=1,

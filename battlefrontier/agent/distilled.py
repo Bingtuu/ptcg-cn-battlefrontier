@@ -98,11 +98,14 @@ class DistilledAgent:
             # v2 路径（task 062 WP2c）：36 维状态 + 26+词表维行动（卡身份 one-hot）
             state_v2 = policy_state_features(view)
             state_row_v2 = [state_v2[name] for name in POLICY_STATE_NAMES]
-            x = np.asarray(
-                [state_row_v2 + [policy_action_features(a, view, self._vocab)[name]
-                                 for name in self._action_names]
-                 for a in legal_actions],
-                dtype=np.float64)
+            # 每条行动特征只算一次（纯函数，键序钉死；曾按 name 内层重复调用
+            # 138×n 次，matrix 慢 ~10 倍——性能护栏测试钉死调用数）
+            rows = []
+            for a in legal_actions:
+                feats = policy_action_features(a, view, self._vocab)
+                rows.append(state_row_v2
+                            + [feats[name] for name in self._action_names])
+            x = np.asarray(rows, dtype=np.float64)
         hidden = np.maximum(x @ self._w1.T + self._b1, 0.0)  # relu
         scores = (hidden @ self._w2.T + self._b2).reshape(-1)
         # 掩码 argmax：候选 = legal_actions；ties 取首索引（argmax 平手返回首个

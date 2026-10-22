@@ -54,6 +54,8 @@ agents:
   # 也可用 MCTS：{type: mcts, params: {worlds: 2, iterations: 50}}
   # （多世界 determinized UCT；迭代预算而非墙钟，同种子仍可复现——
   #   注意单局成本约两分钟/进程级，适合定点分析而非大批量）
+  # 或蒸馏策略学生：{type: distilled, params: {policy_path: models/policy-m12-v2.json}}
+  # （MCTS 行为蒸馏产物，~0.06s/局，定位「分钟级粗筛」而非精排）
 ```
 
 运行（`--workers` 开启多进程并行，结果与串行逐局一致）：
@@ -151,12 +153,12 @@ bfsim dsl-check cards/*.yml --db <卡牌数据库>   # 追加校验：卡牌存�
 
 - **卡牌效果即数据**：每张卡做什么全部写在 YAML 里，由解释器执行；规则引擎只负责回合流程、伤害、胜负等骨架，对卡牌内容零硬编码。
 - **完全可复现**：所有随机（洗牌、掷币、抽牌）走单一随机源——同一个实验定义 + 同一段种子，重跑结果逐局一致，并行与串行一致。
-- **AI 接口统一**：`observe(可见状态, 合法行动) -> 行动`。合法行动由引擎枚举，AI 永远不会违规操作；启发式、蒙特卡洛树搜索（MCTS，已实现）、强化学习（远期）可互换、可混编对照。
+- **AI 接口统一**：`observe(可见状态, 合法行动) -> 行动`。合法行动由引擎枚举，AI 永远不会违规操作；启发式、蒙特卡洛树搜索（MCTS）、MCTS 行为蒸馏学生（distilled，均已实现）、强化学习（远期）可互换、可混编对照。
 - **结果独立存放**：模拟结果写入独立的 SQLite 结果库，卡牌数据库始终只读。
 
 ## 项目状态
 
-一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-05）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS vs 真实 65.1% 命中）。其后（2026-10-05~07）：引擎性能优化（MCTS 成本 -38.5%，行为零变化）；全库 code review（0 Critical / 11 Important）并全部修复闭环——含 MCTS 信息泄漏修复（带冻结集的部分 determinize）与修复后复核（泄漏贡献噪声级，归因结论更硬）；MCTS 决策分析上线（根节点访问分布导出 + `--mcts-consider` 报告）。其后（2026-10-07~11）：历史日期勘误专项（以 git 为准修正文档错位日期）；苍响格小样本复核（EN 侧数据供给已封顶，样本量不可增长）+ 偏差表低置信标注（真实样本 n<100 格标 ⚠低置信）；**方向 B 启发式参数自调优收官**（task 045 tune 子包 + 坐标下降 + `bfsim tune`；task 046 正式跑批 + `bfsim tune-verify` 双门槛 holdout 验证——唯一采纳 deck_low_threshold 6→12 过线但复校准 |Δ| 恶化，用户裁决折中存档不回写，参数档见 `experiments/t046-recalibration.example.yml`）。**方向 A（学习类 Agent）三期 PRD 已批准**（2026-10-16：[三期 PRD](docs/superpowers/specs/2026-10-16-phase3-prd-design.md)——M11 学得评估器接 MCTS rollout 先行 → M12 MCTS 行为蒸馏主线，目标为 MCTS 口径例行化而非超人强度；[可行性报告](docs/superpowers/specs/2026-10-16-learning-agent-feasibility.md)）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS 三类 AI、启发式参数自调优、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性/MCTS 决策分析报告与模拟 vs 真实赛事校准偏差表（1153 项测试绿）。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
+一期里程碑 M1–M6 全部完成（2026-10-03）；二期 M7–M10 全部收官（2026-10-05）——MCTS（多世界 determinized UCT）落地并经预算标定（标准档 2×50），M10 校准复核达成：MCTS 增强版偏差表加权 |Δ| 9.7%（M6 基线 13.2%），|Δ|≥25% 大偏差格归因全闭环（实证「策略深度主导」，沙奈朵格双侧 MCTS vs 真实 65.1% 命中）。其后（2026-10-05~07）：引擎性能优化（MCTS 成本 -38.5%，行为零变化）；全库 code review（0 Critical / 11 Important）并全部修复闭环——含 MCTS 信息泄漏修复（带冻结集的部分 determinize）与修复后复核（泄漏贡献噪声级，归因结论更硬）；MCTS 决策分析上线（根节点访问分布导出 + `--mcts-consider` 报告）。其后（2026-10-07~11）：历史日期勘误专项（以 git 为准修正文档错位日期）；苍响格小样本复核（EN 侧数据供给已封顶，样本量不可增长）+ 偏差表低置信标注（真实样本 n<100 格标 ⚠低置信）；**方向 B 启发式参数自调优收官**（task 045 tune 子包 + 坐标下降 + `bfsim tune`；task 046 正式跑批 + `bfsim tune-verify` 双门槛 holdout 验证——唯一采纳 deck_low_threshold 6→12 过线但复校准 |Δ| 恶化，用户裁决折中存档不回写，参数档见 `experiments/t046-recalibration.example.yml`）。**方向 A（学习类 Agent）三期 PRD 已批准**（2026-10-16：[三期 PRD](docs/superpowers/specs/2026-10-16-phase3-prd-design.md)——M11 学得评估器接 MCTS rollout 先行 → M12 MCTS 行为蒸馏主线，目标为 MCTS 口径例行化而非超人强度；[可行性报告](docs/superpowers/specs/2026-10-16-learning-agent-feasibility.md)）。**三期 M11–M12 收官**（2026-10-21）：M11 学得评估器接 MCTS rollout 双锚达成（决策一致率相对教师天花板口径 100.2%；锚 2 按同预算净效应口径达成）；M12 MCTS 行为蒸馏终判 = 部分达成收口（D3-7）——锚 1 一致率 ✅（相对天花板 88.8%）、锚 3 ✅（蒸馏学生全 matrix 18000 局仅 7.4min，教师口径 ~9h → 73×）、锚 2 过第一门槛（学生口径加权 |Δ| 12.5% ≤ 启发式基线 13.2%）；蒸馏学生正式定位「分钟级粗筛」（跨配对保序实证不成立，精排/深挖仍归 MCTS）。其后（2026-10-21）：引擎侧对局形态诊断（task 063）坐实引擎 bug「跨扫描全场清空漏判负」（promote 空场误判平，影响面 m9 1.4% / v2 0.5% 局），task 064 修复收官（昏厥结算点立即判负 + 四组单测 + 附录 A 决议已核销）。已可用：完整规则引擎、卡牌效果定义库（101 份定义，覆盖当前竞技环境 9 套主流卡组池）、启发式 / 随机 / MCTS / 蒸馏策略四类 AI（附学得评估器与蒸馏学生模型资产 `models/`）、启发式参数自调优、批量实验运行器（含 matchup 矩阵模式）、胜率/决策/敏感性/MCTS 决策分析报告与模拟 vs 真实赛事校准偏差表（1375 项测试绿）。详细进展见 [STATUS.md](STATUS.md)，设计文档见 [一期 PRD](docs/superpowers/specs/2026-08-25-battlefrontier-prd-design.md) 与 [二期 PRD](docs/superpowers/specs/2026-10-03-phase2-prd-design.md)，规则依据见 [rules-manual](docs/rules-manual.md)（简中官方规则整理）。
 
 ## ⚖️ 合规声明
 

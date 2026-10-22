@@ -1860,10 +1860,13 @@ class GameEngine:
         对手拿完奖赏立即获胜时清空换上队列并终止结算。
         战斗场昏厥：无备战 → 场上无宝可梦判负（§8 胜利条件②）；双方本次扫描后都无
         战斗场且无备战 → 平局（§8 同时胜利口径，🔲 待核）；有备战 → 入 promote_queue
-        （不重复入队）。扫描结束后队列非空且不在效果执行中 → 立即进 promote 阶段；
+        （不重复入队）。扫描结束补跨扫描全场空检（task 064）：本扫描有昏厥结算且某方
+        active=None 且备战空 → 同按 wiped 处理（战斗场与备战被同链不同扫描分别清空
+        的漏检修复）。扫描结束后队列非空且不在效果执行中 → 立即进 promote 阶段；
         效果进行中则只入队不翻阶段（由 _run_or_suspend 完成路径翻，D-WP2-1）。
         """
         wiped: list[int] = []  # 本次扫描后场上无宝可梦（战斗场昏厥且备战空）的玩家
+        ko_settled = False  # 本次扫描是否有昏厥结算（跨扫描全场空检的门控，task 064）
         # 白蕾雅奖赏加成（task 026 WP5，D-WP5-2）：取走并清空招式伤害瞬时记录——
         # 本次扫描内的战斗场昏厥若由太晶宝可梦招式伤害导致，take_prize 触点加成
         attack_ctx = self._attack_damage_active
@@ -1876,6 +1879,7 @@ class GameEngine:
             kept = []
             for b in p.bench:
                 if b.damage >= self._effective_hp(b, player):
+                    ko_settled = True
                     if self._knockout_one(player, b, attack_ctx=attack_ctx):
                         self.state = self.state.model_copy(update={"promote_queue": ()})
                         return  # 对手拿完奖赏，立即获胜
@@ -1887,6 +1891,7 @@ class GameEngine:
             # 战斗场昏厥
             p = self.state.players[player]
             if p.active and p.active.damage >= self._effective_hp(p.active, player):
+                ko_settled = True
                 active = p.active
                 self._set_player(player, p.model_copy(update={"active": None}))
                 if self._knockout_one(player, active, active_ko=True,
@@ -1904,6 +1909,21 @@ class GameEngine:
             # 【rules-manual §8 同时胜利口径】双方同时无场上宝可梦 → 平局（🔲 待核）
             self._game_over(winner=None, reason="no_pokemon", is_draw=True)
             return
+        # 跨扫描全场空检（task 064，🔲 待核）：战斗场与备战在同一效果链的不同扫描被
+        # 分别清空时（如「战斗场伤害 + 备战铺伤」组合招——战斗场先昏入队、后续节点再
+        # 清空备战），上方战斗场昏厥分支不再进入，wipe 漏检致 promote 空备战死锁
+        # （m9 247 局 / v2 90 局判平，实例 m9 game 5306）。判定时点 = 昏厥结算点
+        # 立即判（与条件①拿完奖赏同点位；ko_self/bounce 判负先例），换上仍按
+        # D-WP2-1 推迟——判负时点与换上时点分离。ko_settled 门控：仅本扫描有昏厥
+        # 结算才补检（无昏厥扫描行为零变化）。
+        if ko_settled:
+            for player in (0, 1):
+                d = self.state.players[player]
+                if d.active is None and not d.bench and player not in wiped:
+                    wiped.append(player)
+            if len(wiped) == 2:
+                self._game_over(winner=None, reason="no_pokemon", is_draw=True)
+                return
         if wiped:
             # 【rules-manual §8 胜利条件②】战斗场昏厥且备战区无可换上
             self._game_over(winner=1 - wiped[0], reason="no_pokemon")

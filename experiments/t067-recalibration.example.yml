@@ -1,0 +1,12 @@
+# task 067 复校准：064 修复（promote 空场判平）后 v1 卡池 matrix 重跑
+# 口径与 M6/M9 逐格对齐：seed_start 100000、36 配对 × 500 局、双侧 heuristic 默认参数
+# 用法：bfsim run experiments/t067-recalibration.example.yml --workers 16 --results results/t067-recalibration.db
+#       bfsim calibration experiments/t067-recalibration.example.yml --results results/t067-recalibration.db
+name: t067-recalibration
+seed_start: 100000
+matrix:
+  pool: config/target-pool.v1.yml
+  games_per_pair: 500
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

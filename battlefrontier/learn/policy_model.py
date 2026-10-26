@@ -145,6 +145,12 @@ def _check_meta(payload: dict) -> dict:
     meta = payload.get("meta")
     if not isinstance(meta, dict):
         raise TypeError("模型 meta 缺失或非 dict（不猜）")
+    # task 066 D-066-3：可选 weight_scheme 段；缺段（旧资产）不受校验影响
+    ws = meta.get("weight_scheme")
+    if ws is not None and (not isinstance(ws, dict)
+                           or not isinstance(ws.get("name"), str)):
+        raise ValueError(
+            f"模型 meta weight_scheme 段非 dict 或缺 name（不猜）：{ws!r}")
     return meta
 
 

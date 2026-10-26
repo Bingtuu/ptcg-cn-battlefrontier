@@ -362,6 +362,9 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
     准确率落 meta；数据错误 → 退出码 1。
     task 062 WP2d（D-062-2/4）：提供 --pool 时构建卡身份词表触发 v2 特征训练
     （资产 bf-distilled-policy-v2）；不提供 = v1 旧行为逐位不变。
+    task 066 WP1（D-066-1/2/3）：--weight-scheme kind-weights-v1 时按
+    learn.sample_weights 出逐样本权重（kind 映射 + ceiling 双投票 join，
+    缺票/对不上显式报错）；缺省 none = 现状逐位全等。
     """
     from battlefrontier.learn.policy_data import load_policy_samples
     from battlefrontier.learn.policy_model import save_policy_model
@@ -388,6 +391,16 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
             state_names = POLICY_STATE_NAMES
             action_names = policy_action_names(card_vocab)
         samples = load_policy_samples(args.data, card_vocab=card_vocab)
+        sample_weights = None
+        weight_scheme = None
+        if args.weight_scheme != "none":
+            from battlefrontier.learn.sample_weights import (
+                compute_sample_weights,
+            )
+
+            sample_weights, weight_scheme = compute_sample_weights(
+                args.data, scheme=args.weight_scheme,
+                ceiling_dir=args.ceiling_dir)
         model = train_policy(
             samples,
             epochs=args.epochs if args.epochs is not None else DEFAULT_EPOCHS,
@@ -398,7 +411,8 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
             code_version=args.code_version or _code_version(),
             pool=args.pool,
             state_names=state_names, action_names=action_names,
-            card_vocab=card_vocab)
+            card_vocab=card_vocab,
+            sample_weights=sample_weights, weight_scheme=weight_scheme)
     except (ValueError, OSError) as e:
         print(f"错误：{e}")
         return 1
@@ -415,6 +429,13 @@ def _cmd_train_policy(args: argparse.Namespace) -> int:
           f"argmax 准确率 训练 {m['train_argmax_accuracy']:.4f} / holdout {val_acc}")
     if card_vocab is not None:
         print(f"特征版本 v2：卡身份词表 {len(card_vocab)} 张（卡池 {args.pool}）")
+    if weight_scheme is not None:
+        print(f"样本权重方案 {weight_scheme['name']}（kind 权重 "
+              f"{weight_scheme['kind_weights']}；end_turn 双投票不一致 "
+              f"×{weight_scheme['end_turn_unstable_weight']}："
+              f"{weight_scheme['end_turn_unstable_points']}/"
+              f"{weight_scheme['end_turn_points']} 点降权，ceiling "
+              f"{weight_scheme['ceiling_dir']}）")
     print(f"模型资产: {args.out}")
     if m["warning"]:
         print(f"[告警] {m['warning']}")
@@ -692,6 +713,15 @@ def main(argv: list[str] | None = None) -> int:
                            "缺省 = v1 旧口径（逐位不变）")
     tp_p.add_argument("--code-version", default=None,
                       help="代码版本 meta 覆盖（缺省取 git short sha；测试注入用）")
+    tp_p.add_argument("--weight-scheme", default="none",
+                      choices=["none", "kind-weights-v1", "kind-weights-v2"],
+                      help="样本权重方案（task 066，D-066-1/2/5）：缺省 none = 现状逐位"
+                           "全等；kind-weights-v1 = play_stadium ×3 / use_ability ×2"
+                           " + end_turn 双投票不一致 ×0.25；kind-weights-v2 = A2 降"
+                           "剂量（×1.5 / ×1.25 / ×0.5）（meta 落 weight_scheme 段）")
+    tp_p.add_argument("--ceiling-dir", default="results/m12-anchor1-ceiling",
+                      help="end_turn 第二投票数据源目录（pair-*.json，仅 "
+                           "kind-weights-v1 需要；缺省 results/m12-anchor1-ceiling）")
     cs_p = sub.add_parser(
         "collect-snapshots",
         help="M11 一致率快照采集（task 052，D-M11-5）：教师 MCTS 跑局落决策点快照 JSONL")

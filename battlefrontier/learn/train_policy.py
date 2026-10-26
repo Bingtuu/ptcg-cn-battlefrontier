@@ -124,15 +124,20 @@ def _segment_logsumexp(logits, sample_ids, n_samples):
     return seg_max + torch.log(seg_sum)
 
 
-def _vectorized_loss(net, x, teacher_global, sample_ids):
+def _vectorized_loss(net, x, teacher_global, sample_ids, weights=None):
     """全批量一次前向 + 分段 logsumexp − 教师 logit，按样本均值 NLL。
 
     与逐样本 cross_entropy(logits, teacher) 数学等价：
     CE = −logit[teacher] + logsumexp(logits)。
+    weights（task 066，D-066-1/2）：逐样本权重 [n_samples]，归一化口径钉死
+    sum(w×nll)/sum(w)；None = 现状路径逐位不变（旧 .mean()）。
     """
     logits = net(x).squeeze(-1)
     lse = _segment_logsumexp(logits, sample_ids, teacher_global.numel())
-    return (lse - logits[teacher_global]).mean()
+    nll = lse - logits[teacher_global]
+    if weights is None:
+        return nll.mean()
+    return (weights * nll).sum() / weights.sum()
 
 
 def _argmax_accuracy(net, x, teacher_global, sample_ids) -> float:
@@ -160,13 +165,18 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
                  pool: str | None = None,
                  state_names: tuple[str, ...] | None = None,
                  action_names: tuple[str, ...] | None = None,
-                 card_vocab: tuple[str, ...] | None = None) -> PolicyModel:
+                 card_vocab: tuple[str, ...] | None = None,
+                 sample_weights: list[float] | tuple[float, ...] | None = None,
+                 weight_scheme: dict | None = None) -> PolicyModel:
     """样本列 → 训练完成的 PolicyModel（meta 全量落账，含 holdout argmax 准确率）。
 
     全批量 Adam：每 epoch 全训练集一次前向/反向。训练非复算面（D3-4）：
     torch.manual_seed(split_seed) 锚定初始化，其余随机源不锁。
     state_names/action_names/card_vocab 全 None = v1（M11 键序，行为逐位不变）；
     全提供 = v2（task 062，meta feature_version="v2" + 资产携带 card_vocab）。
+    sample_weights / weight_scheme（task 066，D-066-1/2/3）：逐样本权重进 NLL
+    （归一化 sum(w×nll)/sum(w)），weight_scheme 段原样落 meta；两者必须同时
+    提供或同时缺省（缺省 = 现状逐位全等，meta 不出现 weight_scheme 键）。
     """
     if not samples:
         raise ValueError("样本为空（不猜）")
@@ -174,6 +184,20 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         raise ValueError(f"epochs 须 ≥ 1：{epochs}（不猜）")
     if hidden < 1:
         raise ValueError(f"hidden 须 ≥ 1：{hidden}（不猜）")
+    if (sample_weights is None) != (weight_scheme is None):
+        raise ValueError(
+            "sample_weights 与 weight_scheme 须同时提供或同时缺省（不猜）："
+            f"sample_weights={'有' if sample_weights is not None else '无'} "
+            f"weight_scheme={'有' if weight_scheme is not None else '无'}")
+    if sample_weights is not None:
+        if len(sample_weights) != len(samples):
+            raise ValueError(
+                f"sample_weights 长度 {len(sample_weights)} != 样本数 "
+                f"{len(samples)}（不猜）")
+        bad = [i for i, w in enumerate(sample_weights) if w <= 0.0]
+        if bad:
+            raise ValueError(
+                f"sample_weights 含非正权重（样本下标 {bad[:5]}，不猜）")
     version_args = (state_names, action_names, card_vocab)
     if any(a is not None for a in version_args) \
             and not all(a is not None for a in version_args):
@@ -199,6 +223,12 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         feature_version = "v2"
     input_dim = len(state_names) + len(action_names)
     train_rows, val_rows = _split_by_game(samples, split_seed)
+    w_train = None
+    if sample_weights is not None:
+        train_ids = {(s.pair_index, s.seed) for s in train_rows}
+        w_train = torch.tensor(
+            [w for s, w in zip(samples, sample_weights, strict=True)
+             if (s.pair_index, s.seed) in train_ids], dtype=torch.float32)
     torch.manual_seed(split_seed)
     net = torch.nn.Sequential(
         torch.nn.Linear(input_dim, hidden),
@@ -219,7 +249,8 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         train_loss = 0.0
         for _epoch in range(epochs):
             opt.zero_grad()
-            loss = _vectorized_loss(net, x_train, teacher_train, ids_train)
+            loss = _vectorized_loss(net, x_train, teacher_train, ids_train,
+                                    weights=w_train)
             loss.backward()
             opt.step()
             train_loss = float(loss.item())
@@ -258,6 +289,9 @@ def train_policy(samples: list[PolicySample], *, epochs: int = DEFAULT_EPOCHS,
         "warning": None if val_acc is not None
         else "holdout 为空（验证集无样本），val_argmax_accuracy=None——如实落账",
     }
+    if weight_scheme is not None:
+        # task 066 D-066-3：可选段（旧资产无此段仍可装载）；缺省路径不出现该键
+        meta["weight_scheme"] = dict(weight_scheme)
     with torch.no_grad():
         w1, b1 = net[0].weight, net[0].bias
         w2, b2 = net[2].weight, net[2].bias

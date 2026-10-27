@@ -1,0 +1,34 @@
+# 目标卡组池 v2（2026-10-21 锁定，task 068）
+# 选取规则：WUR 排名驱动（D-068-1 用户拍板：只用 09-16 后窗口 46 场，与当前赛制快照
+# standard-2026-09-16（J 标）严格对齐）+ Top-9 全新排（D-068-2 用户拍板；
+# 苍响 0.55% / 赛富豪 2.0% / 多龙喷 0.97% 掉出，N的索罗亚克 / 火伊布猫头夜鹰 /
+# 电电虫Box 新入）。代表卡组 = 合法 full 卡组中窗口内最高名次（并列取日期近/出战多者；
+# limit=500 防截断）——9 套全部窗口内 rank 1、零 fallback（侦察 .kimi-code/t068-pool-v2-scout.md）。
+# 全窗口 WUR 合计覆盖 80.5%。本文件是 v2 覆盖验收与校准的卡池事实源；v1 封存不动。
+# en_archetype = db intl_aligned 段 archetype 名（校准对表键）：3 个新 archetype 在
+# EN 校准窗（2025-04-11..08-31，409 场）有大样本（Joltik Box n=2095 / Flareon Noctowl
+# n=1549 / N's Zoroark n=998）。
+version: 2
+locked_at: "2026-10-21"
+query:
+  granularity: archetype
+  window: "2026-09-16..2026-10-21"
+  division: master
+  basis: cn
+  min_n: 5
+  n_tournaments: 46
+  mapping_status: full
+  snapshot: standard-2026-09-16
+  name_group_rules_hash: f2c86aa8f7e3
+  legality_constraint: "代表卡组须通过 standard-2026-09-16 校验（当前环境口径）"
+  substitution: "无（9 套全部窗口内 rank 1 合法卡组，零替补）"
+decks:
+  - {archetype: 多龙巴鲁托 黑夜魔灵, en_archetype: Dragapult Dusknoir, wur: 0.2355, n: 664, deck_id: "mik_moe:676344", note: "rank 1，2026-10-18，52 次出战"}
+  - {archetype: 玛俐的长毛巨魔 雪妖女, en_archetype: Grimmsnarl Froslass, wur: 0.1849, n: 422, deck_id: "mik_moe:687339", note: "rank 1，2026-10-18，2 次出战"}
+  - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.1186, n: 351, deck_id: "mik_moe:678647", note: "rank 1，2026-10-18，86 次出战"}
+  - {archetype: 猛雷鼓 厄诡椪, en_archetype: Raging Bolt Ogerpon, wur: 0.0748, n: 225, deck_id: "mik_moe:676249", note: "rank 1，2026-10-18，5 次出战"}
+  - {archetype: N的索罗亚克, en_archetype: "N's Zoroark", wur: 0.0497, n: 145, deck_id: "mik_moe:690359", note: "rank 1，2026-10-18，2 次出战"}
+  - {archetype: 火伊布 猫头夜鹰, en_archetype: Flareon Noctowl, wur: 0.0458, n: 134, deck_id: "mik_moe:689871", note: "rank 1，2026-10-18，2 次出战"}
+  - {archetype: 电电虫Box, en_archetype: Joltik Box, wur: 0.0398, n: 109, deck_id: "mik_moe:677291", note: "rank 1，2026-10-18，11 次出战"}
+  - {archetype: 多龙巴鲁托, en_archetype: Dragapult, wur: 0.0288, n: 90, deck_id: "mik_moe:677868", note: "rank 1，2026-10-17，14 次出战"}
+  - {archetype: 喷火龙 大比鸟, en_archetype: Charizard Pidgeot, wur: 0.0268, n: 94, deck_id: "mik_moe:691096", note: "rank 1，2026-10-17，1 次出战"}

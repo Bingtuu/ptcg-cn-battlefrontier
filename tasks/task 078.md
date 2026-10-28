@@ -1,8 +1,8 @@
 # task 078 · 前场与撤退（进化线开局 + 能斩杀才换下低伤前场）
 
-- 状态：规划（待 owner review；本文件不授权改 `heuristic.py`）
-- 关联：`docs/superpowers/specs/2026-10-28-task-078-attack-active-energy-design.md` D-078-1～5、Q1–Q3；计划 Task 1；D10；task 077（`09e6a4c`）之后的下一刀
-- 依赖：无代码依赖。079 / 080 的局级解读依赖本刀先落地，单测不依赖
+- 状态：实现已进 PR（单测绿）。owner 整包拍板 Q1–Q8 按规格建议生效。100 局本机验收未跑（云端无 `ptcg-cn.db`，跳过 `bfsim`）
+- 关联：`docs/superpowers/specs/2026-10-28-task-078-attack-active-energy-design.md` D-078-1～5；计划 Task 1；D10；规划 PR #5 merge `6bbcdbf`；task 077（`09e6a4c`）之后的下一刀
+- 依赖：无代码依赖。079 / 080 未做。局级解读依赖本刀先落地，单测不依赖
 
 ## 目标
 
@@ -14,15 +14,15 @@
 
 `tests/test_heuristic_board_gate.py`（计划 Task 1 有完整草稿）：
 
-- [ ] 战斗场 60 伤已付清、对手剩余 HP 150；备战 190 已付清且撤退合法 → `observe` 返回 `retreat`
-- [ ] 战斗场 190 已能斩杀 → 返回 `attack`，不撤
-- [ ] `board_quality_gate=False` → 60 伤付得起时不撤
-- [ ] 开局手牌同时有高伤基础、以及低伤基础 + 从它进化的一阶 → `place_active` 选低伤基础
-- [ ] 手里没有进化关系 → 仍选 `pokemon_score` 更高的基础
-- [ ] `promote` 仍选 `pokemon_score` 更高的备战
-- [ ] `experiments/t078-gard-zoro.example.yml`：`games==100`，`seed_start==208000`，`mik_moe:678647` × `mik_moe:690359`，utf-8 可读
-- [ ] `tests/test_tune_space.py`：搜索维仍是 10，`board_quality_gate` 在「不进搜索」的布尔集合里
-- [ ] `tests/test_features.py` 期望值不改
+- [x] 战斗场 60 伤已付清、对手剩余 HP 150；备战 190 已付清且撤退合法 → `observe` 返回 `retreat`
+- [x] 战斗场 190 已能斩杀 → 返回 `attack`，不撤
+- [x] `board_quality_gate=False` → 60 伤付得起时不撤
+- [x] 开局手牌同时有高伤基础、以及低伤基础 + 从它进化的一阶 → `place_active` 选低伤基础
+- [x] 手里没有进化关系 → 仍选 `pokemon_score` 更高的基础
+- [x] `promote` 仍选 `pokemon_score` 更高的备战
+- [x] `experiments/t078-gard-zoro.example.yml`：`games==100`，`seed_start==208000`，`mik_moe:678647` × `mik_moe:690359`，utf-8 可读
+- [x] `tests/test_tune_space.py`：搜索维仍是 10，`board_quality_gate` 在「不进搜索」的布尔集合里
+- [x] `tests/test_features.py` 期望值不改
 
 本机（有 `ptcg-cn.db`；云端不做，做了要在结果节写明跳过）：
 
@@ -51,6 +51,10 @@ bfsim report <id> --results results/t078-gard-zoro.db --decisions
 
 ## 结果与遗留
 
-- 未实现。owner 拍板 Q1–Q3 之后才 TDD
-- Q3 若只批撤退：删掉「开局优先进化线」那条测试，不要留着红着
-- 079、080 未做。矩阵 / 索罗亚克整行 / 500 局不在本任务
+- **拍板已生效**：owner 整包拍板 Q1–Q8，全部按规格建议。078 两件都做（斩杀撤退 + 开局进化线），共用 `board_quality_gate`（默认开）。`pokemon_score` 公式不动。无卡名例外。不加 `modify_weakness` 布阵分。079 不在本 PR（也不读血月减费）。规划 PR #5 已合并 `6bbcdbf`，随后授权本刀 TDD
+- **实现**：`HeuristicParams.board_quality_gate = True`。`_pick_place` 走 `_place_key`（键长 4）；`_pick_retreat` 在开关开时，战斗场已付清招式斩杀不了、合法撤退目标已付清且能斩杀，则换到有效伤害最高者（平手 bench 下标小）。谁都不能斩杀，或开关关，走原来的 `_pick_retreat_powerless`。`_pick_promote`、特性门控、能量目标、`_decide_main` 大顺序未改
+- **单测**：`tests/test_heuristic_board_gate.py` 红→绿（撤退两条先失败：返回 `attack` 而非 `retreat`；开局选 iid 10 而非 11）。`test_heuristic_agent.py` 导入会拉 `ptcgdb`，夹具 `setup_state` / `engine_with` 按原语义抄进新文件。`tests/test_features.py` 期望未改。`board_quality_gate` 在 `test_tune_space.py` 的 bool_fields 里，`len(search_space())==10`
+- **印面分（Diupi-Yun）**：愿增猿 HP110 撤退1「精神幻觉」；拉鲁拉丝 HP60–70 撤退1。开局愿增猿当前场主因是手里常无进化线，不是分公式
+- **本机 100 局**（Diupi-Yun，种子 `208000..208099`，失败 0）：关开关 A90/B10；开开关 A92/B8。精神幻觉 58.3%→52.9%，奇迹之力 8.9%→15.3%，A retreat 103→149，A deck_out 胜 27→18。结构方向对；胜率略恶化（诚实写）。本刀单独不要求进 60–75%
+
+- 079、080 未做。矩阵 / 索罗亚克整行 / 500 局不在本任务。代理不合并（待 owner 拍板）

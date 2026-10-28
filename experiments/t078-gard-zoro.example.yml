@@ -1,0 +1,22 @@
+# task 078 本机结构验收：沙奈朵 × N的索罗亚克
+# 对齐 077 同格（种子 208000..208099，100 局）。正式 500 局与索罗亚克整行不在本刀。
+# 需要本机 ptcg-cn.db（config/battlefrontier.local.yml）。云端无库，本文件不预填结果，云端不跑。
+# 门控默认开。负面对照把两边 params 改成 board_quality_gate: false，
+# 应回到「付不起才撤 / pokemon_score 布阵」。
+#
+# bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t078-gard-zoro.db
+# bfsim report <id> --results results/t078-gard-zoro.db --decisions
+#
+# 结构指标（先关开关重放同一 YAML 作分母，不要和诊断包的 34% / 4% / 220/500 直接相减）：
+#   attack.detail.name / attack、attach_energy.detail.target、evolve、game_over.detail.reason。
+# 方向：沙奈朵侧精神幻觉攻击次数占比下降、奇迹之力上升。失败局 0。
+# 本刀单独不要求胜率进 60–75%（那是三刀叠完的口径，规格 D-078-9）。
+name: t078-gard-zoro
+games: 100
+seed_start: 208000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

@@ -3,8 +3,11 @@
 局面评估函数（奖赏差/场面战力/手牌质量/能量就绪度/牌库资源，线性加权）+
 决策规则（开局布阵优先级、行动排序「特性→进化→能量→物品→支援者→攻击」、
 斩杀检测）。特性不再无条件取最小 iid（task 077）：交易类弃抽与弃牌区附能
-加伤按效果形态估价值，其余特性仍优先于进化。D10：不做单卡组定制——评分只用
-通用字段（HP/招式伤害/撤退费/进化链/卡片类别）与效果形态，不按卡名分支。
+加伤按效果形态估价值，其余特性仍优先于进化。前场（task 078，D-078-5）：
+`board_quality_gate` 开时，手里能接上进化线的基础优先上场；战斗场已付清招式
+斩杀不了、备战已付清且能斩杀时撤退。关则回到 `pokemon_score` / 付不起才撤。
+D10：不做单卡组定制——评分只用通用字段（HP/招式伤害/撤退费/进化链/卡片类别）
+与效果形态，不按卡名分支。
 
 确定性纪律：不消费引擎随机源，一切 tie-break 用 iid/下标升序；
 参数全部收敛到 HeuristicParams，默认值即 PRD 通用启发式。
@@ -95,6 +98,9 @@ class HeuristicParams:
     # 手牌最低保留分 ≤ 此值才算有垫牌可弃。能量=1、训练家=3、宝可梦=pokemon_score。
     # 默认 2：只有能量算垫牌（没有能量可弃 = 手牌差，拒交易类）。
     ability_cycle_discard_ceiling: float = 2.0
+    # 前场质量门控（task 078，D-078-4/5）。False = 布阵回到 pokemon_score，
+    # 撤退回到「付不起才撤」。不进 tune。默认是第一刀，不是已拍板最优。
+    board_quality_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -284,6 +290,19 @@ def _attach_targets(
     return kept
 
 
+def _line_names(root: str, hand: tuple) -> set[str]:
+    """从 root 沿 evolves_from 在手牌里能接上的名字（含 root）。中间名断了就不到更高阶。"""
+    names = {root}
+    changed = True
+    while changed:
+        changed = False
+        for card in hand:
+            if card.card.evolves_from in names and card.card.name not in names:
+                names.add(card.card.name)
+                changed = True
+    return names
+
+
 class HeuristicAgent:
     """通用启发式 Agent：只读 VisibleGameState，决策确定（无随机源）。
 
@@ -317,7 +336,29 @@ class HeuristicAgent:
 
     def _pick_place(self, view: VisibleGameState, acts: list[Action]) -> Action:
         hand = {c.iid: c for c in view.own.hand}
-        return min(acts, key=lambda a: (-pokemon_score(hand[a.iid], self.params), a.iid))
+        return min(acts, key=lambda a: self._place_key(hand[a.iid], view.own.hand))
+
+    def _place_key(self, card: CardInstance, hand: tuple) -> tuple:
+        """开局放置键，长度固定 4。
+
+        开关开且这张基础在手里能接上进化线：线优先于无线的基础，线内再比
+        最高阶 pokemon_score，然后才是这张自己的分与 iid。
+        开关关，或手里没有进化关系：前两项是常数，次序与 (-score, iid) 相同。
+        """
+        score = pokemon_score(card, self.params)
+        line = (
+            self.params.board_quality_gate
+            and card.card.stage == 0
+            and len(_line_names(card.card.name, hand)) > 1
+        )
+        if not line:
+            return (1, 0, -score, card.iid)
+        top = max(
+            pokemon_score(c, self.params)
+            for c in hand
+            if c.card.name in _line_names(card.card.name, hand)
+        )
+        return (0, -top, -score, card.iid)
 
     def _decide_setup_bench(self, view: VisibleGameState, by_kind: dict[str, list[Action]]) -> Action:
         acts = by_kind.get("place_bench", [])
@@ -610,6 +651,60 @@ class HeuristicAgent:
         return min(targeted or acts, key=lambda a: (a.target_iid or 0, a.iid))
 
     def _pick_retreat(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
+        """D-078-5：开关开时，战斗场斩杀不了、备战已付清招式能斩杀则换上。
+
+        战斗场自己已能斩杀则不撤（斩杀分支仍在撤退之前，这里是双保险）。
+        谁都不能斩杀，或开关关：回到「付不起才撤」。
+        """
+        if not self.params.board_quality_gate:
+            return self._pick_retreat_powerless(view, acts)
+        active = view.own.active
+        opp = view.opponent.active
+        if active is None or opp is None:
+            return self._pick_retreat_powerless(view, acts)
+        remaining = (opp.current.card.hp or 0) - opp.damage
+        active_best = self._max_paid_ko_damage(view)
+        if active_best is not None and active_best >= remaining:
+            return None
+        ko_targets: list[tuple[int, Action]] = []
+        for act in acts:
+            mon = view.own.bench[act.bench_index]
+            best = self._max_paid_ko_damage(self._view_as_active(view, mon))
+            if best is not None and best >= remaining:
+                ko_targets.append((best, act))
+        if not ko_targets:
+            return self._pick_retreat_powerless(view, acts)
+        return min(ko_targets, key=lambda item: (-item[0], item[1].bench_index))[1]
+
+    def _view_as_active(self, view: VisibleGameState, mon: InPlayPokemon) -> VisibleGameState:
+        """打分副本：把 mon 当成战斗场。不写回引擎状态。"""
+        return view.model_copy(update={
+            "own": view.own.model_copy(update={"active": mon}),
+        })
+
+    def _max_paid_ko_damage(self, view: VisibleGameState) -> int | None:
+        """已付清、且可参与斩杀判定的招式里，对对手战斗场的最高有效伤害。
+
+        弱点 / 抗性走 `_attack_table`。费用仍是印面 `_energy_satisfied`（D-WP8-5）。
+        没有这样的招式则 None。
+        """
+        active = view.own.active
+        if active is None:
+            return None
+        attacks, _sources = self._attack_sources(view)
+        table = self._attack_table(view)
+        best: int | None = None
+        for index, atk in enumerate(attacks):
+            if not _energy_satisfied(active.attached_energy, atk.cost):
+                continue
+            damage, lethal_ok = table[index]
+            if not lethal_ok:
+                continue
+            if best is None or damage > best:
+                best = damage
+        return best
+
+    def _pick_retreat_powerless(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """保守撤退：仅当战斗场无可支付招式且备战区有已就绪打手时撤退。"""
         active = view.own.active
         if active is None:

@@ -1,6 +1,6 @@
 # task 071 · 卡池 v2 引擎扩展第二批 + 070 收口（blocked 19 张清零）
 
-- 状态：进行中（2026-10-27 立项，用户拍板）
+- 状态：完成（2026-10-28；`--db` 装载核销留到有主库的环境）
 - 关联：task 070 第一批（15 落地 / 19 blocked）→ 本任务（blocked 缺口扩展 + DSL 编写 + 070 判据 5/6 收口）→ task 07x（v2 matrix + 校准）
 - 缺口事实源：`cards/authoring-log.jsonl` batch 10 blocked 行（精确到读点）+ 各组子代理报告
 
@@ -59,4 +59,10 @@
 
 ## 结果与遗留
 
-（完成后填写）
+**2026-10-28 收口。** main 上没有 `tests/test_primitives_t071_a.py`，阶段 1 按任务书重新 TDD。
+
+- **WP1–17 ✅**：过滤器 3、条件词（含节点级 `if_own_prizes_eq` / `holder_has_energy` / `holder_trait`）、特性弃手牌成本、attach 多目标备战与牌库备战池、`single_target`（燃烧充能全部附到 1 只）、move_energy 任意数量转自身与回库重洗、对手附着能量弃置与来源全弃、reveal 对手手牌、计数词、备战复制招式、竞技场撤退、突进进化、湿气 `with_primitive: ko_self`、`prize_bonus scope=attack_ko`、`lock_attack scope=all`、「在这种情况下」、grant_attack 合成 AttackDef。复眼用 `modify_damage scope=self` + `target_has_ability`
+- **19 张 DSL ✅**（闸 2；闸 3=false）。无 `--db` 的 dsl-check 通过。authoring-log batch 11
+- **未在本环境完成**：`dsl-check --db`、v2 九卡组 `load_deck` 零缺口（无 `ptcg-cn.db`）。粉碎之锤只挂 `30thDC-029`
+- **未做**：072 及以后
+- **待用户核销**：附录 A 新增 7 行；闸 3 十九张；本机库上补跑闸 1 与装载零缺口

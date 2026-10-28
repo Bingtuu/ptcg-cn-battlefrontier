@@ -1,0 +1,14 @@
+# 驱劲能量 未来（CSV6C-119，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的「未来」宝可梦，【撤退】所需能量全部消除，所使用的招式，给对手的战斗宝可梦造成的伤害「+20」。」
+# holder_trait:未来 读 CardDef.labels（task 071 WP2；与 trait:古代 / 奥琳博士的气魄同数据源，
+# db effect_tags.labels 中文「未来」）。撤退 value=all 为持有者道具口径（无 scope）。
+# 伤害 +20 为道具 modify_damage（无 scope），只加在持有者打对手战斗场的招式上。
+card:
+  name_group: 驱劲能量 未来
+  card_ids: [CSV6C-119, CSV9.5C-178, CSVH4C-044, CSVM1cC-018, SVP-257]
+effects:
+  - trigger: passive_static
+    condition: "holder_trait:未来"
+    actions:
+      - {action: modify_retreat_cost, args: {value: all}}
+      - {action: modify_damage, args: {amount: 20}}

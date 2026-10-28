@@ -1,0 +1,14 @@
+# 宝可平板（30thC-102，物品）
+# text_raw 原文：「选择自己牌库中的1张宝可梦（除「拥有规则的宝可梦」外），在给对手看过之后加入手牌。并重洗牌库。」
+# pokemon_no_rule = 任意阶段且 rule_box 为空（task 071 WP1；basic_pokemon_no_rule 限
+# stage0 不合）。reveal 一期口径仅落事件流（能量回收同构）。检索 up-to（可以不找）。
+card:
+  name_group: 宝可平板
+  card_ids: [30thC-102, 30thDC-031]
+effects:
+  - trigger: on_play
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [pokemon_no_rule], choose: 1, destination: hand}
+      - {action: reveal, selector: own_hand, filters: [pokemon_no_rule]}
+      - {action: shuffle_deck}

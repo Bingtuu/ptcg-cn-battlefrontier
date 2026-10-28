@@ -1,0 +1,13 @@
+# 席蓝（CSV9C-198，支援者）
+# text_raw 原文：「选择自己牌库中最多3张「宝可梦【ex】」，在给对手看过之后，加入手牌。并重洗牌库。」
+# rule_box:ex（task 071 WP1）。「最多」= 检索 up-to。
+card:
+  name_group: 席蓝
+  card_ids: [CSV9C-198, CSV9C-235]
+effects:
+  - trigger: on_play
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: ["rule_box:ex"], choose: 3, destination: hand}
+      - {action: reveal, selector: own_hand, filters: ["rule_box:ex"]}
+      - {action: shuffle_deck}

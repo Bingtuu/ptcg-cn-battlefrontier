@@ -1,0 +1,21 @@
+# 电蜘蛛（CSV8C-010，1阶）
+# text_raw 原文：「特性: 复眼
+# 这只宝可梦所使用的招式，给对手战斗场上的拥有特性的宝可梦造成的伤害「+50」。
+#
+# 【草】【无】 麻麻网 50+
+# 如果这只宝可梦身上附着了【雷】能量的话，则追加造成80伤害。」
+# 复眼 = modify_damage scope=self + target_has_ability（只加成这只宝可梦自己的招式，
+# 不是全场 aura）。麻麻网合成单一伤害节点：base 50 + one_if_holder_has_energy_雷×80，
+# 使复眼只叠加一次（拆成两个 damage 节点会各吃一次修正）。
+# 节点条件 holder_has_energy 仍注册（task 071 WP2），本卡不拆节点。
+card:
+  name_group: 电蜘蛛
+  card_ids: [CSV8C-010]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_damage, args: {amount: 50, scope: self, target_has_ability: true}}
+  - trigger: on_attack
+    attack: 麻麻网
+    actions:
+      - {action: damage, selector: opponent_active, count: one_if_holder_has_energy_雷, args: {base: 50, per: 80, op: "+"}}

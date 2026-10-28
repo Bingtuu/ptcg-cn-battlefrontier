@@ -85,6 +85,10 @@ class NeedChoice:
         self.ordered: bool = False
         self.distinct: str | None = None
         self.choose_groups: tuple[tuple[tuple[int, ...], int], ...] | None = None
+        # task 071 WP10：招式池锚点（备战宝可梦 iid）；build_pending 传给 resolve_pool
+        self.anchor_iid: int | None = None
+        # task 071 WP16：解释器挂起时标注（ctx.prev_optional_done 快照）
+        self.prev_optional_done: bool | None = None
 
 
 def _match_one(card: CardInstance, filter_word: str) -> bool:
@@ -107,6 +111,19 @@ def _match_one(card: CardInstance, filter_word: str) -> bool:
         return (
             (c.supertype == Supertype.POKEMON and c.rule_box is None)
             or _match_one(card, "basic_energy")
+        )
+    if filter_word == "pokemon_no_rule":
+        # task 071 WP1（宝可平板）：宝可梦且无规则盒，任意阶段
+        # （basic_pokemon_no_rule 限 stage0，不合）
+        return c.supertype == Supertype.POKEMON and c.rule_box is None
+    if filter_word == "pokemon_tera":
+        # task 071 WP1（太晶珠）：CardDef.is_tera
+        return c.supertype == Supertype.POKEMON and c.is_tera
+    if filter_word.startswith("rule_box:"):
+        # task 071 WP1（席蓝）：规则盒正向过滤（rule_box:ex）
+        return (
+            c.supertype == Supertype.POKEMON
+            and c.rule_box == filter_word.split(":", 1)[1]
         )
     if filter_word.startswith("pokemon_"):
         # 参数化过滤器（task 029 泛化，D-029-7，对齐 WP1 energy_<属性> 先例）：
@@ -247,6 +264,7 @@ def resolve_pool(
     p: PlayerState, pool: str, filters: tuple[str, ...],
     opponent: PlayerState | None = None,
     hp_of: Callable[[InPlayPokemon], int] | None = None,
+    anchor_iid: int | None = None,
 ) -> tuple:
     """从真实状态计算候选池（挂起瞬间调用一次，结果冻结进 PendingChoice.pool_iids）。
 
@@ -269,6 +287,22 @@ def resolve_pool(
     if pool == "own_attached_energy":
         mons = ([p.active] if p.active else []) + list(p.bench)
         return tuple(e for m in mons for e in m.attached_energy if matches(e, filters))
+    if pool == "opponent_attached_energy":
+        # task 071 WP6（粉碎之锤）：对手场上全体附着能量
+        if opponent is None:
+            raise DslError("opponent_attached_energy 池需要对手状态（chooser 内部约定）")
+        mons = ([opponent.active] if opponent.active else []) + list(opponent.bench)
+        return tuple(e for m in mons for e in m.attached_energy if matches(e, filters))
+    if pool == "anchored_pokemon_attack":
+        # task 071 WP10：锚点宝可梦的招式索引池（元素 = 招式索引，同
+        # opponent_active_attack 口径；可复制性由原语经 exclude_iids 预筛）
+        if anchor_iid is None:
+            raise DslError("anchored_pokemon_attack 池需要 anchor_iid（chooser 内部约定）")
+        mons = ([p.active] if p.active else []) + list(p.bench)
+        mon = next((m for m in mons if m.current.iid == anchor_iid), None)
+        if mon is None:
+            raise DslError("anchored_pokemon_attack：锚点宝可梦不在场上（不猜）")
+        return tuple(range(len(mon.current.card.attacks)))
     if pool == "opponent_active_attack":
         # 招式维度池（task 017 基因侵入）：元素 = 对手战斗宝可梦招式的索引（int），
         # pool_iids 语义 = 招式索引；可复制性（有伤害或有 DSL 绑定）由原语经
@@ -278,6 +312,12 @@ def resolve_pool(
         return tuple(range(len(opponent.active.current.card.attacks)))
     if pool == "own_hand":
         cards = p.hand
+    elif pool == "opponent_hand":
+        # task 071 WP8（咕咕 寂静之翼 reveal）：对手手牌。信息公开只进事件流，
+        # 不扩 Agent 可见视图（D-071-3）
+        if opponent is None:
+            raise DslError("opponent_hand 池需要对手状态（chooser 内部约定）")
+        cards = opponent.hand
     elif pool == "own_deck":
         cards = p.deck
     elif pool == "own_discard":
@@ -329,6 +369,7 @@ def build_pending(
     cursor: int, need: NeedChoice, completion: str = "trainer",
     inner: tuple[str, str, str] | None = None, outer_cursor: int = -1,
     outer_choice: tuple[int, ...] = (),
+    outer_carry: tuple[int, ...] = (),
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
     # choose_groups（task 026 WP6，D-WP6-3）：各组池已由原语按牌库序解析冻结进
@@ -357,6 +398,8 @@ def build_pending(
             flip_heads_count=need.flip_heads_count,
             step_phase=need.step_phase,
             choose_groups=need.choose_groups,
+            prev_optional_done=need.prev_optional_done,
+            outer_carry=outer_carry,
         )
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
     owner = 1 - player if need.pool.startswith("opponent") else player
@@ -364,6 +407,7 @@ def build_pending(
         engine.state.players[player], need.pool, need.filters,
         opponent=engine.state.players[1 - player],
         hp_of=lambda m: engine._effective_hp(m, owner),
+        anchor_iid=need.anchor_iid,
     )
     kept = [
         c for c in pool_cards
@@ -405,6 +449,8 @@ def build_pending(
         ordered=need.ordered,
         distinct=need.distinct or "",
         pool_buckets=buckets,
+        prev_optional_done=need.prev_optional_done,
+        outer_carry=outer_carry,
     )
 
 
@@ -444,7 +490,11 @@ def playable_feasible(
             # 不门控（奥琳博士的气魄「无合法目标仍抽 3」存量行为回归）
             target_pool = node.args.get("target_pool", "own_pokemon_in_play")
             if target_pool == "own_bench":
-                if not resolve_pool(p, "own_discard", node.filters):
+                # 能量来源随 selector（task 071 WP4：弃牌区玻璃喇叭 / 牌库能量涡轮）
+                src = node.selector if node.selector in (
+                    "own_discard", "own_deck", "own_hand",
+                ) else "own_discard"
+                if not resolve_pool(p, src, node.filters):
                     return False
                 if not resolve_pool(p, "own_bench", tuple(node.args.get("target_filters", ()))):
                     return False
@@ -597,6 +647,13 @@ def condition_met(
         return mon is not None and any(
             e.card.energy_type == energy_type for e in mon.attached_energy
         )
+    if condition.startswith("holder_trait:"):
+        # task 071 WP2（驱劲能量 未来）：持有者 CardDef.labels 含标签
+        # （对齐 holder_owner: 先例；空标签 / mon None → 不通过）
+        tag = condition.split(":", 1)[1]
+        if not tag:
+            raise DslError(f"condition 参数畸形 '{condition}'（holder_trait 需非空标签）")
+        return mon is not None and tag in mon.current.card.labels
     if condition.startswith("holder_special_energy_count_ge:"):
         # 参数化条件（task 026 WP8，D-WP8-2 夜光能量降级）：持有者附着的特殊能量
         # （supertype=energy 且非 is_basic_energy）计数 ≥N——含条件来源卡自身
@@ -699,8 +756,20 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                 if not resolve_pool(p, "own_deck", node.filters):
                     return False
                 deck_target_filters = tuple(node.args.get("target_filters", ()))
-                if not resolve_in_play_pool(p, deck_target_filters, hp_of=hp_of):
-                    return False
+                deck_target_pool = node.args.get("target_pool", "own_pokemon_in_play")
+                if deck_target_pool == "own_bench":
+                    if not resolve_pool(
+                        p, "own_bench", deck_target_filters, hp_of=hp_of,
+                    ):
+                        return False
+                elif deck_target_pool == "own_pokemon_in_play":
+                    if not resolve_in_play_pool(p, deck_target_filters, hp_of=hp_of):
+                        return False
+                else:
+                    raise DslError(
+                        "特性可行性门未支持 attach_energy own_deck "
+                        f"target_pool={deck_target_pool!r}（不猜）"
+                    )
                 continue
             if node.selector != "own_discard":
                 raise DslError(
@@ -728,6 +797,14 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
             # task 026 WP4（怒鹦哥ex 英武重抽）：手牌全弃恒可支付（后续 draw 有效）
             # task 026 WP6（火恐龙 大字爆炎）：弃来源宝可梦 1 张附着能量——
             # 无能量时 no-op 合法（伤害照算），恒可行
+            # task 071 WP3（N的索罗亚克ex 交易）：弃自己手牌 choose=N（手牌不足不可行）
+            hand_choose = (
+                node.selector == "own_hand"
+                and isinstance(node.choose, int)
+                and not isinstance(node.choose, bool)
+                and node.choose >= 1
+                and node.count is None
+            )
             if not (
                 (
                     node.selector == "own_hand"
@@ -741,11 +818,14 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                     and node.choose >= 1
                     and node.count is None
                 )
+                or hand_choose
             ):
                 raise DslError(
                     f"特性可行性门未支持 discard 形式 selector={node.selector!r}"
                     f"/count={node.count!r}/choose={node.choose!r}（不猜）"
                 )
+            if hand_choose and len(p.hand) < node.choose:
+                return False
         elif node.action == "draw":
             continue  # 抽牌恒可行（牌库空抽完即止；until_hand 超出空结算）
         elif node.action == "heal":
@@ -834,6 +914,14 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
             if node.selector != "opponent_active" or node.choose is not None:
                 raise DslError(
                     f"特性可行性门未支持 lock_retreat 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            continue
+        elif node.action == "lock_attack":
+            # task 071 WP15（火伊布ex 红玉髓）：锁自身全部招式，无池，恒可行
+            if node.selector != "self" or node.choose is not None:
+                raise DslError(
+                    f"特性可行性门未支持 lock_attack 形式 selector={node.selector!r}"
                     f"/choose={node.choose!r}（不猜）"
                 )
             continue

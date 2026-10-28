@@ -1,0 +1,21 @@
+# 招式学习器 能量涡轮（CSV4C-119，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的宝可梦，可以使用这张卡牌上的招式。[需要满足使用招式所需能量。]
+# 放于宝可梦身上的这张卡牌，将在自己的回合结束时被放于弃牌区。
+#
+# 【无】 能量涡轮
+# 选择自己牌库中最多2张基本能量，以任意方式附着于备战宝可梦身上。并重洗牌库。」
+# db 不解析训练家卡面招式（D-071-4）：grant_attack args.cost=[无]、damage=null，
+# 卡面 attacks 为空时引擎合成 AttackDef。洗牌在 own_deck 附着节点内完成
+# （烈炎支配 D-WP7-8：选完能量即重洗，不再另写 shuffle_deck）。
+# target_pool=own_bench（task 071 WP4）：逐张自选备战目标，可叠到同一只。
+card:
+  name_group: 招式学习器 能量涡轮
+  card_ids: [CSV4C-119, CSVH4aC-016]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: grant_attack, args: {attack: 能量涡轮, cost: [无], damage: null, discard_at_turn_end: true}}
+  - trigger: on_attack
+    attack: 能量涡轮
+    actions:
+      - {action: attach_energy, selector: own_deck, filters: [basic_energy], choose: 2, destination: attach, args: {target_pool: own_bench}}

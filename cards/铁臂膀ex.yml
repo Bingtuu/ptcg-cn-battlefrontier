@@ -1,0 +1,17 @@
+# 铁臂膀ex（CSV6C-051，基础，规则盒 ex，未来）
+# text_raw 原文：「【雷】【雷】【无】 臂膀压制 160
+#
+# 【雷】【无】【无】【无】 多谢款待 120
+# 如果因为这个招式的伤害，对手的宝可梦【昏厥】的话，则多拿取1张奖赏卡。」
+# prize_bonus scope=attack_ko（task 071 WP14）：不要求攻击方 is_tera。
+# 触点与白蕾雅相同，只计招式伤害致对手战斗场昏厥（本招式伤害只落战斗场）。
+# 臂膀压制 160 无附加效果，白板结算。
+card:
+  name_group: 铁臂膀ex
+  card_ids: [CSV6C-051, CSV6C-140, CSV6C-152, CSV9.5C-060, CSV9.5C-231, CSVL2C-027, CSVL2C-126, CSVM1cC-005]
+effects:
+  - trigger: on_attack
+    attack: 多谢款待
+    actions:
+      - {action: prize_bonus, args: {amount: 1, scope: attack_ko}}
+      - {action: damage, selector: opponent_active, args: {amount: 120}}

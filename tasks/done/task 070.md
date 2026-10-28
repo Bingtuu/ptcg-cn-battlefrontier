@@ -1,6 +1,6 @@
 # task 070 · 卡池 v2 DSL 批次（34 张缺口卡清零）
 
-- 状态：进行中（2026-10-21 立项）
+- 状态：完成（2026-10-28，blocked 19 张由 task 071 写成 DSL；闸 3 与 `--db` 装载仍待核）
 - 关联：task 068（卡池 v2 锁定 + 缺口定案）→ task 069（引擎扩展批，表达力备齐）→ 本任务（DSL 批次）→ task 07x（v2 matrix + 校准）
 - 侦察事实源：`.kimi-code/t068-pool-v2-scout.md`（34 张明细 + 卡组归属）+ `.kimi-code/t068-scout-detail.json`（全量 125 卡 text_raw）
 - 编写规范：`.kimi-code/skills/dsl-authoring/SKILL.md`（LLM 辅助编写管线 + 三道验收闸，PRD §5.5）
@@ -48,4 +48,4 @@
 - **blocked 19 张 = task 071 引擎扩展第二批输入**（缺口精确到读点，明细见 authoring-log batch 10 notes）：过滤器 3（pokemon_no_rule / rule_box:ex / pokemon_tera）+ 节点条件 2（if_own_prizes_eq:N / 条件追加伤害）+ attach_energy 组合 2（multi_target×own_bench / own_deck target_pool=own_bench）+ 对手附着能量操作链（粉碎之锤）+ 竞技场撤退读点（N的城堡）+ holder_trait 条件（驱劲能量 未来）+ 训练家授予招式数据缺口（能量涡轮，db latent gap）+ 进化门放宽（伊布）+ 能量回库+节点门控（厄诡椪）+ lock_attack 全招式（火伊布ex）+ 宝可梦来源 suppression 定向（可达鸭）+ reveal opponent_hand（咕咕）+ 计数词/discard 全弃（N的达摩狒狒）+ ability 成本门 + copy_attack 备战维度（N的索罗亚克ex）+ prize_bonus 非太晶（铁臂膀ex）+ move_energy any_count→self（铁斑叶ex）+ modify_damage 目标 has_ability 过滤（电蜘蛛）
 - **待用户核销**：闸 3 全部 15 张（gate3=false）；高级球/裁判再录区分词裁量点；电电虫洗牌 2 次 vs 原文 1 次偏差（🔲 待核）
 
-**判据 1/2/4 ✅（落地部分）；判据 3 待用户核销；判据 5/6 待 071 补齐 blocked 后收口**。
+**判据 1/2/4 ✅（落地部分）；判据 3 待用户核销。判据 5/6：task 071（2026-10-28）已把 blocked 19 张写成 DSL；`dsl-check --db` 与九卡组装载零缺口仍待有主库的环境复核。**

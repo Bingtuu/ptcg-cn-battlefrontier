@@ -286,9 +286,11 @@ def test_attach_bench_single_grass_energy_filter():
 
 
 def test_attach_bad_params_dsl_error():
-    """清单7：target_pool 未知词 / multi_target × target_pool=own_bench → DslError（不猜）。"""
-    for args in ("{target_pool: opponent_bench}", "{target_pool: bogus}",
-                 "{target_pool: own_bench, multi_target: true}"):
+    """清单7：target_pool 未知词 → DslError（不猜）。
+
+    multi_target × own_bench 自 task 071 WP4 起放行（玻璃喇叭），负例移出。
+    """
+    for args in ("{target_pool: opponent_bench}", "{target_pool: bogus}"):
         doc = parse_card_doc(f"""
 card:
   name_group: 测试附着

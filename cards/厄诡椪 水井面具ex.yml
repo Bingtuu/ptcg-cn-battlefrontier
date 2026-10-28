@@ -1,0 +1,25 @@
+# 厄诡椪 水井面具ex（CSV8C-067，基础，规则盒 ex）
+# text_raw 原文：「【无】 啜泣 20
+# 在下一个对手的回合，受到这个招式影响的宝可梦，无法撤退。
+#
+# 【水】【无】【无】 激流水泵 100
+# 若希望，可选择这只宝可梦身上附着的3个能量，放回牌库并重洗牌库。在这种情况下，给对手的1只备战宝可梦，也造成120伤害。[备战宝可梦不计算弱点、抗性。]」
+# 激流水泵前段 = move_energy destination=deck scope=self up_to choose=3
+# （task 071 WP7；任务书把「若希望」钉成 up-to，可选 0～3）。
+# 「在这种情况下」= if_prev_optional_done（task 071 WP16）：实际放回至少 1 张才打备战。
+# 选 0 张不重洗。备战伤害不吃弱点抗性（引擎既有口径）。
+card:
+  name_group: 厄诡椪 水井面具ex
+  card_ids: [CSV8C-067, CSV8C-220, CSV8C-245, CSV9.5C-056, CSV9.5C-229, CSVNC-017]
+effects:
+  - trigger: on_attack
+    attack: 啜泣
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: lock_retreat, selector: opponent_active}
+  - trigger: on_attack
+    attack: 激流水泵
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 100}}
+      - {action: move_energy, selector: own_attached_energy, choose: 3, destination: deck, args: {up_to: true, scope: self}}
+      - {action: damage, selector: opponent_bench, choose: 1, args: {amount: 120}, condition: if_prev_optional_done}

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **不要在 owner 拍板 `docs/superpowers/specs/2026-10-28-task-078-attack-active-energy-design.md` 之前执行。** 拍板若改了 Q1–Q8，先改规格和本计划里对应的测试，再写代码。本文件在规划 PR 里落地，测试与 `heuristic.py` 仍不存在这些改动。
+> **owner 已整包拍板 Q1–Q8（按规格建议），规划 PR #5 merge `6bbcdbf`。** Task 1（078）按本文执行。Task 2 / 2b / 3（079 / 血月 / 080）本轮不做。
 
 **Goal:** 让启发式在「低伤前场占着能斩杀的备战」「能量喂给差一张就能打的那只」「复制/变量招式按可见伤害选」三处改决策，并用沙奈朵 × N索的同种子 100 局看结构是否离开 deck_out 主导。
 
@@ -40,7 +40,7 @@
 - Produces: `_pick_place` 在开关开时用 `_place_key`；关时键仍是 `(-pokemon_score, iid)`
 - Produces: `_pick_retreat` 在开关开时，按规格 D-078-5 增加「备战能斩杀且战斗场不能」的撤退；关时只保留付不起才撤
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/test_heuristic_board_gate.py`：
 
@@ -163,13 +163,13 @@ def test_promote_still_follows_pokemon_score():
 
 `test_setup_prefers_basic_that_heads_a_line_in_hand` 在今天的代码上会选 iid 10（高伤），这是预期的红。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_heuristic_board_gate.py -q`
 
 Expected: `test_retreat_to_bench_ko_when_active_chip_cannot_ko` 与 `test_setup_prefers_basic_that_heads_a_line_in_hand` FAIL。`test_no_retreat_when_active_already_kos`、`test_gate_off_keeps_chip_active`、`test_promote_still_follows_pokemon_score`、`test_setup_without_line_still_uses_pokemon_score` 应当已经 PASS（锁旧行为；前两个要手里没有能量，否则附着排在撤退和斩杀前面，测不到它们）。若 promote 测试因夹具不合法而报错，先修夹具使 `legal_actions` 含 `promote`，不要改 `_pick_promote`。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `HeuristicParams` 增加：
 
@@ -220,7 +220,7 @@ def _place_key(self, card: CardInstance, hand: tuple) -> tuple:
 
 不要为了让撤退测试变绿去改 `_decide_main` 的大顺序。斩杀仍在撤退之前。
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -231,13 +231,13 @@ python -m ruff check battlefrontier/agent/heuristic.py tests/test_heuristic_boar
 
 Expected: PASS，ruff 零告警。`test_features.py` 的手算期望一字不改。
 
-- [ ] **Step 5: 实验 YAML**
+- [x] **Step 5: 实验 YAML**
 
 `experiments/t078-gard-zoro.example.yml` 与 `experiments/t077-gard-zoro.example.yml` 同构：`name: t078-gard-zoro`，`games: 100`，`seed_start: 208000`，`mik_moe:678647` × `mik_moe:690359`，两边 heuristic，不写卡名参数。文件头注释写明结构指标和「云端不跑」。
 
 加一条测试：该 YAML 能被实验加载器解析，`games==100`，`seed_start==208000`。仿 `tests/test_heuristic_ability_gate.py` 里对 t077 YAML 的读法（`read_text(encoding="utf-8")`）。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add battlefrontier/agent/heuristic.py tests/test_heuristic_board_gate.py tests/test_tune_space.py experiments/t078-gard-zoro.example.yml
@@ -245,6 +245,8 @@ git commit -m "task(078): 前场质量门控——斩杀撤退与进化线开局
 ```
 
 - [ ] **Step 7: 本机 100 局（有 ptcg-cn.db 的机器；云端跳过并在 STATUS 写明）**
+
+本实现 PR 在云端跳过：无 `ptcg-cn.db`，不跑 `bfsim`。命令留在 `tasks/task 078.md` 与 `STATUS.md`，由父代理在 Diupi-Yun 跑。
 
 先在开关关闭时跑同一 YAML（两边 `params: {board_quality_gate: false}`），记下攻击名 / `attach_energy.target` / `evolve` / `game_over.reason`。再跑默认开。比较规格 §6。失败局必须是 0。胜率写实，不凑 60%。这一步的数字回写 `tasks/task 078.md` 与 `STATUS.md`。不要跑 `experiments/v2-calibration.example.yml`。
 

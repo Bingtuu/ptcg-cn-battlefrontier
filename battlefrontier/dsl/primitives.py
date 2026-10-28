@@ -1936,6 +1936,14 @@ def _attack_copyable(mon: InPlayPokemon, idx: int, doc) -> bool:
     )
 
 
+def _attack_selectable(ctx: ExecutionContext, mon: InPlayPokemon, idx: int, doc) -> bool:
+    """可复制且不在本攻击的复制链上（task 076：同 iid+招式名再入即环）。"""
+    attack = mon.current.card.attacks[idx]
+    if (mon.current.iid, attack.name) in ctx.copy_chain:
+        return False
+    return _attack_copyable(mon, idx, doc)
+
+
 def _apply_copied_attack(
     ctx: ExecutionContext, donor: InPlayPokemon, attack_index: int,
 ) -> dict[str, object] | NeedChoice:
@@ -1956,18 +1964,22 @@ def _apply_copied_attack(
             "via": "dsl" if effect is not None else "whiteboard",
             "resumed": True,
         }
+    if (donor.current.iid, attack.name) in ctx.copy_chain:
+        return {"copied": None, "reason": "copy_cycle"}
     ctx.emit("copy_attack", attack=attack.name, source=donor.current.card.name)
     if effect is not None:
         sub_ctx = ExecutionContext(
             engine=engine, player=ctx.player, source=ctx.source,
             effect_id=f"{ctx.effect_id}>copy:{attack.name}", trigger=effect.trigger,
         )
+        sub_ctx.copy_chain = ctx.copy_chain + ((donor.current.iid, attack.name),)
         sub = run_effect(sub_ctx, effect, start=0)
         if isinstance(sub, NeedChoice):
             sub.inner = (
                 donor.current.card.card_id, donor.current.card.name, attack.name,
             )
             sub.inner_cursor = sub.cursor
+            sub.inner_donor_iid = donor.current.iid
             return sub
         return {"copied": attack.name, "via": "dsl"}
     opp_idx = 1 - ctx.player
@@ -2004,7 +2016,7 @@ def _copy_attack_from_bench(
     """task 071 WP10：复制自己备战区（filters 如 owner_pokemon:N）的 1 个招式。
 
     段 1 选备战宝可梦，段 2 选其招式（anchored_pokemon_attack）。嵌套执行与
-    梦幻ex 同口径；多级嵌套仍由引擎拒绝。
+    梦幻ex 同口径；多级帧见 task 076，复制链上的招式不再可选。
     """
     from battlefrontier.engine.core import effect_doc
 
@@ -2023,7 +2035,7 @@ def _copy_attack_from_bench(
         for mon in bench:
             doc = effect_doc(ctx.engine.card_effects, mon.current.card)
             if any(
-                _attack_copyable(mon, i, doc)
+                _attack_selectable(ctx, mon, i, doc)
                 for i in range(len(mon.current.card.attacks))
             ):
                 eligible += 1
@@ -2040,7 +2052,8 @@ def _copy_attack_from_bench(
         doc = effect_doc(ctx.engine.card_effects, donor.current.card)
         attacks = donor.current.card.attacks
         excluded_atk = tuple(
-            i for i in range(len(attacks)) if not _attack_copyable(donor, i, doc)
+            i for i in range(len(attacks))
+            if not _attack_selectable(ctx, donor, i, doc)
         )
         if len(excluded_atk) == len(attacks):
             return {"copied": None, "reason": "no_copyable_attack"}
@@ -2084,12 +2097,7 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     opp_doc = effect_doc(engine.card_effects, opp_active.current.card)
 
     def copyable(idx: int) -> bool:
-        a = opp_attacks[idx]
-        if a.damage is not None:
-            return True
-        return opp_doc is not None and any(
-            e.trigger == "on_attack" and e.attack == a.name for e in opp_doc.effects
-        )
+        return _attack_selectable(ctx, opp_active, idx, opp_doc)
 
     if choice is None:
         excluded = tuple(i for i in range(len(opp_attacks)) if not copyable(i))

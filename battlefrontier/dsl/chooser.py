@@ -18,6 +18,7 @@ from battlefrontier.dsl.schema import Effect
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.state import (
     CardInstance,
+    CopyFrame,
     InPlayPokemon,
     PendingChoice,
     PlayerState,
@@ -91,6 +92,8 @@ class NeedChoice:
         self.prev_optional_done: bool | None = None
         # 激流水泵：只枚举「放弃」或恰好 min(max_choose, 池大小) 张（不可少选）
         self.exact_or_zero: bool = False
+        # task 076：被复制招式挂起时标注来源 iid，引擎据此延长 copy_chain
+        self.inner_donor_iid: int | None = None
 
 
 def _match_one(card: CardInstance, filter_word: str) -> bool:
@@ -380,6 +383,8 @@ def build_pending(
     inner: tuple[str, str, str] | None = None, outer_cursor: int = -1,
     outer_choice: tuple[int, ...] = (),
     outer_carry: tuple[int, ...] = (),
+    copy_stack: tuple[CopyFrame, ...] = (),
+    copy_chain: tuple[tuple[int, str], ...] = (),
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
     # choose_groups（task 026 WP6，D-WP6-3）：各组池已由原语按牌库序解析冻结进
@@ -411,6 +416,8 @@ def build_pending(
             prev_optional_done=need.prev_optional_done,
             outer_carry=outer_carry,
             exact_or_zero=need.exact_or_zero,
+            copy_stack=copy_stack,
+            copy_chain=copy_chain,
         )
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
     owner = 1 - player if need.pool.startswith("opponent") else player
@@ -463,6 +470,8 @@ def build_pending(
         prev_optional_done=need.prev_optional_done,
         outer_carry=outer_carry,
         exact_or_zero=need.exact_or_zero,
+        copy_stack=copy_stack,
+        copy_chain=copy_chain,
     )
 
 

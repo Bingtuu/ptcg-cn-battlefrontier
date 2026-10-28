@@ -25,7 +25,7 @@ from battlefrontier.agent.dsl_estimate import (
     pending_damage_link,
 )
 from battlefrontier.engine.actions import Action
-from battlefrontier.engine.core import _energy_satisfied
+from battlefrontier.engine.core import _energy_satisfied, resolve_tool_attacks
 from battlefrontier.engine.state import (
     CardDef,
     CardInstance,
@@ -390,7 +390,10 @@ class HeuristicAgent:
         attacks = list(active.current.card.attacks)
         sources = [active.current.card] * len(attacks)
         if active.attached_tool is not None:
-            tool_attacks = list(active.attached_tool.card.attacks)
+            # 与引擎枚举同一份授予招式（含卡面为空时的 grant_attack 合成）
+            tool_attacks = list(resolve_tool_attacks(
+                active.attached_tool, self.card_effects,
+            ))
             attacks += tool_attacks
             sources += [active.attached_tool.card] * len(tool_attacks)
         return attacks, sources

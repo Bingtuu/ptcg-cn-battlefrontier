@@ -85,6 +85,8 @@ class ExecutionContext:
         # 前序可选节点是否实际执行（task 071 WP16「在这种情况下」）；
         # None = 尚无可选节点。挂起恢复经 PendingChoice.prev_optional_done 穿透
         self.prev_optional_done: bool | None = None
+        # 本攻击已进入的复制链（task 076）：(来源 iid, 招式名)。空 = 非复制结算
+        self.copy_chain: tuple[tuple[int, str], ...] = ()
 
     @property
     def player_state(self) -> PlayerState:

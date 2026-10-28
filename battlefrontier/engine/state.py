@@ -119,6 +119,23 @@ class InPlayPokemon(FrozenModel):
         return self.stack[-1]
 
 
+class CopyFrame(FrozenModel):
+    """copy_attack 父帧（task 076）：内层完成后按此恢复父效果。
+
+    is_origin：父效果是宣言招式本身（source + effect_index），cursor/choice/carry
+    是该效果里 copy 节点的恢复点。否则父效果由 card_id/card_name/attack 定位。
+    """
+
+    is_origin: bool = False
+    card_id: str = ""
+    card_name: str = ""
+    attack: str = ""
+    donor_iid: int = 0
+    cursor: int = 0
+    choice: tuple[int, ...] = ()
+    carry: tuple[int, ...] = ()
+
+
 class PendingChoice(FrozenModel):
     """挂起的效果执行（chooser 机制，PRD §5.2）：等待 Agent 选择，恢复信息全在此。
 
@@ -187,6 +204,10 @@ class PendingChoice(FrozenModel):
     outer_carry: tuple[int, ...] = ()
     # 激流水泵（TPCi 2024-09-12）：合法选择只有空集，或恰好 min(max_choose, 池大小) 张
     exact_or_zero: bool = False
+    # 复制栈（task 076）：深度 ≥2 时，自外向内的父帧；空 = 至多一层（task 020 口径）
+    copy_stack: tuple[CopyFrame, ...] = ()
+    # 本效果已进入的 (来源 iid, 招式名)，含宣言招式。同键不再可选，避免复制环
+    copy_chain: tuple[tuple[int, str], ...] = ()
 
 
 class PlayerState(FrozenModel):

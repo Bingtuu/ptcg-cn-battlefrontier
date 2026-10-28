@@ -1,6 +1,7 @@
 """task 045：参数空间声明（D-T1）——8 连续维乘法网格 + 2 整数维枚举。
 
-网格点不含默认值（默认值即当前点，不重复评估）；7 个布尔开关不进空间（固定全开）。
+网格点不含默认值（默认值即当前点，不重复评估）；布尔开关不进空间（固定全开，
+含 task 077 的 ability_quality_gate）。
 """
 
 import pytest
@@ -29,9 +30,10 @@ def test_空间维度构成():
     assert names[8:] == list(INTEGER_DIMS) == ["max_bench_setup", "deck_low_threshold"]
     assert all(d.kind == "continuous" for d in space[:8])
     assert all(d.kind == "integer" for d in space[8:])
-    # 布尔开关不进空间
+    # 布尔开关不进空间（含特性质量门控）
     bool_fields = {"use_abilities", "play_items", "play_supporters", "play_stadiums",
-                   "attach_tools", "retreat_when_powerless", "deck_protect"}
+                   "attach_tools", "retreat_when_powerless", "deck_protect",
+                   "ability_quality_gate"}
     assert not (set(names) & bool_fields)
 
 

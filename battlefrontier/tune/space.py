@@ -2,8 +2,8 @@
 
 10 维进搜索：8 连续权重走乘法网格（尺度无关，对正负号权重一致适用；
 0 = 关闭该因子），2 整数维走枚举网格。网格点不含默认值——默认值即坐标下降
-起点，不重复评估。7 个布尔开关不进空间（M8a 后「开」均为已验证修复行为，
-固定全开，见设计文档 §2）。
+起点，不重复评估。布尔开关不进空间（M8a 后「开」均为已验证修复行为，
+固定全开，见设计文档 §2；task 077 的 ability_quality_gate 同样固定默认开）。
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ def default_vector() -> dict[str, float | int]:
 
 def params_from_vector(vector: dict[str, float | int]) -> HeuristicParams:
     """参数向量 → HeuristicParams。键集合须恰为 10 搜索维（缺/多/未知显式报错，不猜）；
-    未进空间的 7 个布尔开关取默认（全开）。"""
+    未进空间的布尔开关取默认（全开，含 ability_quality_gate）。"""
     names = {dim.name for dim in search_space()}
     missing = names - set(vector)
     unknown = set(vector) - names

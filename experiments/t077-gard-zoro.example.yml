@@ -1,0 +1,20 @@
+# task 077 本机结构验收：沙奈朵 × N的索罗亚克
+# 对齐 B 诊断消融子集（种子 208000..208099，100 局；正式格是 208000..208499）。
+# 需要本机 ptcg-cn.db（config/battlefrontier.local.yml）。云端无库，本文件不预填结果。
+# 门控默认开。负面对照把两边 params 改成 ability_quality_gate: false，应回到「有特性就用」。
+#
+# bfsim run experiments/t077-gard-zoro.example.yml --workers 8 --results results/t077-gard-zoro.db
+# bfsim report <id> --results results/t077-gard-zoro.db --decisions
+#
+# 结构指标（不要只看胜率；诚实预期是沙奈朵 WR 从 ~96% 降到 ~85–90%，不是 30%）：
+#   沙奈朵胜因里 deck_out 占比、N的索罗亚克ex use_ability 次数/局、沙奈朵 WR 方向。
+# 查询见 tasks/task 077.md / PR 说明。
+name: t077-gard-zoro
+games: 100
+seed_start: 208000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

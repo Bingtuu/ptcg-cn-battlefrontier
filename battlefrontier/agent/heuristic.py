@@ -2,8 +2,9 @@
 
 局面评估函数（奖赏差/场面战力/手牌质量/能量就绪度/牌库资源，线性加权）+
 决策规则（开局布阵优先级、行动排序「特性→进化→能量→物品→支援者→攻击」、
-斩杀检测）。D10：不做单卡组定制——评分只用通用字段（HP/招式伤害/撤退费/
-进化链/卡片类别），不按卡名分支。
+斩杀检测）。特性不再无条件取最小 iid（task 077）：交易类弃抽与弃牌区附能
+加伤按效果形态估价值，其余特性仍优先于进化。D10：不做单卡组定制——评分只用
+通用字段（HP/招式伤害/撤退费/进化链/卡片类别）与效果形态，不按卡名分支。
 
 确定性纪律：不消费引擎随机源，一切 tie-break 用 iid/下标升序；
 参数全部收敛到 HeuristicParams，默认值即 PRD 通用启发式。
@@ -20,10 +21,15 @@ from battlefrontier.agent.dsl_estimate import (
     attack_has_draw,
     card_has_draw,
     damage_formula,
+    doc_for,
     estimate_attack_damage,
     has_hand_ammo_pattern,
     pending_damage_link,
 )
+from battlefrontier.dsl.chooser import matches_in_play
+from battlefrontier.dsl.interpreter import flatten_steps
+from battlefrontier.dsl.loader import DslError
+from battlefrontier.dsl.schema import ActionNode, Effect
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import _energy_satisfied, resolve_tool_attacks
 from battlefrontier.engine.state import (
@@ -78,6 +84,17 @@ class HeuristicParams:
     # 默认值即新行为，旧实验 YAML 无参兼容
     deck_protect: bool = True
     deck_low_threshold: int = 6
+    # 特性质量门控（task 077，D-077-1~4）。False = 消融回「有特性就 min(iid)」。
+    # 三个阈值可进实验 YAML；不进 tune 搜索空间。默认是第一刀，不是已拍板最优。
+    ability_quality_gate: bool = True
+    # 交易类（弃少量手牌再抽）牌库地板：余量 ≤ 此值拒用。每发固定抽 2 且可每回合
+    # 重复，所以高于训练家用的 deck_low_threshold。
+    ability_cycle_deck_floor: int = 12
+    # 手牌张数高于此值拒交易类（同回合多只连刷会把牌库磨穿）。
+    ability_cycle_hand_max: int = 4
+    # 手牌最低保留分 ≤ 此值才算有垫牌可弃。能量=1、训练家=3、宝可梦=pokemon_score。
+    # 默认 2：只有能量算垫牌（没有能量可弃 = 手牌差，拒交易类）。
+    ability_cycle_discard_ceiling: float = 2.0
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -143,6 +160,128 @@ def evaluate(view: VisibleGameState, params: HeuristicParams) -> float:
         + params.w_energy_ready * factor_energy_ready_diff(view)
         + params.w_deck * factor_deck_diff(view)
     )
+
+
+# 特性价值（task 077）。未归类 / 读不到文档 = 通用正价值（仍会用，只是不压过更高的）。
+_GENERIC_ABILITY_VALUE = 10.0
+_CYCLE_ABILITY_VALUE = 8.0
+_ATTACH_PROGRESS_VALUE = 18.0
+_ATTACH_ENABLE_VALUE = 30.0
+_ACTIVE_ATTACH_BONUS = 5.0
+_ENERGY_KEEP_SCORE = 1.0
+_TRAINER_KEEP_SCORE = 3.0
+
+
+def _positive_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+def _is_cycle_discard_draw(effect: Effect) -> bool:
+    """交易类：弃少量手牌（choose=N）再抽牌。整手刷新（count=all）与带伤害的弃牌不算。"""
+    steps = flatten_steps(effect)
+    discards = [n for _, n in steps if n.action == "discard" and n.selector == "own_hand"]
+    if not discards or not any(n.action == "draw" for _, n in steps):
+        return False
+    if any(n.action == "damage" for _, n in steps):
+        return False
+    return all(
+        n.count != "all" and _positive_int(n.choose) is not None
+        for n in discards
+    )
+
+
+def _damage_attach_node(effect: Effect) -> ActionNode | None:
+    """弃牌区附能并放置伤害指示物（精神拥抱形态）。"""
+    for _, node in flatten_steps(effect):
+        counters = _positive_int(node.args.get("damage_counters", 0))
+        if node.action == "attach_energy" and node.selector == "own_discard" and counters:
+            return node
+    return None
+
+
+def _energy_symbol(node: ActionNode) -> str | None:
+    for word in node.filters:
+        if word.startswith("energy_"):
+            return word.split("_", 1)[1]
+    return None
+
+
+def _cost_satisfied(types: list[str | None], cost: tuple[str, ...]) -> bool:
+    """与引擎 _energy_satisfied 同口径，但吃属性列表（便于模拟「再附 1 张」）。"""
+    remaining = list(types)
+    for sym in cost:
+        if sym == "无":
+            continue
+        if sym in remaining:
+            remaining.remove(sym)
+        else:
+            return False
+    colorless = sum(1 for s in cost if s == "无")
+    return len(remaining) >= colorless
+
+
+def _energy_role(types: list[str | None], cost: tuple[str, ...], add: str | None) -> str:
+    """none / progress / enable。add=None 表示过滤里没有属性，只当无色垫。"""
+    if _cost_satisfied(types, cost):
+        return "none"
+    if _cost_satisfied([*types, add], cost):
+        return "enable"
+    colored = [s for s in cost if s != "无"]
+    if add is not None and colored.count(add) > types.count(add):
+        return "progress"
+    colored_paid = all(types.count(s) >= colored.count(s) for s in set(colored))
+    if colored_paid and len(types) < len(cost):
+        return "progress"
+    return "none"
+
+
+def _mon_energy_role(mon: InPlayPokemon, add: str | None) -> int:
+    """0=再附一张就付清某招，1=只推进缺口，2=帮不上。"""
+    types = [e.card.energy_type for e in mon.attached_energy]
+    best = 2
+    for atk in mon.current.card.attacks:
+        role = _energy_role(types, atk.cost, add)
+        if role == "enable":
+            return 0
+        if role == "progress":
+            best = 1
+    return best
+
+
+def _mon_by_iid(view: VisibleGameState, iid: int) -> InPlayPokemon | None:
+    for mon in _in_play(view.own.active, view.own.bench):
+        if mon.current.iid == iid:
+            return mon
+    return None
+
+
+def _attach_targets(
+    view: VisibleGameState, holder: InPlayPokemon, node: ActionNode,
+) -> list[InPlayPokemon]:
+    pool = node.args.get("target_pool", "own_pokemon_in_play")
+    if pool == "self":
+        mons = [holder]
+    elif pool == "own_bench":
+        mons = list(view.own.bench)
+    else:
+        mons = _in_play(view.own.active, view.own.bench)
+    filters = tuple(node.args.get("target_filters", ()))
+    counters = _positive_int(node.args.get("damage_counters", 0)) or 0
+    kept: list[InPlayPokemon] = []
+    for mon in mons:
+        if filters:
+            try:
+                if not matches_in_play(mon, filters):
+                    continue
+            except DslError:
+                continue
+        hp = mon.current.card.hp or 0
+        if mon.damage + counters * 10 >= hp:
+            continue
+        kept.append(mon)
+    return kept
 
 
 class HeuristicAgent:
@@ -233,6 +372,21 @@ class HeuristicAgent:
         # choices 升序（确定性）
         if pc is not None and pc.step_phase == "cost":
             return min(acts, key=lambda a: (score(a), a.choices))
+        # D-077-2：弃牌区附能并放指示物时，优先还没付清招式的目标（再回落原评分）
+        bias = self._damage_attach_choice_node(view)
+        if bias is not None:
+            add = _energy_symbol(bias)
+
+            def rank(a: Action) -> tuple:
+                role_rank = 2
+                for iid in a.choices:
+                    mon = _mon_by_iid(view, iid)
+                    if mon is None:
+                        continue
+                    role_rank = min(role_rank, _mon_energy_role(mon, add))
+                return (role_rank, -score(a), a.choices)
+
+            return min(acts, key=rank)
         return min(acts, key=lambda a: (-score(a), a.choices))
 
     def _pick_damage_linked_discard(
@@ -268,7 +422,9 @@ class HeuristicAgent:
         hand = {c.iid: c for c in view.own.hand}
         deck_low = self._deck_low(view)
         if self.params.use_abilities and (acts := by_kind.get("use_ability")):
-            return min(acts, key=lambda a: a.iid)
+            picked = self._pick_ability(view, acts)
+            if picked is not None:
+                return picked
         if acts := by_kind.get("evolve"):
             return min(
                 acts,
@@ -316,6 +472,101 @@ class HeuristicAgent:
             (a for acts in by_kind.values() for a in acts),
             key=lambda a: (a.kind, a.iid or 0, a.target_iid or 0),
         )
+
+    def _pick_ability(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
+        """D-077-3：按价值选特性；全 ≤0 返回 None（本步不发，继续后续排序）。
+
+        ability_quality_gate=False 时恢复 min(iid)（D-077-4 消融）。
+        """
+        if not self.params.ability_quality_gate:
+            return min(acts, key=lambda a: a.iid if a.iid is not None else 0)
+        positive = [(self._ability_value(view, a), a) for a in acts]
+        positive = [(v, a) for v, a in positive if v > 0]
+        if not positive:
+            return None
+        return max(positive, key=lambda va: (va[0], -(va[1].iid or 0)))[1]
+
+    def _ability_value(self, view: VisibleGameState, action: Action) -> float:
+        if action.iid is None:
+            return _GENERIC_ABILITY_VALUE
+        holder = _mon_by_iid(view, action.iid)
+        if holder is None:
+            return _GENERIC_ABILITY_VALUE
+        effect = self._manual_effect(holder.current.card)
+        if effect is None:
+            return _GENERIC_ABILITY_VALUE
+        if _is_cycle_discard_draw(effect):
+            return _CYCLE_ABILITY_VALUE if self._cycle_allowed(view) else 0.0
+        node = _damage_attach_node(effect)
+        if node is not None:
+            return self._attach_damage_value(view, holder, node)
+        return _GENERIC_ABILITY_VALUE
+
+    def _manual_effect(self, card: CardDef) -> Effect | None:
+        if self.card_effects is None:
+            return None
+        doc = doc_for(self.card_effects, card)
+        if doc is None:
+            return None
+        return next((e for e in doc.effects if e.trigger == "ability_manual"), None)
+
+    def _keep_score(self, card: CardInstance) -> float:
+        """弃牌代价：能量最便宜，训练家次之，宝可梦走通用战力分。"""
+        if card.card.supertype == Supertype.ENERGY:
+            return _ENERGY_KEEP_SCORE
+        if card.card.supertype == Supertype.TRAINER:
+            return _TRAINER_KEEP_SCORE
+        return pokemon_score(card, self.params)
+
+    def _cycle_allowed(self, view: VisibleGameState) -> bool:
+        """D-077-1：牌库厚、手牌还没够用、且有垫牌可弃。"""
+        if view.own.deck_count <= self.params.ability_cycle_deck_floor:
+            return False
+        if len(view.own.hand) > self.params.ability_cycle_hand_max:
+            return False
+        if not view.own.hand:
+            return False
+        worst = min(self._keep_score(c) for c in view.own.hand)
+        return worst <= self.params.ability_cycle_discard_ceiling
+
+    def _attach_damage_value(
+        self, view: VisibleGameState, holder: InPlayPokemon, node: ActionNode,
+    ) -> float:
+        """D-077-2：有「放上指示物仍活着、且能量推进未付清招式」的目标才有价值。"""
+        add = _energy_symbol(node)
+        active_iid = view.own.active.current.iid if view.own.active else None
+        best = 0.0
+        for mon in _attach_targets(view, holder, node):
+            role = _mon_energy_role(mon, add)
+            if role == 2:
+                continue
+            value = _ATTACH_ENABLE_VALUE if role == 0 else _ATTACH_PROGRESS_VALUE
+            if mon.current.iid == active_iid:
+                value += _ACTIVE_ATTACH_BONUS
+            best = max(best, value)
+        return best
+
+    def _damage_attach_choice_node(self, view: VisibleGameState) -> ActionNode | None:
+        """挂起帧正落在附伤类的目标步时返回该节点，否则 None。"""
+        if not self.params.ability_quality_gate or self.card_effects is None:
+            return None
+        pc = view.pending_choice
+        if pc is None or pc.step_phase == "cost":
+            return None
+        if pc.pool not in ("own_pokemon_in_play", "own_bench"):
+            return None
+        doc = doc_for(self.card_effects, pc.source.card)
+        if doc is None or not (0 <= pc.effect_index < len(doc.effects)):
+            return None
+        steps = flatten_steps(doc.effects[pc.effect_index])
+        if not (0 <= pc.cursor < len(steps)):
+            return None
+        node = steps[pc.cursor][1]
+        if _positive_int(node.args.get("damage_counters", 0)) is None:
+            return None
+        if node.action != "attach_energy" or node.selector != "own_discard":
+            return None
+        return node
 
     def _deck_low(self, view: VisibleGameState) -> bool:
         """D-032-6：牌库余量触及保护线（deck_protect 关闭时恒 False）。"""

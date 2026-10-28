@@ -121,6 +121,7 @@ def _cmd_calibration(args: argparse.Namespace) -> int:
         calibration_report,
         format_calibration,
     )
+    from battlefrontier.report.deviation_pack import write_deviation_pack
 
     defn = load_experiment(args.experiment)
     if defn.matrix is None:
@@ -139,7 +140,11 @@ def _cmd_calibration(args: argparse.Namespace) -> int:
         rep = calibration_report(db, defn, pool, real.data, dict(real.meta))
     finally:
         db.close()
-    print(format_calibration(rep))
+    text = format_calibration(rep)
+    out_dir = Path(args.out) if args.out else Path("results") / f"{defn.name}-deviation"
+    paths = write_deviation_pack(out_dir, rep)
+    print(text)
+    print("偏差包：" + " ".join(str(p) for p in paths.values()))
     return 0
 
 
@@ -637,6 +642,10 @@ def main(argv: list[str] | None = None) -> int:
     cal_p.add_argument("experiment", help="matrix 实验定义 YAML 路径")
     cal_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
     cal_p.add_argument("--db", default=None, help="ptcg-cn.db 路径（缺省读本机配置）")
+    cal_p.add_argument(
+        "--out", default=None,
+        help="偏差包目录（默认 results/<实验名>-deviation）：同时写 md/html/csv/json",
+    )
     chk_p = sub.add_parser("dsl-check", help="DSL 文件校验（schema + 词表；LLM harness 闸 1）")
     chk_p.add_argument("files", nargs="+", help="DSL YAML 路径（可多个）")
     chk_p.add_argument("--db", default=None,

@@ -359,7 +359,8 @@ def test_cli_calibration_出表_rc0(db_path, tmp_path, capsys, monkeypatch):
     _, exp = _write_defs(tmp_path)
     fake = _FakeSdk()
     monkeypatch.setattr("ptcgdb.sdk.open_db", lambda path: fake)
-    rc = main(["calibration", str(exp), "--results", str(db_path)])
+    rc = main(["calibration", str(exp), "--results", str(db_path),
+               "--db", str(tmp_path / "no.db")])
     assert rc == 0
     out = capsys.readouterr().out
     assert "A宝 vs B宝" in out and "加权平均" in out
@@ -370,6 +371,32 @@ def test_cli_calibration_出表_rc0(db_path, tmp_path, capsys, monkeypatch):
         "division": "master", "min_n": REAL_MIN_N,
     }
     assert fake.closed
+
+
+def test_cli_calibration_默认写出双轨包(db_path, tmp_path, capsys, monkeypatch):
+    """task 072：同一份 CalibrationReport 落 md/html/csv/json。"""
+    import json
+
+    from battlefrontier.cli import main
+
+    _, exp = _write_defs(tmp_path)
+    fake = _FakeSdk()
+    monkeypatch.setattr("ptcgdb.sdk.open_db", lambda path: fake)
+    pack = tmp_path / "pack"
+    rc = main(["calibration", str(exp), "--results", str(db_path),
+               "--db", str(tmp_path / "no.db"), "--out", str(pack)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "加权平均" in out
+    assert "偏差包：" in out
+    md = (pack / "deviation.md").read_text(encoding="utf-8")
+    assert "加权平均" in md
+    assert (pack / "deviation.html").is_file()
+    assert (pack / "deviation.csv").is_file()
+    payload = json.loads((pack / "deviation.json").read_text(encoding="utf-8"))
+    assert isinstance(payload["weighted_mean_abs_delta"], float)
+    names = {c["archetype"] for c in payload["cells"]}
+    assert names == {"A宝", "B宝"}
 
 
 def test_cli_calibration_非matrix定义_rc1(tmp_path, capsys):

@@ -54,14 +54,7 @@ bfsim report <id> --results results/t078-gard-zoro.db --decisions
 - **拍板已生效**：owner 整包拍板 Q1–Q8，全部按规格建议。078 两件都做（斩杀撤退 + 开局进化线），共用 `board_quality_gate`（默认开）。`pokemon_score` 公式不动。无卡名例外。不加 `modify_weakness` 布阵分。079 不在本 PR（也不读血月减费）。规划 PR #5 已合并 `6bbcdbf`，随后授权本刀 TDD
 - **实现**：`HeuristicParams.board_quality_gate = True`。`_pick_place` 走 `_place_key`（键长 4）；`_pick_retreat` 在开关开时，战斗场已付清招式斩杀不了、合法撤退目标已付清且能斩杀，则换到有效伤害最高者（平手 bench 下标小）。谁都不能斩杀，或开关关，走原来的 `_pick_retreat_powerless`。`_pick_promote`、特性门控、能量目标、`_decide_main` 大顺序未改
 - **单测**：`tests/test_heuristic_board_gate.py` 红→绿（撤退两条先失败：返回 `attack` 而非 `retreat`；开局选 iid 10 而非 11）。`test_heuristic_agent.py` 导入会拉 `ptcgdb`，夹具 `setup_state` / `engine_with` 按原语义抄进新文件。`tests/test_features.py` 期望未改。`board_quality_gate` 在 `test_tune_space.py` 的 bool_fields 里，`len(search_space())==10`
-- **印面分未打印**：云端无 `ptcg-cn.db`，没有愿增猿 / 拉鲁拉丝的 HP、印面伤害、撤退费，不算 `pokemon_score`。开局「愿增猿高于拉鲁拉丝」这个假说在本环境未验证；布阵条款仍按规格落地（手里有进化线则优先该基础）。撤退条款由红测独立成立
-- **100 局跳过**：云端无 `ptcg-cn.db`，本代理不跑 `bfsim`。父代理在 Diupi-Yun 验收。入库 YAML 是默认开。关开关分母不要提交，临时把两边改成 `params: {board_quality_gate: false}` 再跑同一文件
+- **印面分（Diupi-Yun）**：愿增猿 HP110 撤退1「精神幻觉」；拉鲁拉丝 HP60–70 撤退1。开局愿增猿当前场主因是手里常无进化线，不是分公式
+- **本机 100 局**（Diupi-Yun，种子 `208000..208099`，失败 0）：关开关 A90/B10；开开关 A92/B8。精神幻觉 58.3%→52.9%，奇迹之力 8.9%→15.3%，A retreat 103→149，A deck_out 胜 27→18。结构方向对；胜率略恶化（诚实写）。本刀单独不要求进 60–75%
 
-```bash
-bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t078-gard-zoro.db
-bfsim report <id> --results results/t078-gard-zoro.db --decisions
-```
-
-先记关开关的 `attack.detail.name` / `attack`、`attach_energy.detail.target`、`evolve`、`game_over.detail.reason`，再跑默认开。失败局必须是 0。胜率写实。本刀单独不要求进 60–75%
-
-- 079、080 未做。矩阵 / 索罗亚克整行 / 500 局不在本任务。代理不合并
+- 079、080 未做。矩阵 / 索罗亚克整行 / 500 局不在本任务。代理不合并（待 owner 拍板）

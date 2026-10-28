@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 078 前场与撤退（实现已进 PR；100 局未跑）**。owner 整包拍板 Q1–Q8（按规格建议）。规划 PR #5 已合并 `6bbcdbf`。本刀只做 078：`board_quality_gate` 默认开（斩杀撤退 + 开局进化线）。079 / 080 未做。云端无 `ptcg-cn.db`，`bfsim` 100 局跳过，留给父代理在 Diupi-Yun 跑。077 本机验收（种子 `208000..208099`，100 局，失败 0）：A WR **96%→90%**，B **4%→10%**，deck_out **77→27**，N索交易 **11.7→1.35**/局；诚实带命中，**不宣称 |Δ| 闭环**。未做：构筑 GUI、全池单卡扫描、JEV、LLM。v2 锁定后学习线复跑（D3-5）另立项。
+**当前焦点 = task 078 前场与撤退（PR #6 本机 100 局已验收；待合并拍板）**。owner 整包拍板 Q1–Q8（按规格建议）。规划 PR #5 已合并 `6bbcdbf`。本刀只做 078：`board_quality_gate` 默认开（斩杀撤退 + 开局进化线）。079 / 080 未做。云端无 `ptcg-cn.db`，`bfsim` 100 局跳过，留给父代理在 Diupi-Yun 跑。077 本机验收（种子 `208000..208099`，100 局，失败 0）：A WR **96%→90%**，B **4%→10%**，deck_out **77→27**，N索交易 **11.7→1.35**/局；诚实带命中，**不宣称 |Δ| 闭环**。未做：构筑 GUI、全池单卡扫描、JEV、LLM。v2 锁定后学习线复跑（D3-5）另立项。
 
 **三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（task 077 第一刀已合入，该格仍约 90%，未闭环；蒸馏 4.05/局 < 5 门槛仍在）→ task 078 前场门控实现中，079 能量 / 080 同体招式未做；play_stadium / end_turn；~~copy_attack 多级嵌套~~ / ~~IndexError（沙奈朵）~~ 已由 task 076 修掉；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
@@ -32,22 +32,29 @@
 
 ## 工作记录
 
-### 2026-10-28 task 078：前场与撤退（实现；100 局云端跳过）
+### 2026-10-28 task 078：前场与撤退（实现 + Diupi-Yun 100 局验收；未合并）
 
 - **拍板**：owner 整包 Q1–Q8 按规格建议。编号 078 前场 → 079 能量 → 080 同体招式。`pokemon_score` 不动。078 两件都做。079 不读血月减费（本 PR 不做 079）。不加 `modify_weakness` 布阵分。每刀停 100 局，500 / 索罗亚克行留到三刀后。三刀叠完 60–75% 算有效，本刀单独不要求进该带。无卡名例外。规划 PR #5 merge `6bbcdbf` 之后授权本刀 TDD
 - **实现**：`HeuristicParams.board_quality_gate = True`。`_place_key` 键长 4：手里能沿 `evolves_from` 接上的基础优先，线内再比最高阶 `pokemon_score`。`_pick_retreat`：战斗场已付清且能斩杀则不撤；否则合法撤退目标里已付清且能斩杀的，按有效伤害高、bench 下标小换上；谁都不能斩杀或开关关，回到付不起才撤。不改 `_pick_promote`、特性门控、能量、`_decide_main` 大顺序。不进 tune（`len(search_space())==10`）
-- **单测**：`tests/test_heuristic_board_gate.py` 红→绿（撤退旧行为返回 `attack`；开局旧行为选高伤 iid 10）。`test_heuristic_agent.py` / `test_features.py`（期望未改）/ `test_tune_space.py` 同批绿。`experiments/t078-gard-zoro.example.yml` utf-8，`games: 100`，`seed_start: 208000`，`mik_moe:678647` × `mik_moe:690359`
-- **印面分**：云端无库，未打印愿增猿 / 拉鲁拉丝的 HP、印面伤害、撤退费，不算 `pokemon_score`。开局假说是否解释「愿增猿当前场」未在本环境验证
-- **100 局跳过**（云端无 `ptcg-cn.db`，本代理不跑 `bfsim`）。父代理在 Diupi-Yun：
+- **单测**：`tests/test_heuristic_board_gate.py` 红→绿。`test_heuristic_agent.py` / `test_features.py` / `test_tune_space.py` 同批绿（49 passed + ruff）。PR #6 `cursor/task-078-board-gate-3738` @ `995418c`
+- **印面分（本机核）**：愿增猿 基础 HP110 撤退1 招式「精神幻觉」；拉鲁拉丝 基础 HP60–70 撤退1。开局假说：愿增猿当前场主因是开局手牌常无进化线（`_place_key` 仅当手里能接上线才优先拉鲁拉丝），不是分公式把愿增猿抬过线
+- **本机 100 局验收**（Diupi-Yun，代码 `995418c`；种子 `208000..208099`；失败局 **0/0**）：
 
-```bash
-bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t078-gard-zoro.db
-bfsim report <id> --results results/t078-gard-zoro.db --decisions
-```
+| | 关 `board_quality_gate` | 开（默认） |
+|---|---|---|
+| A WR（沙奈朵） | 90% | 92% |
+| B WR（N索） | 10% | 8% |
+| A 胜因 deck_out | 27 | 18 |
+| A 胜因 prizes | 53 | 65 |
+| A 精神幻觉 / 攻击占比 | 623 / 58.3% | 520 / 52.9% |
+| A 奇迹之力 / 攻击占比 | 95 / 8.9% | 150 / 15.3% |
+| A retreat 次数 | 103 | 149 |
+| A place_active 愿增猿 | 49 | 48 |
+| A place_active 拉鲁拉丝 | 18 | 20 |
 
-入库 YAML 是默认开。关开关分母不要提交：临时把两边改成 `params: {board_quality_gate: false}`，记下 `attack.detail.name` / `attack`、`attach_energy.detail.target`、`evolve`、`game_over.detail.reason`，再跑默认开。失败局必须是 0。胜率写实，不凑 60–75%
+结构方向对（幻觉↓、奇迹↑、斩杀撤退↑、deck_out↓）。本刀单独不要求进 60–75%。胜率 90%→92% 略恶化，诚实写。开局愿增猿占比几乎不动，与「手里无线则仍按 pokemon_score」一致。
 
-- **未做**：079、080。不跑矩阵，不引入 JEV/LLM。代理不合并
+- **未做**：079、080。不跑矩阵，不引入 JEV/LLM。代理不合并（待 owner 拍板）
 
 ### 2026-10-28 task 078 规划：攻击 / 前场 / 能量（文档，已由上面的拍板接上；当时不实现）
 

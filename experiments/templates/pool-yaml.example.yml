@@ -1,0 +1,11 @@
+# 入口 2：池 YAML。复制后可改 pool 路径或 games_per_pair。
+# 这里每对 1 局，只验证入口。正式 500 局用 experiments/v2-calibration.example.yml。
+# bfsim run experiments/templates/pool-yaml.example.yml --results results/pool-smoke.db
+name: pool-yaml-template
+seed_start: 1
+matrix:
+  pool: config/target-pool.v2.yml
+  games_per_pair: 1
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

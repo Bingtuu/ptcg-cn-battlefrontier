@@ -88,6 +88,44 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pairings(args: argparse.Namespace) -> int:
+    """池内 archetype 的真实逐桌对阵对照（task 073）。只读，不跑模拟。"""
+    from battlefrontier.data.pairings import pairing_contrast
+    from battlefrontier.data.pool import load_target_pool
+    from battlefrontier.report.calibration import (
+        REAL_BASIS,
+        REAL_DATE_FROM,
+        REAL_DATE_TO,
+    )
+    from battlefrontier.report.pairing_pack import (
+        format_pairing_contrast,
+        write_pairing_pack,
+    )
+
+    pool = load_target_pool(args.pool)
+    names = [d.en_archetype for d in pool.decks]
+    db_path = args.db or load_db_path()
+    try:
+        rep = pairing_contrast(
+            db_path, names,
+            date_from=args.date_from or REAL_DATE_FROM,
+            date_to=args.date_to or REAL_DATE_TO,
+            basis=args.basis or REAL_BASIS,
+            division=args.division,
+            sample_limit=args.sample_limit,
+        )
+    except ValueError as e:
+        print(f"错误：{e}")
+        return 1
+    text = format_pairing_contrast(rep)
+    stem = Path(args.pool).stem
+    out_dir = Path(args.out) if args.out else Path("results") / f"{stem}-pairings"
+    paths = write_pairing_pack(out_dir, rep)
+    print(text)
+    print("对阵包：" + " ".join(str(p) for p in paths.values()))
+    return 0
+
+
 def _cmd_sensitivity(args: argparse.Namespace) -> int:
     from battlefrontier.report.sensitivity import (
         format_sensitivity,
@@ -646,6 +684,21 @@ def main(argv: list[str] | None = None) -> int:
         "--out", default=None,
         help="偏差包目录（默认 results/<实验名>-deviation）：同时写 md/html/csv/json",
     )
+    pr_p = sub.add_parser(
+        "pairings",
+        help="只读拉取池内 archetype 的真实逐桌对阵（task 073，对照用，不是浏览）",
+    )
+    pr_p.add_argument("--pool", required=True, help="目标卡组池 YAML（用其中 en_archetype）")
+    pr_p.add_argument("--db", default=None, help="ptcg-cn.db 路径（缺省读本机配置）")
+    pr_p.add_argument("--date-from", default=None, help="窗口起（默认与 calibration 相同）")
+    pr_p.add_argument("--date-to", default=None, help="窗口止（默认与 calibration 相同）")
+    pr_p.add_argument("--basis", default=None, help="默认 intl_aligned，与 calibration 相同")
+    pr_p.add_argument("--division", default="master", help="赛区（默认 master；NULL 赛区也保留）")
+    pr_p.add_argument("--sample-limit", type=int, default=20, help="原始行抽样上限（不是分母）")
+    pr_p.add_argument(
+        "--out", default=None,
+        help="对阵包目录（默认 results/<池文件名>-pairings）：同时写 md/html/csv/json",
+    )
     chk_p = sub.add_parser("dsl-check", help="DSL 文件校验（schema + 词表；LLM harness 闸 1）")
     chk_p.add_argument("files", nargs="+", help="DSL YAML 路径（可多个）")
     chk_p.add_argument("--db", default=None,
@@ -783,6 +836,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_sensitivity(args)
     if args.cmd == "calibration":
         return _cmd_calibration(args)
+    if args.cmd == "pairings":
+        return _cmd_pairings(args)
     if args.cmd == "dsl-check":
         return _cmd_dsl_check(args)
     if args.cmd == "tune":

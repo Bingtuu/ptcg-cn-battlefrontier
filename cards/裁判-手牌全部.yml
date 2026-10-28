@@ -1,0 +1,16 @@
+# 裁判（30thDC-037，支援者）——「各将手牌全部放回牌库」文本类
+# （同名多文本拆分：「各将所有手牌放回牌库」类见 裁判-4张.yml，CSVH1C-051 等 31 印刷）
+# text_raw 原文：「双方玩家各将手牌全部放回牌库并重洗牌库。然后，各从牌库上方抽取4张卡牌。」
+# 语序与「4张」类一致（裁判-4张.yml D-WP7-9 口径）：双方手牌先各自回库重洗
+# （shuffle_hand_into_deck ×2），再各抽 4（对手侧 draw selector=opponent_deck，
+# 奇树结构先例）；手牌空照常重洗并抽 4。
+card:
+  name_group: 裁判
+  card_ids: [30thDC-037]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: shuffle_hand_into_deck, selector: own_hand}
+      - {action: shuffle_hand_into_deck, selector: opponent_hand}
+      - {action: draw, count: 4}
+      - {action: draw, selector: opponent_deck, count: 4}

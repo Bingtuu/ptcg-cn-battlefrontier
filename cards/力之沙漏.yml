@@ -1,0 +1,17 @@
+# 力之沙漏（CSV8C-188，宝可梦道具）
+# text_raw 原文：「在自己的回合结束时，如果身上放有这张卡牌的宝可梦在战斗场上的话，则可选择自己弃牌区中的1张基本能量，附着于那只宝可梦身上。」
+# own_turn_end 事件触发（task 069 WP4，D-069-1 时点口径 = 检查阶段内、状态结算之后，
+# 仅回合结束方入队）；来源 = 附着道具（_drain_event_triggers 按 iid 找回持有者，
+# 道具消除/离场守卫在排水点实时判定）；「在战斗场上的话」= condition holder_is_active；
+# 「则可选择」= energy_up_to=true（min_choose=0 可放弃）；target_pool=self（task 069
+# WP4）段2 免选，目标固定为道具持有者自身；弃牌区无基本能量 → 不挂起空结算。
+card:
+  name_group: 力之沙漏
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：全 H 标 4 印刷
+  card_ids: [CSV8C-188, CSV9C-265, CSVH5aC-014, CSVH6aC-014]
+effects:
+  - trigger: trigger_on_event
+    event: own_turn_end
+    condition: holder_is_active
+    actions:
+      - {action: attach_energy, selector: own_discard, filters: [basic_energy], choose: 1, destination: attach, args: {target_pool: self, energy_up_to: true}}

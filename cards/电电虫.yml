@@ -1,0 +1,22 @@
+# 电电虫（CBB5C-1501，基础，招式：电电充能）
+# text_raw 原文：「【无】 电电充能 
+# 选择自己牌库中的「基本【草】能量」和「基本【雷】能量」各最多2张，以任意方式附着于自己宝可梦身上。并重洗牌库。」
+# 电电充能 = 双 attach_energy own_deck 节点（「基本【草】能量」和「基本【雷】能量」
+# 各最多 2 张 = 各节点 choose=2 up-to 分属性收口；「以任意方式附着」= 逐张挂起选
+# 目标自由分配，烈炎支配 D-WP7-8 先例 + distribute 显式声明标记 D-029-5）。
+# 已知偏差（报主会话核销，🔲 待核）：单节点「双属性各 cap」形态不存在，两节点各自
+# 内建重洗 → 洗牌 2 次 vs 原文「并重洗牌库」1 次（均匀重洗复合分布等价，仅种子
+# 消耗差 1 次；不重洗节点无法表达——不猜）。
+card:
+  name_group: 电电虫
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：H 标 8 印刷
+  card_ids: [CBB5C-1501, CBB5C-1502, CBB5C-1503, CBB5C-1504, CBB5C-1505, CBB5C-1506,
+             CBB5C-1507, CSV9C-063]
+effects:
+  - trigger: on_attack
+    attack: 电电充能
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: attach_energy, selector: own_deck, filters: [basic_energy, energy_草], choose: 2, destination: attach, args: {distribute: true}}
+      - {action: attach_energy, selector: own_deck, filters: [basic_energy, energy_雷], choose: 2, destination: attach, args: {distribute: true}}

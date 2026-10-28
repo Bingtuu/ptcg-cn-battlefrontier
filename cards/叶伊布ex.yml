@@ -1,0 +1,26 @@
+# 叶伊布ex（CSV9.5C-006，1阶，草属性，TERA，规则盒 ex，evolves_from=伊布）
+# text_raw 原文：「【草】【无】 绿叶风暴 60×
+# 造成对手所有宝可梦身上附着的能量数量×60伤害。
+#
+# 【草】【火】【水】 苔纹玛瑙 230
+# 将自己所有备战宝可梦的HP，各回复「100」。」
+# 绿叶风暴 60×（task 069 WP6 计数词已注册）：damage count=attached_energy_on_opponent_all
+# （对手全场战斗+备战附着能量总数）args {per: 60, op: "×"}。
+# 苔纹玛瑙 230 + 备战全体恢复（task 069 WP6 heal own_bench 形态）：无 choose 逐只
+# 恢复 100（去 10 个指示物，不过回复 floor 0；备战空 → 该节点 no-op、伤害照算）。
+# TERA 规则盒引擎原生（D-070-4），DSL 不写。
+card:
+  name_group: 叶伊布ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-27）：全 H 标 2 印刷，
+  # 均在最新 standard 快照（standard-2026-09-16）合法
+  card_ids: [CSV9.5C-006, CSV9.5C-221]
+effects:
+  - trigger: on_attack
+    attack: 绿叶风暴
+    actions:
+      - {action: damage, selector: opponent_active, count: attached_energy_on_opponent_all, args: {per: 60, op: "×"}}
+  - trigger: on_attack
+    attack: 苔纹玛瑙
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 230}}
+      - {action: heal, selector: own_bench, args: {amount: 100}}

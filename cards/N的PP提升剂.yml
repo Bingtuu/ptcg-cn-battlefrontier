@@ -1,0 +1,14 @@
+# N的PP提升剂（CSV10C-190，物品）
+# text_raw 原文：「选择自己弃牌区中的1张基本能量，附着于备战区中的「N的宝可梦」身上。」
+# attach_energy bench-only（task 026 WP4 飞天螳螂先例）：段1 选弃牌区 1 张基本能量
+# （choose=1 不可放弃——「选择…1张」非「最多」），段2 目标池 = 备战区「N的宝可梦」
+# （target_filters owner_pokemon:N ← CardDef.owner ← db cards.owner）；任一侧为空
+# no-op 不挂起；打出可行性门（playable_feasible target_pool=own_bench 形式）按
+# 弃牌区能量池 / 备战目标池双侧非空枚举（无效果不可使用）。
+card:
+  name_group: N的PP提升剂
+  card_ids: [CSV10C-190]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: attach_energy, selector: own_discard, filters: [basic_energy], choose: 1, destination: attach, args: {target_pool: own_bench, target_filters: ["owner_pokemon:N"]}}

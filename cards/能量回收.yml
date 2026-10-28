@@ -1,0 +1,19 @@
+# 能量回收（CSVH1C-034，物品）
+# text_raw 原文：「选择自己弃牌区中最多2张基本能量，在给对手看过之后，加入手牌。」
+# 「最多2张」= up-to（min_choose=0，args.up_to，水莲的照顾先例）；reveal 一期口径：
+# 仅落结构化事件流（iids+卡名），对手可见视图不建模泄露（超级能量回收同口径）。
+card:
+  name_group: 能量回收
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：14 印刷全收；
+  # 「将自己弃牌区中的2张…」无「最多」异文本类不混入（CSM1DC-230/CSM1aC-120/
+  # CSM2DC-236/CSMPcC-012/CSMPlC-008，如需其语义请新建 能量回收-<区分词>.yml）
+  card_ids: [CS1DC-164, CS3DC-128, CS4DaC-365, CS5DC-118, CSV4C-115, CSVE1C-104,
+             CSVE2C-137, CSVH1C-034, CSVH3C-037, CSVH5C-034, CSVM2aC-013, CSVM2cC-010,
+             CSVSC-049, SVP-235]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：回收选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [basic_energy], choose: 2, destination: hand, args: {up_to: true}}
+      - {action: reveal, selector: own_hand, filters: [basic_energy]}

@@ -560,6 +560,24 @@ _CONDITIONS = {
     "stadium_in_play": (
         lambda engine, player, mon: engine.state.stadium is not None
     ),
+    # task 069 WP3（璀璨结晶「身上放有这张卡牌的太晶宝可梦」）：持有者当前卡 is_tera
+    "holder_is_tera": (
+        lambda engine, player, mon: mon is not None and mon.current.card.is_tera
+    ),
+    # task 069 WP5（盖诺赛克特 ACE 锁「身上放有宝可梦道具」）：持有者附着道具非空
+    "holder_has_tool": (
+        lambda engine, player, mon: mon is not None and mon.attached_tool is not None
+    ),
+    # task 070 WP0（逆转能量「自己的剩余奖赏卡张数比对手多 + 附着于进化宝可梦
+    # （除「拥有规则的宝可梦」外）」）：组合词 = 奖赏比较 ∧ 持有者为进化
+    # （stage≥1）∧ 无规则盒；组合词先例 self_is_active_and_first_own_turn
+    "own_prizes_more_and_holder_evolved_no_rule_box": (
+        lambda engine, player, mon: len(engine.state.players[player].prizes)
+        > len(engine.state.players[1 - player].prizes)
+        and mon is not None
+        and mon.current.card.stage >= 1
+        and mon.current.card.rule_box is None
+    ),
 }
 
 
@@ -689,12 +707,16 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                     f"特性可行性门未支持 attach_energy selector={node.selector!r}（不猜）"
                 )
             target_pool = node.args.get("target_pool", "own_pokemon_in_play")
-            if target_pool not in ("own_pokemon_in_play", "own_bench"):
+            if target_pool not in ("own_pokemon_in_play", "own_bench", "self"):
                 raise DslError(
                     f"特性可行性门未支持 attach_energy target_pool={target_pool!r}（不猜）"
                 )
             if not resolve_pool(p, "own_discard", node.filters):
                 return False
+            if target_pool == "self":
+                # task 069 WP4（力之沙漏 回合末回收附能到持有者自身）：
+                # 持有者恒在场（枚举保证），只查弃牌区能量池
+                continue
             target_filters = tuple(node.args.get("target_filters", ()))
             if target_pool == "own_bench":
                 # task 026 WP4：bench-only 附着——备战区无合法目标不可行
@@ -714,7 +736,9 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                 )
                 or (
                     node.selector == "own_attached_energy"
-                    and node.choose == 1
+                    and isinstance(node.choose, int)
+                    and not isinstance(node.choose, bool)
+                    and node.choose >= 1
                     and node.count is None
                 )
             ):
@@ -724,6 +748,17 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                 )
         elif node.action == "draw":
             continue  # 抽牌恒可行（牌库空抽完即止；until_hand 超出空结算）
+        elif node.action == "heal":
+            # task 069 WP6（叶伊布ex 青翠复苏类备战全体回复）：own_bench 全体回复——
+            # 备战区空不可行；满血空结算合法（原语侧 total>0 才 set_state），
+            # 此处不查伤害（「无效果不可使用」对回复全体门按备战非空口径）
+            if node.selector != "own_bench" or node.choose is not None:
+                raise DslError(
+                    f"特性可行性门未支持 heal 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            if not p.bench:
+                return False
         elif node.action == "move_damage_counters":
             # 亢奋脑力（task 017）：自己场上有带伤害指示物的宝可梦（来源）+
             # 对手场上有宝可梦（转放落点）

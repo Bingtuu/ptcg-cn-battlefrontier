@@ -1,0 +1,29 @@
+# 密勒顿ex（CSV1C-050，基础，规则盒 ex，特性：串联装置）
+# text_raw 原文：「特性: 串联装置
+# 在自己的回合可以使用1次。选择自己牌库中最多2张【雷】属性的【基础】宝可梦，放于备战区。并重洗牌库。
+#
+# 【雷】【雷】【无】 光子引爆 220
+# 在下一个自己的回合，这只宝可梦无法使用招式。」
+# 串联装置 = 巢穴球同款 search_deck bench 去向的特性化（ability_manual once_per_turn；
+# 可行性门 = 牌库有匹配 + 备战区有余量）；检索后重洗按 DSL 编写纪律显式 shuffle_deck
+# 节点表达。
+# 光子引爆（task 026 WP4 裁决 2 口径）：damage 220 + lock_attack self；本卡仅单招式，
+# 原文「无法使用招式」与锁本招式名等价（附录 A D-WP4-5 已知近似同拉帝亚斯ex）。
+card:
+  name_group: 密勒顿ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：G 标 9 印刷
+  card_ids: [CSV1C-050, CSV1C-138, CSV1C-154, CSV1C-164, CSVE1pC-016, CSVL2C-028,
+             CSVL2C-131, CSVM1cC-006, SVP-011]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_pokemon, pokemon_雷], choose: 2, destination: bench}
+      - {action: shuffle_deck}
+  - trigger: on_attack
+    attack: 光子引爆
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 220}}
+      - {action: lock_attack, selector: self}

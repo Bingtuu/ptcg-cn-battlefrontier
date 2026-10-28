@@ -1,0 +1,18 @@
+# 高级球（30thC-101，物品）——「…后才可以使用这张卡牌」文本类
+# （同名多文本拆分：「这张卡牌，只有…后才可使用」类见 高级球.yml，CSV1C-112 等）
+# text_raw 原文：「只有将自己的2张手牌放于弃牌区后才可以使用这张卡牌。
+#
+# 选择自己牌库中的1张宝可梦，在给对手看过之后加入手牌。并重洗牌库。」
+card:
+  name_group: 高级球
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：全 I 标 3 印刷
+  card_ids: [30thC-101, 30thDC-030, CSVH6C-035]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    cost:
+      - {action: discard, selector: own_hand, choose: 2}
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [pokemon], choose: 1, destination: hand}
+      - {action: shuffle_deck}

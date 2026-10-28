@@ -1,0 +1,19 @@
+# 盖诺赛克特（CSV9C-133，基础，特性：ACE消除器）
+# text_raw 原文：「特性: ACE消除器
+# 如果这只宝可梦身上放有「宝可梦道具」的话，则对手无法从手牌使出「【ACE SPEC】」卡牌。
+#
+# 【钢】【无】【无】 磁力爆破 100」
+# ACE消除器（task 069 WP5，D-069-2 🔲 待核）：passive_static lock_play/ace_spec 声明
+# + holder_has_tool 条件（对声明持有者求值）；引擎 _ace_spec_play_locked 实时扫场
+# 读声明——对手 ACE SPEC 广义五门类（物品/支援者/竞技场打出 + 道具附着 + 能量附着）
+# 枚举全锁；来源离场/道具移除/特性被消除（D-029-1 守卫落点④）即解锁，天然无追溯。
+# 磁力爆破 100 无效果文，引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 盖诺赛克特
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：H 标 2 印刷
+  card_ids: [CSV9C-133, SVP-415]
+effects:
+  - trigger: passive_static
+    condition: holder_has_tool
+    actions:
+      - {action: lock_play, args: {category: ace_spec}}

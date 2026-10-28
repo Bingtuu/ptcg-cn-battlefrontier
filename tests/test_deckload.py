@@ -211,10 +211,12 @@ def test_library_docs_semantics() -> None:
     from helpers import doc_of
 
     docs = load_card_dir("cards")
-    ub = doc_of(docs, "高级球").effects[0]
-    assert ub.cost[0].action == "discard" and ub.cost[0].choose == 2
-    assert ub.actions[0].action == "search_deck" and ub.actions[0].destination == "hand"
-    assert ub.actions[1].action == "shuffle_deck"
+    # 高级球同名多文本拆分（30th 再录，D-070-3）：两等价类语义同构，逐文档断言
+    for ub_doc in docs.by_name("高级球"):
+        ub = ub_doc.effects[0]
+        assert ub.cost[0].action == "discard" and ub.cost[0].choose == 2
+        assert ub.actions[0].action == "search_deck" and ub.actions[0].destination == "hand"
+        assert ub.actions[1].action == "shuffle_deck"
     nb = doc_of(docs, "巢穴球").effects[0]
     assert nb.actions[0].destination == "bench"
     assert "basic_pokemon" in nb.actions[0].filters

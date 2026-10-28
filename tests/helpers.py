@@ -76,9 +76,10 @@ def effects_by_name(library) -> dict:
     例外（task 026 WP6）：「火恐龙」同文本等价类拆分文件（大字爆炎/闪焰之幕，
     与索财灵/百变怪拆分同例）保留 name_group=火恐龙——stub 对局用不到该名，
     真实卡组走 card_id 挂载；已知白名单内的重复组跳过按名注入，其余重复仍报错
-    （防错挂守卫不放宽）。
+    （防错挂守卫不放宽）。task 070 WP1a 追加：高级球/裁判（30th 同效果异文本
+    再录拆分，D-070-3 预期同组多文档）。
     """
-    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙"}
+    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙", "高级球", "裁判"}
     docs = list({id(d): d for d in library.values()}.values())
     names = [d.card.name_group for d in docs]
     dupes = {n for n in names if names.count(n) > 1}

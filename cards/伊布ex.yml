@@ -1,0 +1,20 @@
+# 伊布ex（CSV9.5C-140，基础，无属性，TERA，规则盒 ex，特性：虹色因子）
+# text_raw 原文：「特性: 虹色因子
+# 这只宝可梦，可以从手牌中使出从「伊布」进化而来的「宝可梦【ex】」，放于这只宝可梦身上进行进化。（在自己最初的回合，以及刚出场的回合无法进化。）
+#
+# 【火】【水】【雷】 石英闪耀 200」
+# 虹色因子 = 声明式进化加宽（task 069 WP1，附录 A 待核决议随 D-070-4 不核销）：
+# passive_static + modify_evolution args {match_evolves_from: 伊布, rule_box: ex}——
+# 手牌中 rule_box==ex 且 evolves_from==伊布 的卡可进化到本卡；括号句 = 既有进化门
+# （entered_play_this_turn / evolved_this_turn / turn==1 不清除）自然生效，不放宽。
+# TERA 规则盒引擎原生（D-070-4），DSL 不写。
+# 石英闪耀 200 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: 伊布ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-27）：全 H 标 4 印刷，
+  # 均在最新 standard 快照（standard-2026-09-16）合法
+  card_ids: [CSV9.5C-140, CSV9.5C-245, CSV9.5C-246, CSVH6pC-006]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_evolution, args: {match_evolves_from: 伊布, rule_box: ex}}

@@ -46,7 +46,9 @@ actions:
   - provide_energy          # 声明式：特殊能量提供值（task 026 WP8 喷射/夜光/薄雾：passive_static，引擎读声明，解释器不执行；args.types=[无] 单属性 / all 彩虹）
   - suppress_ability        # 声明式：特性消除（task 029 火箭队的监视塔：竞技场 passive_static，args.types=[属性] 双方场上该属性宝可梦特性全消；引擎 _ability_suppressed 统一守卫读声明）
   - suppress_tool           # 声明式：道具消除（task 029 阻碍之塔：竞技场 passive_static，双方所有宝可梦道具效果全消；引擎 _tool_suppressed 统一守卫读声明）
-  - lock_play               # 打出锁（task 029 含羞苞 痒痒花粉：on_attack，args.category=item——受击方下个自己回合无法从手牌使出物品；玩家侧回合标记 + turn 戳，对齐 lock_retreat 结构）
+  - lock_play               # 打出锁（task 029 含羞苞 痒痒花粉：on_attack，args.category=item——受击方下个自己回合无法从手牌使出物品；玩家侧回合标记 + turn 戳，对齐 lock_retreat 结构；task 069 WP5 盖诺赛克特：可挂 passive_static + category=ace_spec——对手无法从手牌使出 ACE SPEC，广义五门类，引擎 _ace_spec_play_locked 实时扫场读声明）
+  - modify_evolution        # 声明式：进化加宽（task 069 WP1 伊布ex 虹色因子：手牌中 rule_box 匹配且 evolves_from==args.match_evolves_from 的卡可进化到声明持有者；引擎 _main_actions 读声明，解释器不执行）
+  - prevent_ko              # 声明式：满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心：持有者卡 passive_static，引擎 _survival_cap 读声明，解释器不执行；args.remaining_hp=免死后剩余 HP / args.when=full_hp；仅截招式伤害，指示物/效果伤害/自伤不经守卫）
 
 # 选择器（作用对象）
 selectors:
@@ -85,6 +87,7 @@ counters:
   - damage_counters_on_target      # 目标身上伤害指示物数量
   - damage_counters_on_self        # 自身身上伤害指示物数量
   - attached_energy_on_opponent_active  # 对手战斗宝可梦附着能量数量
+  - attached_energy_on_opponent_all     # 对手全场（战斗+备战）附着能量总数（task 069 WP6 叶伊布ex 绿叶风暴 ×60）
   - bench_count_both               # 双方备战宝可梦数量
   - attached_energy_on_target      # 目标宝可梦附着能量数量（task 026 WP5 猛雷鼓 落雷风暴）
   - opponent_taken_prizes          # 对手已拿奖赏张数（=6−对手剩余奖赏；task 026 WP5 月月熊）
@@ -116,3 +119,4 @@ events:
   - own_ko_by_attack             # 在战斗场受到对手招式伤害而昏厥时（task 026 WP6 沙铃仙人掌 炸裂针刺）
   - pokemon_check                # 每次宝可梦检查时（task 026 WP7 雪妖女 冻结帷幕：双方回合结束后的检查阶段统一触发）
   - own_attach_from_hand_to_bench  # 自己的回合，从手牌附着能量于备战宝可梦时（task 026 WP8 喷射能量；仅手动附着行动，效果附着不触发）
+  - own_turn_end                 # 自己的回合结束时（task 069 WP4 力之沙漏：附着道具声明；D-069-1 时点口径 = 检查阶段内、状态结算之后，仅回合结束方入队）

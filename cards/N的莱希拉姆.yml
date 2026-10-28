@@ -1,0 +1,16 @@
+# N的莱希拉姆（CSV10C-166，基础，招式：力量愤怒 / 纯真火焰）
+# text_raw 原文：「【火】【雷】 力量愤怒 20×
+# 造成这只宝可梦身上放置的伤害指示物数量×20伤害。
+#
+# 【火】【火】【雷】【无】 纯真火焰 170」
+# 力量愤怒 = damage_counters_on_self ×20（爬地翅 烫伤怒涛族同计数词）。
+# 纯真火焰 170 无效果文，引擎白板伤害结算，无需 DSL 绑定。
+card:
+  name_group: N的莱希拉姆
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：I 标 2 印刷
+  card_ids: [CSV10C-166, CSV10C-228]
+effects:
+  - trigger: on_attack
+    attack: 力量愤怒
+    actions:
+      - {action: damage, selector: opponent_active, count: damage_counters_on_self, args: {op: "×", per: 20}}

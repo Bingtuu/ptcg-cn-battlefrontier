@@ -74,12 +74,14 @@ PRIMITIVE_ARGS: dict[str, frozenset[str]] = {
     "grant_attack": frozenset({"attack", "discard_at_turn_end"}),
     "modify_weakness": frozenset({"becomes", "scope", "target_type"}),
     "modify_retreat_cost": frozenset({"scope", "value"}),
-    "modify_attack_cost": frozenset({"attack", "value"}),
+    "modify_attack_cost": frozenset({"attack", "types", "value"}),
     "bench_size": frozenset({"value"}),
     "protection": frozenset({"scope", "target_filters"}),
     "provide_energy": frozenset({"count", "types"}),
     "suppress_ability": frozenset({"types"}),
     "suppress_tool": frozenset(),
+    "modify_evolution": frozenset({"match_evolves_from", "rule_box"}),
+    "prevent_ko": frozenset({"remaining_hp", "when"}),
     # ── 词表已有、实现未注册的原语（占位：不接受 args；实现时收紧）──
     "put_into_play": frozenset(),
 }
@@ -137,7 +139,9 @@ def _discard(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | 
     args.any_count=true（task 026 WP5，D-WP5-1）：「任意数量」= up-to all
     （min_choose=0，max=池大小；选 0 张合法）；与 count/choose 互斥。
     selector=own_attached_energy（task 026 WP5 猛雷鼓ex 极雷轰）：自己场上全体
-    宝可梦附着能量池（filters 如 basic_energy），摘下弃置——仅 any_count 形式。
+    宝可梦附着能量池（filters 如 basic_energy），摘下弃置——any_count 形式，
+    或 choose=N 定点形式（池收窄为来源宝可梦附着能量；task 026 WP6 火恐龙
+    choose=1 / task 069 WP6 皮卡丘ex 黄晶伏特 choose=3）。
     结果字典恒带 discarded 张数：解释器累计进 ctx.discarded_this_effect，
     供 damage 的 discarded_this_effect 计数词读取（×N 伤害族）。
     """
@@ -150,13 +154,14 @@ def _discard(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | 
         raise DslError(f"discard 的 any_count 须为 bool（收到 {any_count!r}）")
     if any_count and (node.choose is not None or node.count is not None):
         raise DslError("discard 的 any_count 与 count/choose 互斥（「任意数量」= up-to all）")
-    if (
-        node.selector == "own_attached_energy" and not any_count
-        and not (node.choose == 1 and node.count is None)
-    ):
+    fixed_choose = (
+        isinstance(node.choose, int) and not isinstance(node.choose, bool)
+        and node.choose >= 1 and node.count is None
+    )
+    if node.selector == "own_attached_energy" and not any_count and not fixed_choose:
         raise DslError(
             "discard own_attached_energy 暂仅支持 args.any_count=true（任意数量）"
-            "或 choose=1（「这只宝可梦身上」定点弃 1，task 026 WP6）形式"
+            "或 choose=N（「这只宝可梦身上」定点弃 N，正 int）形式"
             f"（收到 choose={node.choose!r}/count={node.count!r}，不猜）"
         )
     if node.count == "all" and node.choose is None and not any_count:
@@ -199,17 +204,18 @@ def _discard(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | 
         }))
         return {"discarded": len(moved), "iids": list(choice)}
     if node.selector == "own_attached_energy":
-        # choose=1（task 026 WP6，火恐龙 大字爆炎「选择这只宝可梦身上附着的1张能量」）：
-        # 池收窄为来源宝可梦附着能量（其他自己宝可梦的能量经 exclude_iids 剔除）；
-        # 来源无匹配能量 → no-op 不挂起（伤害等前序/后续节点照算，清单 28）
+        # choose=N（task 026 WP6 火恐龙 大字爆炎 choose=1；task 069 WP6 皮卡丘ex
+        # 黄晶伏特 choose=3「弃掉这只宝可梦身上附着的3个能量」）：池收窄为来源宝可梦
+        # 附着能量（其他自己宝可梦的能量经 exclude_iids 剔除）；池不足 N → no-op
+        # 不挂起（对齐池空 no-op 口径；伤害等前序/后续节点照算，清单 28）
         source_mon = _find_source_mon(ctx)
         if source_mon is None:
-            raise DslError("discard own_attached_energy choose=1：来源宝可梦不在场上")
+            raise DslError("discard own_attached_energy choose=N：来源宝可梦不在场上")
         p = ctx.player_state
         if choice is None:
             pool = tuple(e for e in source_mon.attached_energy
                          if matches(e, node.filters))
-            if not pool:
+            if len(pool) < node.choose:
                 return {"discarded": 0, "iids": []}
             others = tuple(
                 e.iid
@@ -218,7 +224,8 @@ def _discard(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | 
                 for e in m.attached_energy
             )
             return NeedChoice(pool="own_attached_energy", filters=node.filters,
-                              min_choose=1, max_choose=1, exclude_iids=others)
+                              min_choose=node.choose, max_choose=node.choose,
+                              exclude_iids=others)
         slot, idx, holder = ctx.engine._find_in_play(p, source_mon.current.iid)
         moved = tuple(e for e in holder.attached_energy if e.iid in choice)
         holder = holder.model_copy(update={
@@ -768,6 +775,12 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
 
     selector=own_hand + args.target_pool=self（task 027，D-027-5，厄诡椪 碧草之舞）：
     单段选择手牌能量附到来源持有者自身，见 _attach_energy_from_hand。
+
+    selector=own_discard + args.target_pool=self（task 069 WP4，力之沙漏
+    「则可选择自己弃牌区1张基本能量，附着于这只宝可梦身上」）：段1 选弃牌区能量
+    （energy_up_to=true → min_choose=0 可放弃），段2 免选——目标固定为来源
+    （道具）持有者（_self_holder_iid 解析）；target_filters 组合 = DslError
+    （目标固定，过滤无语义，不猜）。
     """
     if node.destination != "attach":
         raise DslError(f"attach_energy 暂仅支持 destination=attach（收到 {node.destination!r}）")
@@ -787,10 +800,15 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
     if not isinstance(multi, bool):
         raise DslError(f"attach_energy 的 multi_target 须为 bool（收到 {multi!r}）")
     target_pool = node.args.get("target_pool", "own_pokemon_in_play")
-    if target_pool not in ("own_pokemon_in_play", "own_bench"):
+    if target_pool not in ("own_pokemon_in_play", "own_bench", "self"):
         raise DslError(
-            f"attach_energy 的 target_pool 暂仅支持 own_pokemon_in_play/own_bench"
+            f"attach_energy 的 target_pool 暂仅支持 own_pokemon_in_play/own_bench/self"
             f"（收到 {target_pool!r}）"
+        )
+    if target_pool == "self" and target_filters:
+        raise DslError(
+            "attach_energy target_pool=self 不支持 target_filters"
+            "（目标固定为来源持有者，过滤无语义，不猜）"
         )
     if multi and target_pool != "own_pokemon_in_play":
         raise DslError(
@@ -824,6 +842,12 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
         # 段1 恢复：energy_up_to 选 0 张 → 直接完成，不进段2（D-WP4-4）
         if energy_up_to and not choice:
             return {"attached": 0, "iids": [], "destination": "attach"}
+        # target_pool=self（task 069 WP4 力之沙漏）：段2 免选，目标固定为来源
+        # （道具）持有者自身
+        if target_pool == "self":
+            return _attach_energy_finish(
+                ctx, tuple(choice), _self_holder_iid(ctx), counters,
+            )
         # 第二段：选目标宝可梦（能量选择经 carry 冻结传递；target_pool=own_bench
         # 时目标池为备战区，战斗场不可选）
         return NeedChoice(
@@ -832,12 +856,34 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
         )
 
     # 恢复完成：carry = 能量 iids，choice = 目标栈顶 iid
-    energy_iids = set(ctx.carry)
-    target_iid = choice[0]
+    return _attach_energy_finish(ctx, tuple(ctx.carry), choice[0], counters)
+
+
+def _self_holder_iid(ctx: ExecutionContext) -> int:
+    """target_pool=self 目标解析（task 069 WP4）：来源为场上宝可梦栈顶 → 其自身；
+    来源为附着道具（力之沙漏）→ 道具持有者。均不在场 = DslError（不猜）。"""
     p = ctx.player_state
-    energies = tuple(c for c in p.discard if c.iid in energy_iids)
+    for m in ([p.active] if p.active else []) + list(p.bench):
+        if m.current.iid == ctx.source.iid:
+            return m.current.iid
+        if m.attached_tool is not None and m.attached_tool.iid == ctx.source.iid:
+            return m.current.iid
+    raise DslError(
+        "attach_energy target_pool=self：来源（道具）持有者不在场上（不猜）"
+    )
+
+
+def _attach_energy_finish(
+    ctx: ExecutionContext, energy_iids: tuple[int, ...], target_iid: int,
+    counters: int,
+) -> dict[str, object]:
+    """own_discard 附着完成段：所选能量从弃牌区摘下附到目标（含 damage_counters
+    附加），统一 check_knockouts（守卫外的理论兜底）。"""
+    iid_set = set(energy_iids)
+    p = ctx.player_state
+    energies = tuple(c for c in p.discard if c.iid in iid_set)
     p = p.model_copy(update={
-        "discard": tuple(c for c in p.discard if c.iid not in energy_iids),
+        "discard": tuple(c for c in p.discard if c.iid not in iid_set),
     })
 
     def attach(mon: InPlayPokemon) -> InPlayPokemon:
@@ -854,7 +900,7 @@ def _attach_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, .
     }))
     ctx.engine.check_knockouts()
     return {
-        "attached": len(energies), "energy_iids": sorted(energy_iids),
+        "attached": len(energies), "energy_iids": sorted(iid_set),
         "target_iid": target_iid, "damage_counters": counters,
     }
 
@@ -1003,6 +1049,13 @@ def _eval_counter(ctx: ExecutionContext, word: str, target: InPlayPokemon | None
         return target.damage // 10
     if word == "attached_energy_on_opponent_active":
         return len(opp.active.attached_energy) if opp.active else 0
+    if word == "attached_energy_on_opponent_all":
+        # task 069 WP6（叶伊布ex 绿叶风暴「对手场上宝可梦身上附着的能量数量」×60）：
+        # 对手全场（战斗+备战）附着能量总数
+        return sum(
+            len(m.attached_energy)
+            for m in ([opp.active] if opp.active else []) + list(opp.bench)
+        )
     if word == "attached_energy_on_both_actives":
         # task 027（厄诡椪 万叶阵雨「双方战斗宝可梦身上附着的能量数量」）：
         # 双方战斗场附着能量总数；任一侧战斗场空按 0 计
@@ -1186,6 +1239,11 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
             weakness=ctx.engine._effective_weakness(ctx.player, target))
     else:
         final = amount
+    # 满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）：仅招式伤害
+    # （ctx.trigger=="on_attack" 门控；on_play 等效果伤害不经守卫，对齐
+    # D-WP6-7/D-WP7-5 先例）；截顶作用于弱点/抗性结算后的 final
+    if ctx.trigger == "on_attack":
+        final = engine._survival_cap(defender_idx, target, final)
     engine._set_player(defender_idx, engine._replace_in_play(
         d, slot, idx, target.model_copy(update={"damage": target.damage + final}),
     ))
@@ -1673,6 +1731,9 @@ def _copy_attack(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
                                  target_rule_box=d.active.current.card.rule_box)
                              if attacker is not None else 0
                          ))
+    # 满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）：
+    # 复制招式的白板伤害与 _do_attack 同口径（复制招式也是我方所使用的招式）
+    dmg = engine._survival_cap(opp_idx, d.active, dmg)
     engine._set_player(opp_idx, d.model_copy(update={
         "active": d.active.model_copy(update={"damage": d.active.damage + dmg}),
     }))
@@ -1722,7 +1783,8 @@ def _heal(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | Non
     不超过已有伤害（floor 0；恢复类效果无过回复，rules-manual §7.1 恢复途径
     「使用恢复类效果」+ §6 伤害以伤害指示物累计）。昏厥检查无必要（恢复只减伤）。
     selector=own_active 自动目标；own_pokemon_in_play + choose=1 经 chooser 选目标
-    （filters 如 has_damage_counters；池空不挂起，尽力而为空结算）。
+    （filters 如 has_damage_counters；池空不挂起，尽力而为空结算）；
+    own_bench = 自己备战全体各恢复 N（task 069 WP6，无 choose）。
     """
     amount = node.args.get("amount")
     if not isinstance(amount, int) or isinstance(amount, bool) or amount < 0:
@@ -1773,7 +1835,23 @@ def _heal(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | Non
                         mon.model_copy(update={"damage": mon.damage - healed}),
                     ))
         return {"healed": total}
-    raise DslError(f"heal 暂仅支持 selector=own_active/own_pokemon_in_play/all_pokemon_both（收到 {node.selector!r}）")
+    if node.selector == "own_bench":
+        # 自己备战全体恢复（task 069 WP6 叶伊布ex 苔纹玛瑙「自己备战区的所有宝可梦
+        # 各恢复100」）：无 choose 逐只恢复（不过回复 floor 0）；备战空 → no-op
+        _require_no_choose(node, "heal")
+        p = ctx.player_state
+        total = 0
+        new_bench = []
+        for m in p.bench:
+            healed = min(amount, m.damage)
+            total += healed
+            new_bench.append(
+                m.model_copy(update={"damage": m.damage - healed}) if healed else m
+            )
+        if total:
+            ctx.set_player_state(p.model_copy(update={"bench": tuple(new_bench)}))
+        return {"healed": total}
+    raise DslError(f"heal 暂仅支持 selector=own_active/own_pokemon_in_play/own_bench/all_pokemon_both（收到 {node.selector!r}）")
 
 
 @register("coin_flip")
@@ -2334,7 +2412,9 @@ def _lock_play(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] 
     门控（core._main_actions）；支援者/竞技场/道具附着/能量附着不受影响。
     落点是玩家而非宝可梦——不接闪焰之幕类 protection 守卫（D-WP6-7 守卫清单
     均作用于宝可梦目标）。
-    args.category 暂仅支持 item（未知 category = DslError 不猜）。
+    args.category：解释执行路径仅支持 item（D-029-3）；ace_spec（task 069 WP5
+    盖诺赛克特 ACE 锁）仅 passive_static 声明挂载（引擎 _ace_spec_play_locked
+    实时扫场读声明，不经本解释路径）——经本路径收到 = DslError（不猜）。
     """
     _require_no_choose(node, "lock_play")
     if node.selector is not None:
@@ -2344,7 +2424,8 @@ def _lock_play(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] 
     category = node.args.get("category")
     if category != "item":
         raise DslError(
-            f"lock_play 的 category 暂仅支持 item（收到 {category!r}；不猜）"
+            f"lock_play 解释执行路径的 category 暂仅支持 item（收到 {category!r}；"
+            f"ace_spec 仅 passive_static 声明挂载，不猜）"
         )
     engine = ctx.engine
     opp_idx = 1 - ctx.player

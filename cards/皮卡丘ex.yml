@@ -1,0 +1,28 @@
+# 皮卡丘ex（CSV9C-054，基础，雷属性，TERA，规则盒 ex，特性：顽强之心）
+# text_raw 原文：「特性: 顽强之心
+# 当这只宝可梦的HP为全满的状态下，这只宝可梦受到招式的伤害而【昏厥】时，这只宝可梦不会【昏厥】，而是以剩余HP为「10」的状态留在场上。
+#
+# 【草】【雷】【钢】 黄晶伏特 300
+# 选择这只宝可梦身上附着的3个能量，放于弃牌区。」
+# 顽强之心 = 声明式满 HP 免昏厥截顶（task 069 WP2，附录 A 待核决议随 D-070-4 不核销）：
+# passive_static + prevent_ko args {remaining_hp: 10, when: full_hp}——满 HP
+# （damage==0）受招式伤害致死时截顶至 有效HP−10；指示物/效果伤害/自伤不经守卫；
+# 特性消除失效。
+# 黄晶伏特 300 + 弃自身 3 能（task 069 WP6 discard own_attached_energy choose=3
+# 形态，火恐龙 大字爆炎 choose=1 先例扩展）：池收窄为来源宝可梦附着能量，
+# min=max=3 定点弃置；伤害节点先行（大字爆炎同序）。
+# TERA 规则盒引擎原生（D-070-4），DSL 不写。
+card:
+  name_group: 皮卡丘ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-27）：全 H 标 6 印刷，
+  # 均在最新 standard 快照（standard-2026-09-16）合法；其余 7 印刷为异文本类不混入
+  card_ids: [CSV9C-054, CSV9C-221, CSV9C-245, CSV9C-260, CSV9.5C-258, CSVH6pC-002]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: prevent_ko, args: {remaining_hp: 10, when: full_hp}}
+  - trigger: on_attack
+    attack: 黄晶伏特
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 300}}
+      - {action: discard, selector: own_attached_energy, choose: 3}

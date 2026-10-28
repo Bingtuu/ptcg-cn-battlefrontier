@@ -1,0 +1,22 @@
+# 逆转能量（CSV2C-128，特殊能量）
+# text_raw 原文：「只要这张卡牌，被附着于宝可梦身上，就被视作1个【无】能量。
+#
+# 如果自己的剩余奖赏卡张数，比对手的剩余奖赏卡张数多的话，则这张卡牌，只要被附着于进化宝可梦身上（除「拥有规则的宝可梦」外），就被视作3个所有属性的能量。」
+# provide_energy 条件分层（task 026 WP8 夜光能量先例，D-WP8-1/2）：有条件块覆盖无条件块，
+# 恰 1 条生效（同层 ≥2 条 DslError 不猜）。条件 = task 070 WP0 组合词
+# own_prizes_more_and_holder_evolved_no_rule_box（自己奖赏比对手多 ∧ 持有者 stage≥1
+# ∧ 无规则盒）；通过 = 3 个彩虹单元（types=all count=3，1 单元抵任意 1 个需求符号
+# 含有色），不通过/非进化/规则盒持有者 = 回退 1 个【无】。求值点实时读声明，
+# 奖赏翻转/进化换栈顶即生效。
+card:
+  name_group: 逆转能量
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-10-21）：全 G 标 3 印刷
+  card_ids: [CSV2C-128, CSV3C-165, CSVE2C-207]
+effects:
+  - trigger: passive_static
+    condition: own_prizes_more_and_holder_evolved_no_rule_box
+    actions:
+      - {action: provide_energy, args: {types: all, count: 3}}
+  - trigger: passive_static
+    actions:
+      - {action: provide_energy, args: {types: [无]}}

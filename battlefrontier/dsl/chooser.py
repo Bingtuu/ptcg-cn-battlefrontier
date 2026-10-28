@@ -89,6 +89,8 @@ class NeedChoice:
         self.anchor_iid: int | None = None
         # task 071 WP16：解释器挂起时标注（ctx.prev_optional_done 快照）
         self.prev_optional_done: bool | None = None
+        # 激流水泵：只枚举「放弃」或恰好 min(max_choose, 池大小) 张（不可少选）
+        self.exact_or_zero: bool = False
 
 
 def _match_one(card: CardInstance, filter_word: str) -> bool:
@@ -354,6 +356,14 @@ def enumerate_choices(pending: PendingChoice) -> list[Action]:
         return actions
     pool = tuple(sorted(pending.pool_iids))
     actions = []
+    if pending.exact_or_zero:
+        # 放弃，或恰好 k=min(上限, 池大小) 张（池不足则尽数，不可故意少选）
+        k = min(pending.max_choose, len(pool))
+        sizes = (0, k) if k > 0 else (0,)
+        for n in sizes:
+            for subset in combinations(pool, n):
+                actions.append(Action(kind="choose", choices=subset))
+        return actions
     for n in range(pending.min_choose, min(pending.max_choose, len(pool)) + 1):
         for subset in combinations(pool, n):
             if pending.ordered:
@@ -400,6 +410,7 @@ def build_pending(
             choose_groups=need.choose_groups,
             prev_optional_done=need.prev_optional_done,
             outer_carry=outer_carry,
+            exact_or_zero=need.exact_or_zero,
         )
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
     owner = 1 - player if need.pool.startswith("opponent") else player
@@ -451,6 +462,7 @@ def build_pending(
         pool_buckets=buckets,
         prev_optional_done=need.prev_optional_done,
         outer_carry=outer_carry,
+        exact_or_zero=need.exact_or_zero,
     )
 
 

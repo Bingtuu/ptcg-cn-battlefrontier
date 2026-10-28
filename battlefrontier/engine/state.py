@@ -185,6 +185,8 @@ class PendingChoice(FrozenModel):
     # 嵌套帧外层 carry（task 071 WP10 备战复制两段式）：内层挂起时冻结外层
     # 已选来源 iid，内层完成后恢复外层 copy 节点（既有单段复制 carry 为空，零变化）
     outer_carry: tuple[int, ...] = ()
+    # 激流水泵（TPCi 2024-09-12）：合法选择只有空集，或恰好 min(max_choose, 池大小) 张
+    exact_or_zero: bool = False
 
 
 class PlayerState(FrozenModel):

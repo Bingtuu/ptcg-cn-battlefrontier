@@ -48,7 +48,7 @@ PRIMITIVE_ARGS: dict[str, frozenset[str]] = {
     "apply_status": frozenset({"status"}),
     "switch": frozenset(),
     "move_energy": frozenset({
-        "any_count", "scope", "target_filters", "target_pool", "up_to",
+        "any_count", "opt_exact", "scope", "target_filters", "target_pool", "up_to",
     }),
     "evolve": frozenset({"mode"}),
     "move_damage_counters": frozenset({"max_counters", "target_pool"}),
@@ -1613,8 +1613,11 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
 
     task 071 WP5：args.any_count + target_pool=self——任意数量自己场上（除自身）
     附着能量转附固定目标=来源持有者，无段 2。
-    task 071 WP7：destination=deck + scope=self + up_to——从自身摘下最多 N 张
-    放回牌库并重洗；选 0 / 池空不洗牌。两种新形态都写 optional_done。
+    task 071 WP7：destination=deck + scope=self。
+    up_to=true：0～N 任意张（少选合法）。
+    opt_exact=true（激流水泵，TPCi 2024-09-12）：可放弃；若执行则必须
+    恰好 min(N, 身上张数) 张（够 N 不可少选，不足则尽数）。选 0 / 池空不洗牌。
+    两种新形态都写 optional_done。
     """
     if node.selector != "own_attached_energy":
         raise DslError(
@@ -1627,6 +1630,11 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     up_to = node.args.get("up_to", False)
     if not isinstance(up_to, bool):
         raise DslError(f"move_energy 的 up_to 须为 bool（收到 {up_to!r}）")
+    opt_exact = node.args.get("opt_exact", False)
+    if not isinstance(opt_exact, bool):
+        raise DslError(f"move_energy 的 opt_exact 须为 bool（收到 {opt_exact!r}）")
+    if up_to and opt_exact:
+        raise DslError("move_energy 的 up_to 与 opt_exact 互斥（不猜）")
     target_pool = node.args.get("target_pool")
     scope = node.args.get("scope")
     to_deck = node.destination == "deck"
@@ -1644,10 +1652,14 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
             "move_energy 的 any_count 暂仅支持 target_pool=self"
             f"（收到 {target_pool!r}，不猜）"
         )
-    if to_deck and (scope != "self" or not up_to or node.choose is None):
+    if to_deck and (
+        scope != "self" or node.choose is None or not (up_to or opt_exact)
+    ):
         raise DslError(
-            "move_energy destination=deck 需要 scope=self、up_to=true、choose=N"
-            f"（收到 scope={scope!r}/up_to={up_to!r}/choose={node.choose!r}）"
+            "move_energy destination=deck 需要 scope=self、choose=N，"
+            "以及 up_to 或 opt_exact 其一"
+            f"（收到 scope={scope!r}/up_to={up_to!r}/opt_exact={opt_exact!r}"
+            f"/choose={node.choose!r}）"
         )
     if not to_deck and not to_self and node.choose is None:
         raise DslError("move_energy 需要 choose=N（转附必须经 chooser 交互选择）")
@@ -1679,10 +1691,23 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
             if not pool:
                 return {"moved": 0, "iids": [], "optional_done": False}
             cap = node.choose if to_deck else len(pool)
-            return NeedChoice(
+            need = NeedChoice(
                 pool="own_attached_energy", filters=node.filters,
                 min_choose=0, max_choose=cap, exclude_iids=exclude,
             )
+            need.exact_or_zero = bool(to_deck and opt_exact)
+            return need
+        if to_deck and opt_exact and choice:
+            pool_n = sum(
+                1 for e in source.attached_energy if matches(e, node.filters)
+            )
+            required = min(node.choose, pool_n)
+            if len(choice) != required:
+                raise DslError(
+                    "move_energy opt_exact 须放弃或恰好交 "
+                    f"min({node.choose}, 身上{pool_n}张)={required} 张"
+                    f"（收到 {len(choice)} 张）"
+                )
         n, moved = _relocate_energy(
             ctx, set(choice), None if to_deck else source.current.iid,
             to_deck=to_deck,

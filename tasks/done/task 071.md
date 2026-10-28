@@ -63,6 +63,6 @@
 
 - **WP1–17 ✅**：过滤器 3、条件词（含节点级 `if_own_prizes_eq` / `holder_has_energy` / `holder_trait`）、特性弃手牌成本、attach 多目标备战与牌库备战池、`single_target`（燃烧充能全部附到 1 只）、move_energy 任意数量转自身与回库重洗、对手附着能量弃置与来源全弃、reveal 对手手牌、计数词、备战复制招式、竞技场撤退、突进进化、湿气 `with_primitive: ko_self`、`prize_bonus scope=attack_ko`、`lock_attack scope=all`、「在这种情况下」、grant_attack 合成 AttackDef。复眼用 `modify_damage scope=self` + `target_has_ability`
 - **19 张 DSL ✅**（闸 2；闸 3=false）。无 `--db` 的 dsl-check 通过。authoring-log batch 11
-- **未在本环境完成**：`dsl-check --db`、v2 九卡组 `load_deck` 零缺口（无 `ptcg-cn.db`）。粉碎之锤只挂 `30thDC-029`
+- **2026-10-28 核销**：闸 1 / 闸 3 = 19/19；附录 A 七条 ✅ 已核。激流水泵初稿 `up_to` 过宽（够 3 张仍可只交 1～2），改为 `opt_exact`（TPCi 2024-09-12：可放弃；执行则恰好 min(3, 身上张数)）
+- **未在本环境完成**：v2 九卡组 `load_deck` 零缺口（无 `ptcg-cn.db`）。粉碎之锤只挂 `30thDC-029`
 - **未做**：072 及以后
-- **待用户核销**：附录 A 新增 7 行；闸 3 十九张；本机库上补跑闸 1 与装载零缺口

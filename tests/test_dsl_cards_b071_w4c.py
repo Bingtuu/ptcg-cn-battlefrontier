@@ -111,9 +111,71 @@ def test_厄诡椪_水井面具ex_激流水泵选了才打备战() -> None:
     e = engine_at(state.model_copy(update={"players": (p0, p1)}))
     e.card_effects = {"厄诡椪 水井面具ex": doc}
     e.apply(0, Action(kind="attack", attack_index=0))
-    e.apply(0, Action(kind="choose", choices=(20,)))
+    e.apply(0, Action(kind="choose", choices=(20, 21, 22)))
     e.apply(0, Action(kind="choose", choices=(80,)))
     assert e.state.players[1].bench[0].damage == 120
+    assert len(e.state.players[0].active.attached_energy) == 0
+
+
+def test_厄诡椪_水井面具ex_激流水泵按裁定交还能量() -> None:
+    """TPCi 2024-09-12：放弃，或恰好 min(3, 身上张数)；至少交 1 张才打备战。"""
+    doc = load("厄诡椪 水井面具ex")
+    # 费用置空，便于测「身上 0 张」；交还张数只看附着，不看招式费是否已支付
+    og = poke(
+        "厄诡椪 水井面具ex", rule_box="ex",
+        attacks=(AttackDef(name="激流水泵", cost=(), damage=None),),
+    )
+    bench = in_play(80, poke("敌备", hp=400))
+    state = main_state(p1_bench=(bench,))
+    wall = in_play(2, poke("墙", hp=400))
+
+    def start(n_energy: int):
+        energies = tuple(inst(20 + i, energy()) for i in range(n_energy))
+        active = in_play(1, og).model_copy(update={"attached_energy": energies})
+        p0 = state.players[0].model_copy(update={"active": active})
+        p1 = state.players[1].model_copy(update={"active": wall})
+        e = engine_at(state.model_copy(update={"players": (p0, p1)}))
+        e.card_effects = {"厄诡椪 水井面具ex": doc}
+        e.apply(0, Action(kind="attack", attack_index=0))
+        return e
+
+    # ≥3：只能放弃或恰好 3 张
+    e = start(4)
+    sizes = {len(a.choices) for a in e.legal_actions(0) if a.kind == "choose"}
+    assert sizes == {0, 3}
+    e.apply(0, Action(kind="choose", choices=(20, 21, 22)))
+    e.apply(0, Action(kind="choose", choices=(80,)))
+    assert len(e.state.players[0].active.attached_energy) == 1
+    assert e.state.players[1].bench[0].damage == 120
+
+    # 2 张：执行则尽数交还，不能只交 1
+    e = start(2)
+    sizes = {len(a.choices) for a in e.legal_actions(0) if a.kind == "choose"}
+    assert sizes == {0, 2}
+    e.apply(0, Action(kind="choose", choices=(20, 21)))
+    e.apply(0, Action(kind="choose", choices=(80,)))
+    assert e.state.players[0].active.attached_energy == ()
+    assert e.state.players[1].bench[0].damage == 120
+
+    # 1 张：执行则交还这一张
+    e = start(1)
+    sizes = {len(a.choices) for a in e.legal_actions(0) if a.kind == "choose"}
+    assert sizes == {0, 1}
+    e.apply(0, Action(kind="choose", choices=(20,)))
+    e.apply(0, Action(kind="choose", choices=(80,)))
+    assert e.state.players[0].active.attached_energy == ()
+    assert e.state.players[1].bench[0].damage == 120
+
+    # 放弃：能量不动，备战不受 120
+    e = start(3)
+    e.apply(0, Action(kind="choose", choices=()))
+    assert len(e.state.players[0].active.attached_energy) == 3
+    assert e.state.players[1].bench[0].damage == 0
+
+    # 身上 0 张：可选段未完成，不打备战
+    e = start(0)
+    assert e.state.phase != "choice"
+    assert e.state.players[1].bench[0].damage == 0
 
 
 def test_火伊布ex_红玉髓锁全部招式() -> None:

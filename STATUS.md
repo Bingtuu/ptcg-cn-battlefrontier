@@ -5,13 +5,13 @@
 
 ## 当前
 
-**当前焦点 = task 076 已在本机正式矩阵验证通过**（Diupi-Yun，`c436471`：18000 局失败 0；加权 |Δ| 18.5% 仍是启发式策略偏差）。PR #2 待合并。未做：构筑 GUI、全池单卡扫描、JEV、LLM。v2 锁定后学习线复跑（D3-5）另立项。
+**当前焦点 = 核销 PR 待审**（070 闸 3 十五张 + 069 附录 A 三条 + 区分词 / 电电虫偏差；只改文档，不合并）。task 076 正式矩阵已在 main（`c436471`：18000 局失败 0；加权 |Δ| 18.5% 仍是启发式策略偏差）。未做：构筑 GUI、全池单卡扫描、JEV、LLM。v2 锁定后学习线复跑（D3-5）另立项。
 
 **三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（4.05/局 < 5 门槛）/ play_stadium / end_turn；~~copy_attack 多级嵌套~~ / ~~IndexError（沙奈朵）~~ 已由 task 076 修掉；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
-**卡池 v2 独立线（D3-5）**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 第一批 15 张 ✅（task 070，闸 3 十五张仍待核）；引擎扩展第二批 + 原 blocked 19 张 ✅（task 071，闸 1/闸 3 19/19 与附录 A #1–#7 已核）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。DSL 定义库 134 文件。本机正式矩阵已跑完（Diupi-Yun，code `8a3aecb`，启发式，16 workers，约 5.6min）：`load_deck` 九卡组 9/9、n=60、warnings=0；`dsl-check --db` 134/134 OK。数字与失败拆分见下方 task 072 节。换卡正式 `results/*swap*` 未见，只有模板和代码。
+**卡池 v2 独立线（D3-5）**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 第一批 15 张 ✅（task 070，闸 3 十五张 ✅ 2026-10-28 助手核销）；引擎扩展第二批 + 原 blocked 19 张 ✅（task 071，闸 1/闸 3 19/19 与附录 A #1–#7 已核）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。DSL 定义库 134 文件。本机正式矩阵已跑完（Diupi-Yun，code `8a3aecb`，启发式，16 workers，约 5.6min）：`load_deck` 九卡组 9/9、n=60、warnings=0；`dsl-check --db` 134/134 OK。数字与失败拆分见下方 task 072 节。换卡正式 `results/*swap*` 未见，只有模板和代码。
 
-**待用户核销/拍板**：task 070 闸 3 十五张；高级球「才可以使用」/裁判「手牌全部」区分词裁量点；电电虫洗牌 2 次 vs 原文 1 次偏差（🔲）；附录 A 待核攒批（task 069 三条）。
+**核销（2026-10-28，助手，owner 授权 C）**：task 070 闸 3 十五张 ✅；高级球「才可以使用」/裁判「手牌全部」同语义异措辞 ✅（拆文件正确，DSL 同构，gate3 PASS）；电电虫洗牌 2 次 vs 原文 1 次 ✅ 已核工程偏差（均匀重洗等价，RNG 多耗 1 次）；附录 A 虹色因子 / 顽强之心 / types:all ✅。力之沙漏时点与 ACE 锁维持原 ✅，未重开。
 
 ## 里程碑
 
@@ -31,6 +31,15 @@
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-28 核销：070 闸 3 十五张 + 069 附录 A 三条（文档，不合并）
+
+- **授权**：owner C 授权助手查资料确认并核销。核销人 = 助手；日期 2026-10-28（Asia/Shanghai）。不改引擎、不跑矩阵、不引入 JEV/LLM
+- **闸 3**：`cards/authoring-log.jsonl` batch 10 十五张 `gate3=true`（全部 PASS）：高级球、裁判、能量回收、N的PP提升剂、璀璨结晶、力之沙漏、逆转能量、伊布ex、叶伊布ex、皮卡丘ex、密勒顿ex、N的莱希拉姆、盖诺赛克特、电电虫、老大的指令。blocked（`gate1=false`）行未改
+- **区分词**：高级球「才可以使用」vs「才可使用」、裁判「手牌全部」vs「所有手牌」= 同语义异措辞，拆文件正确，DSL 同构，gate3 PASS
+- **电电虫**：洗牌 2 次 vs 原文 1 次 = ✅ 已核工程偏差（两段 `attach_energy own_deck` 各内建重洗；均匀重洗等价，RNG 多耗 1 次）
+- **附录 A**：虹色因子 / 顽强之心 / types:all（璀璨结晶）🔲→✅。力之沙漏时点与 ACE 锁维持原 ✅，未重开
+- **依据**：伊布ex 卡面括号门 + EN Rainbow DNA（登场/最初回合仍不可进化；`modify_evolution` 不走 `skip_play_gates`）；皮卡丘ex 卡面「招式的伤害」+ Compendium 2041（满 HP 在伤害放置当时判定）；璀璨结晶卡面「任意属性」+ EN Sparkling Crystal，引擎可视费用 = 优先【无】否则 cost 首个有色
 
 ### 2026-10-28 task 076 ✅：正式矩阵两大失败（IndexError / copy_attack 嵌套）
 
@@ -109,7 +118,7 @@ bfsim calibration experiments/v2-calibration.example.yml --results results/v2-ca
 - **电蜘蛛**：复眼是 `modify_damage scope=self`（只加成这只宝可梦的招式）+ `target_has_ability`。麻麻网用计数词 `one_if_holder_has_energy_雷` 合成一次伤害，避免复眼按伤害节点重复叠加。节点条件 `holder_has_energy` 已注册，本卡不拆节点
 - **阶段 2**：19 张 DSL 入库（批 4a/4b/4c，分片测试）。闸 1（本机 `--db`）与闸 3 均为 19/19 ✅（2026-10-28 用户核销；厄诡椪在 `opt_exact` 修正后核销）
 - **存量测试**：两处负例随新契约移出（`multi_target × own_bench`、`reveal opponent_hand`）；`effects_by_name` 白名单加「咕咕」。其余存量断言未改
-- **未做**：072+（v2 matrix / 校准 / 备赛）。电电虫洗牌偏差仍在 backlog。粉碎之锤只挂池内 J 标 `30thDC-029`（旧系列印刷未复核赛制合法性）
+- **未做**：072+（v2 matrix / 校准 / 备赛）。电电虫洗牌 2 次于 2026-10-28 改为 ✅ 已核工程偏差（均匀重洗等价，RNG 多耗 1 次），不改引擎。粉碎之锤只挂池内 J 标 `30thDC-029`（旧系列印刷未复核赛制合法性）
 
 ### 2026-10-27 task 071 立项：引擎扩展第二批 + 070 收口（阶段 1 派遣遭配额中断，待恢复）
 
@@ -118,22 +127,22 @@ bfsim calibration experiments/v2-calibration.example.yml --results results/v2-ca
 - **中断记录**：组 A/B1/C 派遣后约 10 分钟配额 429（5 小时窗口）全灭——组 A 留 TDD 红阶段遗产 `tests/test_primitives_t071_a.py` 25 测（WP1/2/3/16 全覆盖，实现零改动可直接 resume）；B1/C 零残留。恢复路径沿用 070 同事故实证（resume + continue）
 - **遗留**：阶段 1 四组完成 → WP17 → 阶段 2 DSL 批 4a/4b/4c（19 张）→ 判据 4（v2 装载零缺口）收口 070
 
-### 2026-10-27 task 070 ◐：卡池 v2 DSL 批次第一批——15/34 落地 + 19 blocked（表达力缺口全清单）
+### 2026-10-27 task 070 ✅：卡池 v2 DSL 批次第一批——15/34 落地 + 19 blocked（表达力缺口全清单；闸 3 于 2026-10-28 核销）
 
 - **立项**：task 069 表达力备齐后的 DSL 编写棒；任务书 `tasks/task 070.md`（D-070-1 分组 4 批子代理 + 主会话直做 WP0 / D-070-2 纪律 / D-070-3 印刷对齐 / D-070-4 规则不猜）
 - **WP0 主会话直做**：逆转能量组合词 `own_prizes_more_and_holder_evolved_no_rule_box`（chooser.py，9 测 `test_primitives_t070.py`）；老大的指令 30thDC-039 纯挂载（text_raw 逐字全等实证，闸 1 ✅）
 - **落地 14 张（4 组子代理并行，闸 1+闸 2 全部一次通过、零返工）**：WP1a 高级球-才可以使用/裁判-手牌全部/能量回收；WP1b N的PP提升剂/璀璨结晶/力之沙漏/逆转能量；WP2 伊布ex（modify_evolution）/叶伊布ex/皮卡丘ex（prevent_ko）；WP3 密勒顿ex/N的莱希拉姆/盖诺赛克特（lock_play ace_spec）/电电虫；测试分片 4 文件共 49 测，ruff 零告警
 - **blocked 19 张**：全部是引擎/DSL 表达力缺口（子代理按纪律未自造词未降级），缺口精确到读点 → task 071 输入；含 1 项 db 侧 latent gap（训练家卡面招式不解析，招式学习器族）
 - **主会话处置**：同名多文本测试碰撞（高级球/裁判再录拆分）按火恐龙先例收口——helpers 白名单 + 2 处语义测试改逐等价类断言
-- **待用户核销**：闸 3 十五张（gate3=false）；高级球/裁判区分词裁量点；电电虫洗牌 2 次 vs 原文 1 次偏差（🔲）；authoring-log batch 10 落账 34 行
+- **核销（2026-10-28，助手，owner 授权 C）**：闸 3 十五张 gate3=true（全部 PASS）；高级球/裁判区分词 = 同语义异措辞、拆文件正确；电电虫洗牌 2 次 = ✅ 已核工程偏差。blocked 19 行未改。authoring-log batch 10 落账 34 行
 
 ### 2026-10-21 task 069 ✅：卡池 v2 引擎扩展批（5 机制 + 3 原语小扩，TDD）
 
 - **立项**：task 068 机制定案的实现棒；D-069-1（力之沙漏时点 = 检查阶段内状态结算后）/ D-069-2（ACE 锁 = 广义五门类）用户拍板；D-069-3 三组子代理 TDD（A = WP1/3/5 `_main_actions` 面 / B = WP2 伤害路径 / C = WP4+WP6 回合末面）+ 主会话独立复验
 - **交付**：新原语 `modify_evolution` / `prevent_ko`；`modify_attack_cost` 扩 `types:all`；词表 `own_turn_end` 事件 + `attached_energy_on_opponent_all` 计数词；chooser 新 condition `holder_is_tera` / `holder_has_tool`；`lock_play` 扩 passive_static + ace_spec；`_survival_cap` / `_ace_spec_play_locked` / `_modify_evolution_args` 引擎助手；discard choose=N / heal own_bench / attach_energy target_pool=self
-- **验收**：判据 1–5 全 ✅——50 新测（WP1 8 / WP2 12 / WP3 6 / WP4 8 / WP5 8 / WP6 9），全量 1454 绿 + ruff 零告警（主会话亲跑）；附录 A 决议 5 行（D-069-1/2 已核；虹色因子 / 顽强之心 / D-WP5-4 扩展 🔲 待核攒批）；存量测试零改动
+- **验收**：判据 1–5 全 ✅——50 新测（WP1 8 / WP2 12 / WP3 6 / WP4 8 / WP5 8 / WP6 9），全量 1454 绿 + ruff 零告警（主会话亲跑）；附录 A 决议 5 行（D-069-1/2 当时已核；虹色因子 / 顽强之心 / D-WP5-4 扩展当时待核，2026-10-28 已核）；存量测试零改动
 - **插曲**：组 C 子代理首轮上下文压缩丢失任务（误判为核验员），主会话 resume 纠正后正常交付；组 B 报告自伤不截顶决定（对齐 _damage_self 先例，认可）
-- **遗留**：34 张 DSL 编写 → task 070；附录 A 3 条待核攒批；v2 matrix + 校准 → task 07x
+- **遗留**：34 张 DSL 编写 → task 070；附录 A 3 条（虹色因子 / 顽强之心 / types:all）于 2026-10-28 核销 ✅；v2 matrix + 校准 → task 072–076
 
 ### 2026-10-21 task 068 ✅：卡池 v2 锁定（Top-9 全新排 + 缺口定案 + 机制评估 + 校准口径实测）
 
@@ -179,3 +188,4 @@ bfsim calibration experiments/v2-calibration.example.yml --results results/v2-ca
 | 2026-10-28 | 072–075 统一审 = 管道验收通过。正式矩阵（code `8a3aecb`，启发式，18000 局）加权 \|Δ\| 18.5%，被两缺口抬高：沙奈朵 IndexError（888，无堆栈、路径未钉）与 N的索罗亚克 `copy_attack` 多级嵌套「暗夜王牌」（858）。二者下一任务修，本 PR 不修。顺序：① 更新 STATUS → ② 提交并合并 PR #1（代理不合并）→ ③ 下一任务再修引擎。残留盲区保留特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套，并补入 IndexError（沙奈朵） | 用户拍板；STATUS task 072 节 |
 | 2026-10-28 | task 076 修正式矩阵两失败：IndexError = 启发式攻击表漏 `grant_attack` 合成招式（能量涡轮）；copy_attack 多级 = 帧栈 + 同 (iid, 招式名) 不再可选（附录 A ✅ 已核，2026-10-28 搜卡核实）。完整 18000 复跑留本机 | 用户拍板下一任务；tasks/done/task 076.md |
 | 2026-10-28 | task 076 本机正式复跑（`c436471`，18000 局）失败 0；加权 \|Δ\| 18.5% 仍为启发式策略偏差（最大格沙奈朵 vs N的索罗亚克 +65.6%，sim 96% vs real 30.4%），不是引擎崩溃。真实侧 72/72 与 `v_pairing_players` 全等。owner 授权 STATUS 回写后合并 PR #2 | 用户授权；STATUS task 076 节 |
+| 2026-10-28 | 核销 070 闸 3 十五张 + 069 附录 A 三条：owner C 授权助手查资料确认后核销（核销人=助手）。闸 3 十五张全部 PASS；高级球「才可以使用」/裁判「手牌全部」= 同语义异措辞、拆文件正确、gate3 PASS；电电虫洗牌 2 次 = ✅ 已核工程偏差（均匀重洗等价，RNG 多耗 1 次）；虹色因子 / 顽强之心 / types:all ✅。力之沙漏时点与 ACE 锁不重开。不改引擎、不跑矩阵、不引入 JEV/LLM | owner 授权 C；STATUS；rules-reference 附录 A |

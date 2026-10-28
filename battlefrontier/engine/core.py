@@ -19,6 +19,7 @@ from battlefrontier.engine.state import (
     AttackDef,
     CardDef,
     CardInstance,
+    CopyFrame,
     GameState,
     InPlayPokemon,
     PendingChoice,
@@ -54,6 +55,52 @@ def effect_doc(
 ) -> CardEffectDoc | None:
     """effect_doc_by_ref 的 CardDef 便捷封装（引擎全部 card_effects 查询点走此助手）。"""
     return effect_doc_by_ref(effects, card.card_id, card.name)
+
+
+def resolve_tool_attacks(
+    tool: CardInstance, effects: Mapping[str, CardEffectDoc] | None,
+) -> tuple[AttackDef, ...]:
+    """道具授予招式（task 016 卡面招式；task 071 卡面为空时按 grant_attack 合成）。
+
+    枚举、执行与启发式攻击表共用本函数（task 076：合成招式漏进表会 IndexError）。
+    卡面 attacks 非空 → 原样返回。无 cost 的旧声明不合成。
+    """
+    if tool.card.attacks:
+        return tool.card.attacks
+    if not effects:
+        return ()
+    doc = effect_doc(effects, tool.card)
+    if doc is None:
+        return ()
+    out: list[AttackDef] = []
+    for effect in doc.effects:
+        if effect.trigger != "passive_static":
+            continue
+        for node in effect.actions:
+            if node.action != "grant_attack" or "cost" not in node.args:
+                continue
+            name = node.args.get("attack")
+            cost = node.args.get("cost")
+            damage = node.args.get("damage", None)
+            if not isinstance(name, str) or not name:
+                raise DslError(
+                    f"grant_attack 的 attack 须为非空字符串（收到 {name!r}）"
+                )
+            if (
+                not isinstance(cost, (list, tuple))
+                or not all(isinstance(x, str) for x in cost)
+            ):
+                raise DslError(
+                    f"grant_attack 的 cost 须为属性符号列表（收到 {cost!r}）"
+                )
+            if damage is not None and (
+                isinstance(damage, bool) or not isinstance(damage, int)
+            ):
+                raise DslError(
+                    f"grant_attack 的 damage 须为 int 或 null（收到 {damage!r}）"
+                )
+            out.append(AttackDef(name=name, cost=tuple(cost), damage=damage))
+    return tuple(out)
 
 
 # 规则盒宝可梦昏厥时对手拿取的奖赏张数（rules-manual §1.4/§8；开放词表，
@@ -1246,8 +1293,10 @@ class GameEngine:
                     self._start_pokemon_check(player)
                     return
             self._emit("attack", player, name=atk.current.card.name, attack=attack.name)
-            self._run_or_suspend(player, source, effect_index, start=0,
-                                 completion="attack")
+            self._run_or_suspend(
+                player, source, effect_index, start=0, completion="attack",
+                copy_chain=((atk.current.iid, attack.name),),
+            )
             return
         defender = 1 - player
         d = s.players[defender]
@@ -2173,46 +2222,8 @@ class GameEngine:
         return found
 
     def _tool_attacks(self, tool: CardInstance) -> tuple[AttackDef, ...]:
-        """道具授予招式（task 016 既有卡面招式；task 071 WP17 卡面无招式时合成）。
-
-        卡面 attacks 非空 → 原样返回（进化/退化学习器零变化）。
-        卡面为空 → 读 grant_attack args.cost（必填）与 damage（缺省 null）合成
-        AttackDef。无 cost 的旧声明不合成（不把存量「只声明名字」误报错）。
-        """
-        if tool.card.attacks:
-            return tool.card.attacks
-        doc = self._effect_doc(tool.card)
-        if doc is None:
-            return ()
-        out: list[AttackDef] = []
-        for effect in doc.effects:
-            if effect.trigger != "passive_static":
-                continue
-            for node in effect.actions:
-                if node.action != "grant_attack" or "cost" not in node.args:
-                    continue
-                name = node.args.get("attack")
-                cost = node.args.get("cost")
-                damage = node.args.get("damage", None)
-                if not isinstance(name, str) or not name:
-                    raise DslError(
-                        f"grant_attack 的 attack 须为非空字符串（收到 {name!r}）"
-                    )
-                if (
-                    not isinstance(cost, (list, tuple))
-                    or not all(isinstance(x, str) for x in cost)
-                ):
-                    raise DslError(
-                        f"grant_attack 的 cost 须为属性符号列表（收到 {cost!r}）"
-                    )
-                if damage is not None and (
-                    isinstance(damage, bool) or not isinstance(damage, int)
-                ):
-                    raise DslError(
-                        f"grant_attack 的 damage 须为 int 或 null（收到 {damage!r}）"
-                    )
-                out.append(AttackDef(name=name, cost=tuple(cost), damage=damage))
-        return tuple(out)
+        """道具授予招式。与启发式攻击表共用 resolve_tool_attacks（task 076）。"""
+        return resolve_tool_attacks(tool, self.card_effects)
 
     def _modify_evolution_args(self, mon: InPlayPokemon) -> Mapping[str, object] | None:
         """声明驱动进化加宽（task 069 WP1 伊布ex 虹色因子，modify_evolution）。
@@ -2598,12 +2609,14 @@ class GameEngine:
         flip_heads_count: int | None = None,
         prev_optional_done: bool | None = None,
         outer_carry: tuple[int, ...] = (),
+        copy_stack: tuple[CopyFrame, ...] = (),
+        copy_chain: tuple[tuple[int, str], ...] = (),
     ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
-        嵌套帧（task 020 copy_attack）：inner 非空时按 inner 定位内层效果续跑；
-        内层完成 → 带 inner_done 恢复外层 copy 节点（不重复执行内层）；
-        内层再传播 inner → 嵌套层级 >1，显式 DslError（不猜）。
+        嵌套帧（task 020 / task 076）：inner 非空时按 inner 定位内层效果续跑
+        （含 inner_done：中间层 copy 节点只回结果）。内层再传播 inner 时把父帧
+        压入 copy_stack，不设层数上限。copy_chain 上已有的 (iid, 招式名) 不再可选。
         flip（task 025）：挂起冻结的掷币结果，恢复时穿透进 ctx.last_flip；
         嵌套帧内层完成恢复外层时不穿透（外层 copy 节点后接掷币门控节点的组合
         会在解释器显式 DslError——不猜，需要时再扩展多级冻结）。
@@ -2620,8 +2633,9 @@ class GameEngine:
         """
         from battlefrontier.dsl.chooser import build_pending
 
-        if inner is not None and not inner_done:
-            # inner = (card_id, 卡名, 招式名)：CardLibrary 按 card_id 取，朴素 dict 按名取
+        if inner is not None:
+            # inner = (card_id, 卡名, 招式名)：CardLibrary 按 card_id 取，朴素 dict 按名取。
+            # inner_done 仍跑内层文档（中间层 copy 节点靠 ctx.inner_done 短路）。
             doc = effect_doc_by_ref(self.card_effects, inner[0], inner[1])
             if doc is None:
                 raise DslError(f"copy_attack 内层文档缺失：{inner[1]}（{inner[0]}）未挂载（不猜）")
@@ -2639,6 +2653,7 @@ class GameEngine:
         )
         ctx.inner_done = inner_done
         ctx.attacker_iid = attacker_iid
+        ctx.copy_chain = copy_chain
         self._in_effect = True
         try:
             need = run_effect(ctx, effect, start=start, choice=choice, carry=carry,
@@ -2650,35 +2665,84 @@ class GameEngine:
             self._in_effect = False
         if need is not None:
             if need.inner is not None:
-                if inner is not None:
-                    raise DslError(
-                        f"copy_attack 嵌套层级 >1 未支持（不猜）：内层 {inner} "
-                        f"又传播 {need.inner}（需要时扩展 chooser 多级帧）"
+                donor_iid = need.inner_donor_iid
+                extended = copy_chain
+                if donor_iid is not None:
+                    extended = copy_chain + ((donor_iid, need.inner[2]),)
+                if inner is None:
+                    # 第一层：outer_* 记住宣言招式的 copy 节点（task 020）
+                    pending = build_pending(
+                        self, player, card, effect_index, need.inner_cursor, need,
+                        completion=completion, inner=need.inner,
+                        outer_cursor=need.cursor, outer_choice=choice or (),
+                        outer_carry=carry, copy_chain=extended,
                     )
-                # 外层 copy 节点首次传播：建立嵌套帧（cursor/outer_cursor 分层记录）
-                pending = build_pending(
-                    self, player, card, effect_index, need.inner_cursor, need,
-                    completion=completion, inner=need.inner,
-                    outer_cursor=need.cursor, outer_choice=choice or (),
-                    outer_carry=carry,
-                )
+                else:
+                    # 更深一层：父帧入栈。不设层数上限（task 076，附录 A）
+                    frames = list(copy_stack)
+                    if not frames:
+                        origin_iid = copy_chain[0][0] if copy_chain else 0
+                        origin_atk = copy_chain[0][1] if copy_chain else ""
+                        frames.append(CopyFrame(
+                            is_origin=True, cursor=outer_cursor,
+                            choice=outer_choice, carry=outer_carry,
+                            donor_iid=origin_iid, attack=origin_atk,
+                        ))
+                    frames.append(CopyFrame(
+                        card_id=inner[0], card_name=inner[1], attack=inner[2],
+                        donor_iid=copy_chain[-1][0] if copy_chain else 0,
+                        cursor=need.cursor, choice=choice or (), carry=carry,
+                    ))
+                    pending = build_pending(
+                        self, player, card, effect_index, need.inner_cursor, need,
+                        completion=completion, inner=need.inner,
+                        outer_cursor=need.cursor, outer_choice=choice or (),
+                        outer_carry=carry,
+                        copy_stack=tuple(frames), copy_chain=extended,
+                    )
             else:
                 pending = build_pending(
                     self, player, card, effect_index, need.cursor, need,
                     completion=completion, inner=inner,
                     outer_cursor=outer_cursor, outer_choice=outer_choice,
                     outer_carry=outer_carry,
+                    copy_stack=copy_stack, copy_chain=copy_chain,
                 )
             self.state = self.state.model_copy(update={
                 "phase": "choice", "current_player": player, "pending_choice": pending,
             })
             return
+        if need is None and inner is not None and copy_stack:
+            parent = copy_stack[-1]
+            rest = copy_stack[:-1]
+            parent_chain = copy_chain[:-1] if copy_chain else ()
+            if parent.is_origin:
+                self._run_or_suspend(
+                    player, card, effect_index, start=parent.cursor,
+                    choice=parent.choice, carry=parent.carry,
+                    completion=completion, inner_done=True,
+                    prev_optional_done=prev_optional_done,
+                    copy_stack=rest, copy_chain=parent_chain,
+                )
+            else:
+                self._run_or_suspend(
+                    player, card, effect_index, start=parent.cursor,
+                    choice=parent.choice, carry=parent.carry,
+                    completion=completion, inner_done=True,
+                    inner=(parent.card_id, parent.card_name, parent.attack),
+                    prev_optional_done=prev_optional_done,
+                    copy_stack=rest, copy_chain=parent_chain,
+                )
+            return
         if inner is not None and not inner_done:
-            # 内层完成 → 带 inner_done 恢复外层 copy 节点（外层后续节点照常执行）
-            self._run_or_suspend(player, card, effect_index, start=outer_cursor,
-                                 choice=outer_choice, carry=outer_carry,
-                                 completion=completion, inner_done=True,
-                                 prev_optional_done=prev_optional_done)
+            # 第一层内层完成 → 带 inner_done 恢复宣言招式的 copy 节点
+            self._run_or_suspend(
+                player, card, effect_index, start=outer_cursor,
+                choice=outer_choice, carry=outer_carry,
+                completion=completion, inner_done=True,
+                prev_optional_done=prev_optional_done,
+                copy_chain=copy_chain[:-1] if copy_chain else (),
+            )
             return
         # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置；
         # 攻击结算完毕推进对手回合（rules-manual §6：攻击后回合结束）。
@@ -2797,7 +2861,8 @@ class GameEngine:
                              attacker_iid=pc.attacker_iid,
                              flip_heads_count=pc.flip_heads_count,
                              prev_optional_done=pc.prev_optional_done,
-                             outer_carry=pc.outer_carry)
+                             outer_carry=pc.outer_carry,
+                             copy_stack=pc.copy_stack, copy_chain=pc.copy_chain)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。

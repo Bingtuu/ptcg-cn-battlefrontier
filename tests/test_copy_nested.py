@@ -2,18 +2,16 @@
 
 场景：梦幻ex 基因侵入复制「自身含运行时选择的 DSL 招式」（如吉雉鸡ex 残忍箭矢
 选任意对手宝可梦）——外层挂起选招式 → 内层挂起选目标 → 内层完成后外层收尾。
-嵌套层级 >1（套娃复制）维持显式 DslError（不猜）。
+嵌套层级 >1 按帧栈执行（task 076）；同一来源招式再入栈则空结算，不挂起、不循环。
 """
 
 import hashlib
 import json
 
-import pytest
 from helpers import basic, doc_of, engine_at, in_play, main_state
 
 from battlefrontier.agent.heuristic import HeuristicAgent
 from battlefrontier.dsl import load_card_dir, parse_card_doc
-from battlefrontier.dsl.loader import DslError
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.state import AttackDef, CardDef
 
@@ -183,15 +181,15 @@ def test_outer_continues_after_copy_node():
     assert sum(1 for ev in e.events if ev.kind == "copy_attack") == 1  # 事件不重复
 
 
-def test_nested_depth_over_one_raises():
-    """套娃复制（嵌套层级 >1）：显式 DslError，不猜不静默。"""
+def test_copy_cycle_ends_attack_without_error():
+    """套娃互相复制：内层唯一目标已在复制栈上 → 空结算，攻击结束，不 DslError。"""
     e = _engine(doll("套娃B", "镜像B"), DOLL_B_DOC,
                 mew_card=doll("套娃A", "镜像A"), mew_doc=DOLL_A_DOC)
     e.apply(0, Action(kind="attack", attack_index=0))
-    e.apply(0, Action(kind="choose", choices=(0,)))   # 复制 镜像B
-    assert e.state.phase == "choice"                  # 内层挂起：选我方招式（同层允许）
-    with pytest.raises(DslError, match="嵌套"):
-        e.apply(0, Action(kind="choose", choices=(0,)))  # 镜像B 再复制 镜像A → 层级 3
+    e.apply(0, Action(kind="choose", choices=(0,)))  # 复制 镜像B；镜像B 再指回 镜像A
+    assert e.state.phase == "main"
+    assert e.state.current_player == 1
+    assert e.state.players[1].active.damage == 0
 
 
 # ── 确定性与 Agent 驱动 ──────────────────────────────────

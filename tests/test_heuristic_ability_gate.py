@@ -330,7 +330,8 @@ def test_t077_local_experiment_pins_the_diagnosed_cell():
 
     只核 YAML 字段（云端无 ptcgdb，不经 load_experiment）。
     """
-    raw = yaml.safe_load((ROOT / "experiments" / "t077-gard-zoro.example.yml").read_text())
+    raw = yaml.safe_load(
+        (ROOT / "experiments" / "t077-gard-zoro.example.yml").read_text(encoding="utf-8"))
     assert raw["name"] == "t077-gard-zoro"
     assert raw["seed_start"] == 208000
     assert raw["games"] == 100

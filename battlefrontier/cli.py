@@ -635,6 +635,18 @@ def _cmd_report(args: argparse.Namespace) -> int:
             print(f"错误：{e}")
             return 1
         print(format_report(report))
+        from battlefrontier.report.battle_log import (
+            battle_log_report,
+            format_game_summaries,
+            format_main_actions,
+            write_battle_log_pack,
+        )
+
+        log = battle_log_report(
+            db, args.experiment_id, sample_n=args.replay_sample,
+        )
+        print(format_game_summaries(log))
+        print(format_main_actions(log))
         if args.decisions:
             from battlefrontier.report.decisions import (
                 decision_report,
@@ -649,6 +661,10 @@ def _cmd_report(args: argparse.Namespace) -> int:
             )
 
             print(format_mcts_report(mcts_report(db, args.experiment_id)))
+        out_dir = (Path(args.out) if args.out
+                   else Path("results") / f"report-{args.experiment_id}-log")
+        paths = write_battle_log_pack(out_dir, log)
+        print("对局包：" + " ".join(str(p) for p in paths.values()))
     finally:
         db.close()
     return 0
@@ -670,6 +686,14 @@ def main(argv: list[str] | None = None) -> int:
     rep_p.add_argument("--decisions", action="store_true", help="追加决策聚合分节")
     rep_p.add_argument("--mcts-consider", action="store_true",
                        help="追加 MCTS 决策分析分节（task 042：访问份额/高熵决策点/分桶胜率）")
+    rep_p.add_argument(
+        "--replay-sample", type=int, default=3,
+        help="抽样回放局数（默认 3，完成局按种子升序；0 表示不写回放正文）",
+    )
+    rep_p.add_argument(
+        "--out", default=None,
+        help="对局包目录（默认 results/report-<id>-log）：md/html/csv/json",
+    )
     sen_p = sub.add_parser("sensitivity",
                            help="换卡敏感性：baseline vs variants 并排 ΔWR + 显著性检验")
     sen_p.add_argument("base_id", type=int, help="baseline 实验 id")

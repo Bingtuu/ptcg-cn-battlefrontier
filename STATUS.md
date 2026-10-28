@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 073 导入已落在 PR #1，正式矩阵与真实对阵数字未跑**（分支 `cursor/task-071-engine-ext-0053`，代理不合并）。072 复验 `tests/test_v2_calibration_matrix.py`、`tests/test_deviation_pack.py`、`tests/test_calibration.py` 共 19 passed，无缺口，不填 |Δ|。073 三种入口模板在 `experiments/templates/`，`bfsim pairings` 只读拉池内 archetype 的逐桌对阵并双轨落盘。074–075 未开始。v2 锁定后学习线复跑（D3-5）另立项。
+**当前焦点 = task 074 精简对局日志已落在 PR #1**（分支 `cursor/task-071-engine-ext-0053`，代理不合并）。`bfsim report` 默认打印每局汇总与主阶段行动 × 胜率，并写出 `log.md` / `log.html` / `summary.csv` / `actions.csv` / `log.json`。回放走现成 `render_log`，默认只抽种子最小的 3 局完成局。不编造理由，不倾倒合法行动。075 未开始。正式矩阵与真实对阵数字仍未跑。v2 锁定后学习线复跑（D3-5）另立项。
 
 **三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（4.05/局 < 5 门槛）/ play_stadium / end_turn / copy_attack 多级嵌套；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
@@ -31,6 +31,19 @@
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-28 task 074 ✅：精简对局日志 B（PR #1 未由代理合并）
+
+- **数据**：只读结果库 `games` / `game_events`。主阶段 kind = attack / retreat / play_trainer / play_stadium / evolve / attach_energy / end_turn。`choose` 仍由 `--decisions` 负责
+- **默认开**：每局一行（种子、先后、胜负、回合、失败文本）。抽样回放默认 3 局，完成局按种子升序，`--replay-sample 0` 可关掉正文。不渲染全部对局
+- **导出**：`results/report-<id>-log`。Markdown 内嵌胜率、汇总、行动、回放原文；HTML 由该文转义；CSV/JSON 的胜率等于 `ActionStat`
+- **命令**：
+
+```bash
+bfsim report <experiment_id> --results results/exp.db --out results/report-log
+```
+
+不做假理由、合法行动全量转储、关键路径 LLM。075 未做。
 
 ### 2026-10-28 task 073 ✅：三种入口模板 + 只读真实对阵（PR #1 未由代理合并）
 

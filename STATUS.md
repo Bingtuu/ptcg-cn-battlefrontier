@@ -35,7 +35,7 @@
 ### 2026-10-28 task 076 ✅：正式矩阵两大失败（IndexError / copy_attack 嵌套）
 
 - **IndexError 根因（栈自证，不是精神拥抱）**：`HeuristicAgent._attack_table` 只读 `card.attacks`。招式学习器 能量涡轮卡面 attacks 为空，引擎用 `grant_attack` 合成招式（task 071 D-071-4），合法 `attack_index` 落到表外 → `list index out of range`（`heuristic.py` 斩杀检测）。全库只有这一张卡走合成路径；矩阵 888 局 100% 含沙奈朵 `mik_moe:678647`，与「该卡组带这张学习器、其它卡组互打几乎不炸」一致。修复 = 启发式与引擎共用 `resolve_tool_attacks`
-- **copy_attack 根因**：task 020 只留一层帧，内层再传播即 `DslError`（不猜）。暗夜王牌复制「自身又会挂起的 copy_attack」即第二层（858 局，100% 含 N的索罗亚克 `mik_moe:690359`，钉在暗夜王牌）；梦幻ex 基因侵入同形态 2 局。第一层复制「不挂起的招式」原本就能走完。卡面「作为这个招式使用」没有层数上限，rules-manual 无条款 → 附录 A 🔲：帧栈不设上限；已在栈上的 (来源 iid, 招式名) 不再可选，池空则 no_copyable 空结算
+- **copy_attack 根因**：task 020 只留一层帧，内层再传播即 `DslError`（不猜）。暗夜王牌复制「自身又会挂起的 copy_attack」即第二层（858 局，100% 含 N的索罗亚克 `mik_moe:690359`，钉在暗夜王牌）；梦幻ex 基因侵入同形态 2 局。第一层复制「不挂起的招式」原本就能走完。卡面「作为这个招式使用」没有层数上限，rules-manual 无条款 → 附录 A ✅ 已核（助手 2026-10-28 搜卡核实）：帧栈不设上限；已在栈上的 (来源 iid, 招式名) 不再可选，池空则 no_copyable 空结算
 - **测试**：`tests/test_t076_matrix_failures.py`（合成招式打分 + 驱动一步、嵌套 2/3 层伤害、基因侵入套暗夜王牌、同招式不再入池）+ `test_copy_cycle_ends_attack_without_error`。云端无库，未复跑 18000
 - **未做**：本机正式矩阵复跑；特性使用质量 / play_stadium / end_turn 仍在 backlog
 
@@ -176,4 +176,4 @@ bfsim calibration experiments/v2-calibration.example.yml --results results/v2-ca
 | 2026-10-21 | task 069 D-069-1/2 规则决议：力之沙漏「回合结束时」时点 = 检查阶段内状态结算后（本卡结果等价，名义偏差记附录 A）；盖诺赛克特 ACE 锁「使出」= 广义五门类（物品/支援者/竞技场 + 道具附着 + 能量附着） | 用户拍板；tasks/done/task 069.md、rules-reference 附录 A |
 | 2026-10-28 | 071 之后路线：受众 = 研究者/备赛（CLI + 文件 + 导出，无产品 GUI）；导出默认双轨（Markdown/HTML + CSV/JSON）；日志 = 精简 B；JEV/LLM 不进 072–075。顺序原为合并 PR #1 → 072 → 073 → 074 → 075。同日改口：072 整段做完再审，实现留在 PR #1，代理不合并。070 闸 3 十五张与 069 附录 A 三条不挡 072 | 用户拍板；`docs/superpowers/specs/2026-10-28-post-071-roadmap-design.md` |
 | 2026-10-28 | 072–075 统一审 = 管道验收通过。正式矩阵（code `8a3aecb`，启发式，18000 局）加权 \|Δ\| 18.5%，被两缺口抬高：沙奈朵 IndexError（888，无堆栈、路径未钉）与 N的索罗亚克 `copy_attack` 多级嵌套「暗夜王牌」（858）。二者下一任务修，本 PR 不修。顺序：① 更新 STATUS → ② 提交并合并 PR #1（代理不合并）→ ③ 下一任务再修引擎。残留盲区保留特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套，并补入 IndexError（沙奈朵） | 用户拍板；STATUS task 072 节 |
-| 2026-10-28 | task 076 修正式矩阵两失败：IndexError = 启发式攻击表漏 `grant_attack` 合成招式（能量涡轮）；copy_attack 多级 = 帧栈 + 同 (iid, 招式名) 不再可选（附录 A 🔲）。完整 18000 复跑留本机 | 用户拍板下一任务；tasks/done/task 076.md |
+| 2026-10-28 | task 076 修正式矩阵两失败：IndexError = 启发式攻击表漏 `grant_attack` 合成招式（能量涡轮）；copy_attack 多级 = 帧栈 + 同 (iid, 招式名) 不再可选（附录 A ✅ 已核，2026-10-28 搜卡核实）。完整 18000 复跑留本机 | 用户拍板下一任务；tasks/done/task 076.md |

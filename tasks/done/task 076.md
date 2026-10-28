@@ -17,9 +17,10 @@
 ## 实现要点
 
 - IndexError：`resolve_tool_attacks` 为枚举、执行、启发式攻击表的同一函数。根因不是精神拥抱
-- copy_attack：`copy_stack` 帧栈，不设层数上限。终止条件记附录 A（🔲）：链上已有的招式不再入池，池空 = 既有 no_copyable
+- copy_attack：`copy_stack` 帧栈，不设层数上限。终止条件记附录 A（✅ 已核，助手 2026-10-28 搜卡核实）：链上已有的招式不再入池，池空 = 既有 no_copyable
 
 ## 结果与遗留
 
 - 相关测试绿。完整矩阵复跑留本机
+- 附录 A「copy_attack 多级嵌套」✅ 已核（2026-10-28）：卡面与 rules-manual 无层数上限；JP Q&A 无层数禁令；栈上去重是终止条件
 - backlog 仍留：特性使用质量 / play_stadium / end_turn

@@ -1,0 +1,23 @@
+# N的索罗亚克ex（CSV10C-145，1阶，规则盒 ex）
+# text_raw 原文：「特性: 交易
+# 在自己的回合，如果将自己的1张手牌放于弃牌区的话，则可以使用1次。从自己牌库上方抽取2张卡牌。
+#
+# 【恶】【恶】 暗夜王牌
+# 选择自己备战区中的「N的宝可梦」所拥有的1个招式，作为这个招式使用。」
+# 交易：ability 成本 discard own_hand choose=1（task 071 WP3），然后抽 2。
+# 暗夜王牌：copy_attack own_bench_attack + owner_pokemon:N（task 071 WP10）。
+# 无伤害数字，纯效果招式。多级嵌套复制仍不支持（梦幻ex 同口径）。
+card:
+  name_group: N的索罗亚克ex
+  card_ids: [CSV10C-145, CSV10C-245, CSV10C-272, CSV10C-285]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    cost:
+      - {action: discard, selector: own_hand, choose: 1}
+    actions:
+      - {action: draw, count: 2}
+  - trigger: on_attack
+    attack: 暗夜王牌
+    actions:
+      - {action: copy_attack, selector: own_bench_attack, choose: 1, filters: ["owner_pokemon:N"]}

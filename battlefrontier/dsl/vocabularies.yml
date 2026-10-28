@@ -61,6 +61,8 @@ selectors:
   - own_discard             # 自己的弃牌区
   - own_pokemon_in_play     # 自己场上的宝可梦
   - own_attached_energy     # 自己场上宝可梦身上附着的能量（能量转移等）
+  - opponent_attached_energy # 对手场上宝可梦身上附着的能量（task 071 WP6 粉碎之锤）
+  - own_bench_attack        # 自己备战区宝可梦所拥有的招式（task 071 WP10 暗夜王牌复制源）
   - own_bench               # 自己的备战区
   - opponent_pokemon_any    # 对手的 1 只宝可梦（含备战）
   - opponent_bench          # 对手的备战区
@@ -95,6 +97,8 @@ counters:
   - flip_heads_count               # 本效果内掷币正面次数（task 026 WP5 until_tails 索财灵）
   - attached_energy_on_both_actives  # 双方战斗宝可梦附着能量总数（task 027 厄诡椪 万叶阵雨）
   - opponent_ability_pokemon_count   # 对手场上拥有特性的宝可梦数量（task 029 巨钳螳螂 惩罚巨钳；CardDef.has_ability ← db abilities 非空）
+  - opponent_discard_basic_energy_count  # 对手弃牌区基本能量张数（task 071 WP9 N的达摩狒狒 复燃 ×30）
+  - one_if_holder_has_energy_雷  # 持有者附着【雷】能量则为 1 否则 0（task 071 电蜘蛛 麻麻网：与复眼同招式只叠加一次）
 
 # 去向（destination 字段）
 destinations:

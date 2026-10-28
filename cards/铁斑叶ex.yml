@@ -1,0 +1,23 @@
+# 铁斑叶ex（CSV7C-033，基础，规则盒 ex，未来）
+# text_raw 原文：「特性: 快速游标
+# 在自己的回合，当将这张卡牌从手牌使出放于备战区时，可使用1次。将这只宝可梦与战斗宝可梦互换。如果成功执行互换了的话，则选择任意数量的自己场上宝可梦身上附着的能量，转附于这只宝可梦身上。
+#
+# 【草】【草】【无】 棱镜利刃 180
+# 在下一个自己的回合，这只宝可梦无法使用招式。」
+# 快速游标 = own_play_from_hand_to_bench（摔角鹰人先例：「可使用」的放弃不建模）。
+# switch self 成功才 optional_done，随后 any_count → self（task 071 WP5 / WP16）。
+# 棱镜利刃 lock_attack scope=all（「无法使用招式」= 全部招式，含之后获得的授予招式）。
+card:
+  name_group: 铁斑叶ex
+  card_ids: [CSV7C-033, CSV7C-212, CSV7C-237, CSV7C-251, CSV9.5C-018, CSV9.5C-255, SVP-223]
+effects:
+  - trigger: trigger_on_event
+    event: own_play_from_hand_to_bench
+    actions:
+      - {action: switch, selector: self}
+      - {action: move_energy, selector: own_attached_energy, args: {any_count: true, target_pool: self}, condition: if_prev_optional_done}
+  - trigger: on_attack
+    attack: 棱镜利刃
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 180}}
+      - {action: lock_attack, selector: self, args: {scope: all}}

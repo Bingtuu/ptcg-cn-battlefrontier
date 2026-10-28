@@ -1,0 +1,20 @@
+# 伊布（CSV9C-153，基础）——突进进化文本类（伊布ex 虹色因子见 伊布ex.yml）
+# text_raw 原文：「特性: 突进进化
+# 只要这只宝可梦，在战斗场上，则即使是最初的自己的回合，以及刚被放出的回合也可进行进化。
+#
+# 【无】【无】 突击 30
+# 给这只宝可梦也造成10伤害。」
+# skip_play_gates（task 071 WP12）：仅战斗场持有者跳过 entered_play_this_turn /
+# 最初回合门；evolved_this_turn 不放宽；特性被消除则门恢复。
+card:
+  name_group: 伊布
+  card_ids: [CSV9C-153, CSV9.5C-139, SVP-299]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_evolution, args: {skip_play_gates: true}}
+  - trigger: on_attack
+    attack: 突击
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 30}}
+      - {action: damage, selector: self, args: {amount: 10}}

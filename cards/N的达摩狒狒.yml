@@ -1,0 +1,23 @@
+# N的达摩狒狒（CSV10C-041，1阶）
+# text_raw 原文：「【无】【无】 复燃 30×
+# 造成对手弃牌区中基本能量张数×30伤害。
+#
+# 【火】【火】【无】 焚身加农炮 90
+# 将这只宝可梦身上附着的能量全部放于弃牌区，给对手的1只备战宝可梦也造成90伤害。[备战宝可梦不计算弱点、抗性。]」
+# 复燃计数词 opponent_discard_basic_energy_count（task 071 WP9）。
+# 焚身加农炮：来源附着能量 count=all scope=self（task 071 WP6）；备战 90 走
+# damage opponent_bench（弱点抗性仅战斗场，括号注记已由引擎保证）。
+card:
+  name_group: N的达摩狒狒
+  card_ids: [CSV10C-041]
+effects:
+  - trigger: on_attack
+    attack: 复燃
+    actions:
+      - {action: damage, selector: opponent_active, count: opponent_discard_basic_energy_count, args: {op: "×", per: 30}}
+  - trigger: on_attack
+    attack: 焚身加农炮
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 90}}
+      - {action: discard, selector: own_attached_energy, count: all, args: {scope: self}}
+      - {action: damage, selector: opponent_bench, choose: 1, args: {amount: 90}}

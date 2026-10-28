@@ -1,0 +1,22 @@
+# 火伊布ex（CSV9.5C-023，1阶，规则盒 ex，evolves_from=伊布）
+# text_raw 原文：「【火】【无】 燃烧充能 130
+# 选择自己牌库中最多2张基本能量，附着于自己的1只宝可梦身上。并重洗牌库。
+#
+# 【火】【水】【雷】 红玉髓 280
+# 在下一个自己的回合，这只宝可梦无法使用招式。」
+# 燃烧充能 single_target：最多 2 张全部附到同一只（洗牌在 own_deck 节点内）。
+# 红玉髓 lock_attack scope=all（task 071 WP15）：双招式卡不能只锁本招式名。
+card:
+  name_group: 火伊布ex
+  card_ids: [CSV9.5C-023, CSV9.5C-223, SVP-372]
+effects:
+  - trigger: on_attack
+    attack: 燃烧充能
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 130}}
+      - {action: attach_energy, selector: own_deck, filters: [basic_energy], choose: 2, destination: attach, args: {single_target: true}}
+  - trigger: on_attack
+    attack: 红玉髓
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 280}}
+      - {action: lock_attack, selector: self, args: {scope: all}}

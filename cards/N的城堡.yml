@@ -1,0 +1,12 @@
+# N的城堡（CSV10C-215，竞技场）
+# text_raw 原文：「将双方场上所有「N的宝可梦」【撤退】所需能量全部消除。」
+# 竞技场读点（task 071 WP11）：condition holder_owner:N 对撤退方持有者求值，
+# value=all 与既有减免共用归零旗标（任一来源 all → 最终 0）。双方均可读到。
+card:
+  name_group: N的城堡
+  card_ids: [CSV10C-215]
+effects:
+  - trigger: passive_static
+    condition: "holder_owner:N"
+    actions:
+      - {action: modify_retreat_cost, args: {value: all}}

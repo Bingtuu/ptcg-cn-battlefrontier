@@ -1,0 +1,14 @@
+# 可达鸭（CSV10C-043，基础）
+# text_raw 原文：「特性: 湿气
+# 只要这只宝可梦在场上，就将双方所有宝可梦的令自身【昏厥】的效果的特性全部消除。
+#
+# 【无】【无】 冲撞 20」
+# with_primitive: ko_self（task 071 WP13）：ability_manual 的 actions 含 ko_self 则不枚举。
+# 来源被监视塔按属性消除时，抑制同步失效。冲撞 20 无附加效果，白板结算。
+card:
+  name_group: 可达鸭
+  card_ids: [CSV10C-043]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: suppress_ability, args: {with_primitive: ko_self}}

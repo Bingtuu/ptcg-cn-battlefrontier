@@ -588,9 +588,11 @@ def test_reveal_event_iids_and_names_no_state_change():
 
 
 def test_reveal_bad_forms_dsl_error():
-    """未知/未支持 selector / 带 choose → DslError（不猜）。"""
+    """未知/未支持 selector / 带 choose → DslError（不猜）。
+
+    opponent_hand 自 task 071 WP8 起放行（咕咕 寂静之翼），负例移出。
+    """
     for node in (
-        "{action: reveal, selector: opponent_hand}",
         "{action: reveal, selector: own_deck}",
         "{action: reveal, selector: own_hand, choose: 1}",
     ):

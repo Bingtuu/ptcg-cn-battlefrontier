@@ -1,0 +1,12 @@
+# 入口 1：deck_id。复制本文件后改 deck_id / games 再跑。
+# 需要本机 ptcg-cn.db。下面两个 id 来自 config/target-pool.v2.yml。
+# bfsim run experiments/templates/deck-id.example.yml --results results/deck-id-smoke.db
+name: deck-id-template
+games: 1
+seed_start: 1
+decks:
+  a: {source: db, deck_id: "mik_moe:676344"}
+  b: {source: db, deck_id: "mik_moe:687339"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

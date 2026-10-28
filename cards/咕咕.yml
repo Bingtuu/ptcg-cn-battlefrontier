@@ -1,0 +1,15 @@
+# 咕咕（CSV7C-159，基础）——寂静之翼文本类
+# （同名异文本「三刺击」见 咕咕-三刺击.yml）
+# text_raw 原文：「【无】【无】 寂静之翼 20
+# 查看对手的手牌。」
+# reveal selector=opponent_hand（task 071 WP8，D-071-3）：只落 reveal 事件，
+# 不扩 Agent 可见视图与 MCTS 冻结集。
+card:
+  name_group: 咕咕
+  card_ids: [CSV7C-159]
+effects:
+  - trigger: on_attack
+    attack: 寂静之翼
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: reveal, selector: opponent_hand}

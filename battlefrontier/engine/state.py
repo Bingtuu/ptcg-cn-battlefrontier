@@ -103,6 +103,9 @@ class InPlayPokemon(FrozenModel):
     # turn（解禁时点见 core._begin_turn；撤退/离场/昏厥清除，进化继承——决议口径待核）
     attack_locks: tuple[str, ...] = ()
     attack_lock_turn: int | None = None
+    # 全招式锁（task 071 WP15 火伊布ex 红玉髓）：与 attack_locks 同时点清除
+    # （下下个回合开始 / 撤退）；真 = 持有者全部招式（含道具授予）不可用
+    attack_lock_all: bool = False
     # 撤退锁（task 026 WP6 沙铃仙人掌 穷追不舍，D-WP6-6）：被锁目标下个自己回合无法撤退
     # （回合结束 core._on_turn_end 解除；进化/离场清除）
     retreat_lock: bool = False
@@ -176,6 +179,14 @@ class PendingChoice(FrozenModel):
     # 解释器挂起时标注，经 chooser.build_pending 透传；Agent 据此区分代价支付
     # （cost 取最低评分）与收益选择（actions 取最高评分）
     step_phase: str = "actions"
+    # 前序可选节点是否实际执行（task 071 WP16「在这种情况下」）：恢复时重建
+    # ctx.prev_optional_done；None = 本效果尚无可选节点（读条件则 DslError）
+    prev_optional_done: bool | None = None
+    # 嵌套帧外层 carry（task 071 WP10 备战复制两段式）：内层挂起时冻结外层
+    # 已选来源 iid，内层完成后恢复外层 copy 节点（既有单段复制 carry 为空，零变化）
+    outer_carry: tuple[int, ...] = ()
+    # 激流水泵（TPCi 2024-09-12）：合法选择只有空集，或恰好 min(max_choose, 池大小) 张
+    exact_or_zero: bool = False
 
 
 class PlayerState(FrozenModel):
@@ -203,6 +214,9 @@ class PlayerState(FrozenModel):
     # 回合级奖赏加成标记（task 026 WP5 白蕾雅，D-WP5-2 🔲 待核）：本回合自己太晶
     # 宝可梦招式伤害致对手战斗场昏厥时多拿 1 张奖赏；回合结束 _on_turn_end 清除
     extra_prize_tera_ko: bool = False
+    # 非太晶招式昏厥奖赏加成（task 071 WP14 铁臂膀ex 多谢款待）：scope=attack_ko，
+    # 不要求攻击方 is_tera；与 extra_prize_tera_ko 独立叠加；回合结束清除
+    extra_prize_attack_ko: bool = False
     # 回合级伤害修正标记（task 026 WP7 空手道王的修炼，D-WP7-3）：on_play 的
     # modify_damage 写入——元素 = (增减值, 目标规则盒限定 | None)，与道具/竞技场/
     # aura 三来源求和；自己回合结束（_on_turn_end / 检查阶段入口）清除

@@ -1,0 +1,12 @@
+# 入口 3：本地「卡名×张数」列表。复制后把 path 换成自己的 60 张列表。
+# 本仓库附带的 txt 不足 60 张，直接跑会在装载时拒绝，这是故意的。
+# bfsim run experiments/templates/name-count.example.yml --results results/name-count.db
+name: name-count-template
+games: 1
+seed_start: 1
+decks:
+  a: {source: file, path: experiments/templates/name-count.example.txt}
+  b: {source: file, path: experiments/templates/name-count.example.txt}
+agents:
+  a: {type: heuristic}
+  b: {type: random}

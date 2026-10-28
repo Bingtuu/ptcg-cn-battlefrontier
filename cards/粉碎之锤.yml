@@ -1,0 +1,12 @@
+# 粉碎之锤（30thDC-029，物品）
+# text_raw 原文：「抛掷1次硬币，如果为正面，则选择对手场上的宝可梦身上附着的1个能量，放于弃牌区。」
+# opponent_attached_energy + if_flip_heads（task 071 WP6）。能量进对手弃牌区。
+# 同文本旧系列印刷未并入：赛制合法性未在本环境用主库复核，只挂池内 J 标印刷。
+card:
+  name_group: 粉碎之锤
+  card_ids: [30thDC-029]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: coin_flip}
+      - {action: discard, selector: opponent_attached_energy, choose: 1, condition: if_flip_heads}

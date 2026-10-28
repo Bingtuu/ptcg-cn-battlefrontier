@@ -5,11 +5,11 @@
 
 ## 当前
 
-**当前焦点 = task 071 引擎扩展第二批**（已立项，任务书 `tasks/task 071.md`，D-071-1~5；阶段 1 组 A/B1/C 派遣遭配额 429 中断——组 A 留 TDD 红阶段遗产 `tests/test_primitives_t071_a.py` 25 测、实现零改动，B1/C 零残留，待窗口恢复 resume）→ 阶段 2 DSL 批 4a/4b/4c（task 070 blocked 19 张）→ 判据 4（卡池 v2 装载零缺口）收口 task 070 → v2 matrix + 校准（真实侧 72/72 格零低置信备便）；v2 锁定后学习线复跑（D3-5）另立项。
+**当前焦点 = 072–075 管道验收通过，正式矩阵已跑；两处引擎缺口放到下一任务**（分支 `cursor/task-071-engine-ext-0053` / PR #1，**代理仍不合并**，合并由负责人/协调侧另做）。统一审一句：管道验收通过；加权 |Δ| 18.5% 被沙奈朵 IndexError 与 N的索罗亚克 `copy_attack` 多级嵌套抬高，修复不进本 PR。拍板顺序：① 更新本记录 → ② 提交并合并 PR #1 → ③ 下一任务再修引擎。未做：构筑 GUI、全池单卡扫描、JEV、LLM、假理由。v2 锁定后学习线复跑（D3-5）另立项。
 
-**三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（4.05/局 < 5 门槛）/ play_stadium / end_turn / copy_attack 多级嵌套；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
+**三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（4.05/局 < 5 门槛）/ play_stadium / end_turn / copy_attack 多级嵌套 / IndexError（沙奈朵，2026-10-28 补入）；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
-**卡池 v2 独立线（D3-5）进行中**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 批次第一批 ◐（task 070：15/34 落地一次过闸、19 blocked 全为引擎表达力缺口 → task 071 输入）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。当前全量 1512 测试绿 + ruff 零告警；DSL 定义库 115 文件；v2 池 9 卡组装载未覆盖恰好 19 张 blocked。
+**卡池 v2 独立线（D3-5）**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 第一批 15 张 ✅（task 070，闸 3 十五张仍待核）；引擎扩展第二批 + 原 blocked 19 张 ✅（task 071，闸 1/闸 3 19/19 与附录 A #1–#7 已核）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。DSL 定义库 134 文件。本机正式矩阵已跑完（Diupi-Yun，code `8a3aecb`，启发式，16 workers，约 5.6min）：`load_deck` 九卡组 9/9、n=60、warnings=0；`dsl-check --db` 134/134 OK。数字与失败拆分见下方 task 072 节。换卡正式 `results/*swap*` 未见，只有模板和代码。
 
 **待用户核销/拍板**：task 070 闸 3 十五张；高级球「才可以使用」/裁判「手牌全部」区分词裁量点；电电虫洗牌 2 次 vs 原文 1 次偏差（🔲）；附录 A 待核攒批（task 069 三条）。
 
@@ -31,6 +31,77 @@
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-28 task 075 ✅：换卡报告双轨（PR #1 未由代理合并）
+
+- **站在现有命令上**：`variants` 跑批仍是 `bfsim run`；报告仍是 `bfsim sensitivity`。新增 `--out` 与 `--replay-sample`（默认各抽 2 局）
+- **导出**：`swap.md` 内嵌 `format_sensitivity`；HTML 由该文转义；CSV/JSON 的 `d_wr` 等于 `VariantComparison.d_wr`。回放复用 074 的 `sample_replays` / `render_log`
+- **模板**：`experiments/templates/card-swap.example.yml` 只声明一组换卡，不扫描卡池
+- **命令**（跑局需要本机库）：
+
+```bash
+bfsim run experiments/templates/card-swap.example.yml --results results/card-swap.db
+bfsim sensitivity <base_id> <variant_id> --results results/card-swap.db --out results/card-swap
+```
+
+072–075 在这条 PR 上收口。代理不合并。
+
+### 2026-10-28 task 074 ✅：精简对局日志 B（PR #1 未由代理合并）
+
+- **数据**：只读结果库 `games` / `game_events`。主阶段 kind = attack / retreat / play_trainer / play_stadium / evolve / attach_energy / end_turn。`choose` 仍由 `--decisions` 负责
+- **默认开**：每局一行（种子、先后、胜负、回合、失败文本）。抽样回放默认 3 局，完成局按种子升序，`--replay-sample 0` 可关掉正文。不渲染全部对局
+- **导出**：`results/report-<id>-log`。Markdown 内嵌胜率、汇总、行动、回放原文；HTML 由该文转义；CSV/JSON 的胜率等于 `ActionStat`
+- **命令**：
+
+```bash
+bfsim report <experiment_id> --results results/exp.db --out results/report-log
+```
+
+不做假理由、合法行动全量转储、关键路径 LLM。075 未做。
+
+### 2026-10-28 task 073 ✅：三种入口模板 + 只读真实对阵（PR #1 未由代理合并）
+
+- **入口**：`experiments/templates/deck-id.example.yml`（`source: db`）、`pool-yaml.example.yml`（`matrix.pool`，每对 1 局冒烟）、`name-count.example.yml` + `name-count.example.txt`（「N 卡名」，示例不足 60，装载会拒绝）
+- **对阵**：`battlefrontier/data/pairings.py` 以 `mode=ro` 读 `v_pairing_players` ⋈ `v_tournament_weights`。只留池内 `en_archetype`、镜像剔除、`winner_side=0` 不进分母。不是浏览产品，也不填正式 |Δ|
+- **命令**（需本机库才能跑出真实行；测试用临时库）：
+
+```bash
+bfsim run experiments/templates/deck-id.example.yml --results results/deck-id-smoke.db
+bfsim run experiments/templates/pool-yaml.example.yml --results results/pool-smoke.db
+bfsim pairings --pool config/target-pool.v2.yml --out results/v2-pairings
+```
+
+卡名×张数须先把列表凑满 60 张再跑。不做构筑 GUI。074/075 未做。
+
+### 2026-10-28 task 072 ✅：v2 校准管道 + 正式矩阵已跑（PR #1 仍由代理不合并）
+
+- **范围**：卡组入口是池 YAML 的 `deck_id`。不新造校准命令。管道与 073–075 同在 PR #1；本 PR 不修下面两处引擎缺口
+- **实验**：`experiments/v2-calibration.example.yml`（`v2-calibration`，种子 200000，每对 500 局，池 `config/target-pool.v2.yml`）。冒烟定义 `experiments/v2-calibration-smoke.example.yml`（每对 1 局，种子 900000）不作为正式偏差
+- **导出**：`battlefrontier/report/deviation_pack.py`。Markdown 内嵌 `format_calibration` 全文；HTML 由该 Markdown 转义；CSV/JSON 字段来自同一 `CalibrationCell`
+- **本机正式跑**（Diupi-Yun，code `8a3aecb`，启发式，16 workers，约 5.6min）：
+  - `load_deck` 九卡组 9/9，n=60，warnings=0
+  - `dsl-check --db` 134/134 OK
+  - 相关 pytest 29 passed；PR 上 072–075 套件曾报 47 passed / 9 skipped
+  - 矩阵 18000 局 → `results/v2-calibration.db`。失败 1748：IndexError 888（100% 含沙奈朵 `mik_moe:678647`；无堆栈，路径未钉死）、`copy_attack` 嵌套 >1「暗夜王牌」N的索罗亚克ex 858（100% 含 `mik_moe:690359`）、梦幻ex 基因侵入 2
+  - 偏差包 `results/v2-deviation/`：加权平均 |Δ| **18.5%**（`weighted_mean_abs_delta`≈0.1849）、CI 覆盖 2.8%（2/72）、低置信 0/72、最大 Δ N的索罗亚克 vs 沙奈朵 −64.7%
+  - 对阵包 `results/v2-pairings/`、report 冒烟 `results/v2-report-smoke/` 已写出
+  - 换卡正式 `results/*swap*` 未见（仅模板 `experiments/templates/card-swap.example.yml` 与代码）
+- **统一审**：管道验收通过。|Δ| 被上述 IndexError 与索罗亚克招式复制嵌套抬高。这不是笼统的「特性使用」：索罗亚克失败是 `copy_attack` 多级嵌套；IndexError 只与沙奈朵共现。两处下一任务修，本 PR 不修
+- **命令**（本次正式跑用 16 workers）：
+
+```bash
+bfsim run experiments/v2-calibration.example.yml --workers 16 --results results/v2-calibration.db
+bfsim calibration experiments/v2-calibration.example.yml --results results/v2-calibration.db --out results/v2-deviation
+```
+
+### 2026-10-28 task 071 ✅：引擎扩展第二批 + 19 张 DSL（闸 3 与附录 A 已核，PR #1 待合并）
+
+- **阶段 1**：WP1–17 全部落地。main 上没有中断留下的红测文件，按任务书重新 TDD（`tests/test_primitives_t071.py` 23 测）。组 A chooser/interpreter、组 B primitives、组 C core 读点、WP17 合成 AttackDef
+- **规则口径**：突进进化只跳过登场/最初回合门；N的城堡 value=all 与既有减免同一归零旗标；reveal 对手手牌只进事件流；grant_attack 在卡面无招式时用 cost/damage 合成。激流水泵为 `opt_exact`（TPCi 2024-09-12：可放弃，执行则恰好 min(3, 身上张数)），后段 `if_prev_optional_done`。附录 A 第 1–7 条 ✅ 已核（2026-10-28）
+- **电蜘蛛**：复眼是 `modify_damage scope=self`（只加成这只宝可梦的招式）+ `target_has_ability`。麻麻网用计数词 `one_if_holder_has_energy_雷` 合成一次伤害，避免复眼按伤害节点重复叠加。节点条件 `holder_has_energy` 已注册，本卡不拆节点
+- **阶段 2**：19 张 DSL 入库（批 4a/4b/4c，分片测试）。闸 1（本机 `--db`）与闸 3 均为 19/19 ✅（2026-10-28 用户核销；厄诡椪在 `opt_exact` 修正后核销）
+- **存量测试**：两处负例随新契约移出（`multi_target × own_bench`、`reveal opponent_hand`）；`effects_by_name` 白名单加「咕咕」。其余存量断言未改
+- **未做**：072+（v2 matrix / 校准 / 备赛）。电电虫洗牌偏差仍在 backlog。粉碎之锤只挂池内 J 标 `30thDC-029`（旧系列印刷未复核赛制合法性）
 
 ### 2026-10-27 task 071 立项：引擎扩展第二批 + 070 收口（阶段 1 派遣遭配额中断，待恢复）
 
@@ -96,3 +167,5 @@
 | 2026-10-21 | task 067 D-067-6 MCTS 定点重跑范围：高残留 3 格重跑（赛富豪×苍响 30 / 玛俐×赛富豪 32 / 多龙黑夜×赛富豪 28 旧口径局，2×50×500 种子对齐原格）；低残留 2 格（多龙喷 17 / 猛雷鼓×玛俐 6）不重跑留档，随卡池 v2 整体新口径消解 | 用户拍板；tasks/task 067.md |
 | 2026-10-21 | task 068 D-068-1/2 卡池 v2 口径拍板：选池窗口只用 09-16 后（46 场，对齐 standard-2026-09-16 J 标快照）+ Top-9 全新排（覆盖 80.48%；苍响/赛富豪/多龙喷掉出，索罗亚克/火伊布猫头夜鹰/电电虫Box 新入）；v1 封存（D-068-4） | 用户拍板；tasks/done/task 068.md |
 | 2026-10-21 | task 069 D-069-1/2 规则决议：力之沙漏「回合结束时」时点 = 检查阶段内状态结算后（本卡结果等价，名义偏差记附录 A）；盖诺赛克特 ACE 锁「使出」= 广义五门类（物品/支援者/竞技场 + 道具附着 + 能量附着） | 用户拍板；tasks/done/task 069.md、rules-reference 附录 A |
+| 2026-10-28 | 071 之后路线：受众 = 研究者/备赛（CLI + 文件 + 导出，无产品 GUI）；导出默认双轨（Markdown/HTML + CSV/JSON）；日志 = 精简 B；JEV/LLM 不进 072–075。顺序原为合并 PR #1 → 072 → 073 → 074 → 075。同日改口：072 整段做完再审，实现留在 PR #1，代理不合并。070 闸 3 十五张与 069 附录 A 三条不挡 072 | 用户拍板；`docs/superpowers/specs/2026-10-28-post-071-roadmap-design.md` |
+| 2026-10-28 | 072–075 统一审 = 管道验收通过。正式矩阵（code `8a3aecb`，启发式，18000 局）加权 \|Δ\| 18.5%，被两缺口抬高：沙奈朵 IndexError（888，无堆栈、路径未钉）与 N的索罗亚克 `copy_attack` 多级嵌套「暗夜王牌」（858）。二者下一任务修，本 PR 不修。顺序：① 更新 STATUS → ② 提交并合并 PR #1（代理不合并）→ ③ 下一任务再修引擎。残留盲区保留特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套，并补入 IndexError（沙奈朵） | 用户拍板；STATUS task 072 节 |

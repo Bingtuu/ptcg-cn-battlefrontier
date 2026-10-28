@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 from battlefrontier.dsl.chooser import NeedChoice
 from battlefrontier.dsl.loader import DslError
 from battlefrontier.dsl.schema import ActionNode, Effect
-from battlefrontier.engine.state import CardInstance, PlayerState
+from battlefrontier.engine.state import CardInstance, InPlayPokemon, PlayerState
 
 if TYPE_CHECKING:
     from battlefrontier.engine.core import GameEngine
@@ -82,6 +82,9 @@ class ExecutionContext:
         # 造成本效果的攻击方栈顶 iid（task 026 WP6 own_ko_by_attack 触发效果；
         # place_damage_counters 的 opponent_attacker 选择器读取；非该触发 = None）
         self.attacker_iid: int | None = None
+        # 前序可选节点是否实际执行（task 071 WP16「在这种情况下」）；
+        # None = 尚无可选节点。挂起恢复经 PendingChoice.prev_optional_done 穿透
+        self.prev_optional_done: bool | None = None
 
     @property
     def player_state(self) -> PlayerState:
@@ -117,11 +120,55 @@ def flatten_steps(effect: Effect) -> list[tuple[str, ActionNode]]:
 _NODE_CONDITIONS = (
     "if_flip_heads", "if_flip_tails", "if_self_active",
     "if_own_ko_by_attack_during_opponent_turn",
+    # task 071 WP16：前序可选节点实际执行了才放行（激流水泵「在这种情况下」）
+    "if_prev_optional_done",
 )
+
+
+def _source_holder(ctx: ExecutionContext) -> InPlayPokemon | None:
+    """效果来源所在的场上宝可梦（栈顶 / 道具 / 附着能量）。"""
+    p = ctx.engine.state.players[ctx.player]
+    for m in ([p.active] if p.active else []) + list(p.bench):
+        if m.current.iid == ctx.source.iid:
+            return m
+        if m.attached_tool is not None and m.attached_tool.iid == ctx.source.iid:
+            return m
+        if any(e.iid == ctx.source.iid for e in m.attached_energy):
+            return m
+    return None
 
 
 def _node_condition_met(ctx: ExecutionContext, condition: str) -> bool:
     """节点 condition 求值：未知词 = DslError（不猜）。"""
+    if condition.startswith("if_own_prizes_eq:"):
+        # task 071 WP2（莉莉艾的决心）：节点级奖赏张数门（抽 6，奖赏恰 N 再抽）
+        raw = condition.split(":", 1)[1]
+        try:
+            n = int(raw)
+        except ValueError:
+            raise DslError(
+                f"节点 condition 参数畸形 {condition!r}（if_own_prizes_eq 需 int）"
+            ) from None
+        return len(ctx.engine.state.players[ctx.player].prizes) == n
+    if condition.startswith("holder_has_energy:"):
+        # task 071 WP2（电蜘蛛 麻麻网）：节点级放行 effect 级既有前缀
+        energy_type = condition.split(":", 1)[1]
+        if not energy_type:
+            raise DslError(
+                f"节点 condition 参数畸形 {condition!r}"
+                f"（holder_has_energy 需非空属性）"
+            )
+        holder = _source_holder(ctx)
+        return holder is not None and any(
+            e.card.energy_type == energy_type for e in holder.attached_energy
+        )
+    if condition == "if_prev_optional_done":
+        if ctx.prev_optional_done is None:
+            raise DslError(
+                "节点 condition 'if_prev_optional_done' 需要本效果内前置可选节点"
+                "（无可选结果，不猜）"
+            )
+        return ctx.prev_optional_done
     if condition not in _NODE_CONDITIONS:
         raise DslError(
             f"未知节点 condition 词 {condition!r}（不猜；扩展请在 dsl/interpreter.py 注册）"
@@ -149,6 +196,7 @@ def run_effect(
     cost_discarded: tuple[int, ...] = (),
     discarded_count: int = 0,
     flip_heads_count: int | None = None,
+    prev_optional_done: bool | None = None,
 ) -> NeedChoice | None:
     """执行效果块：成本 → 动作序列；逐节点发事件（PRD §5.4）。
 
@@ -170,6 +218,7 @@ def run_effect(
     ctx.cost_discarded_iids = cost_discarded
     ctx.discarded_this_effect = discarded_count
     ctx.flip_heads_count = flip_heads_count
+    ctx.prev_optional_done = prev_optional_done
     ctx.bound_attack = effect.attack
     card_name = ctx.source.card.name
     if start == 0 and choice is None:  # 恢复执行（带 choice）不重复发 effect_start
@@ -217,12 +266,17 @@ def run_effect(
             result.attacker_iid = ctx.attacker_iid
             # 掷币正面次数随挂起冻结（task 040 F1，D-040-1 穿透第六件，同 flip 口径）
             result.flip_heads_count = ctx.flip_heads_count
+            # 前序可选节点结果随挂起冻结（task 071 WP16，同 flip 口径）
+            result.prev_optional_done = ctx.prev_optional_done
             # 扁平步骤段（cost/actions）随挂起标注（task 032 WP1，D-032-1：
             # Agent 据此区分代价支付/收益选择方向，同四件套穿透口径）
             result.step_phase = phase
             return result
         # cost 段弃置记录（task 026 WP4，D-WP4-3）：供 recover_from_discard 的
         # exclude_cost_discarded 池剔除（「无法选择因为这张卡牌的效果而被弃置的能量」）
+        if isinstance(result, dict) and "optional_done" in result:
+            # task 071 WP16：可选节点实际执行与否（选 0 / 池空 = False）
+            ctx.prev_optional_done = bool(result["optional_done"])
         if phase == "cost" and node.action == "discard" and result.get("iids"):
             ctx.cost_discarded_iids = (*ctx.cost_discarded_iids, *result["iids"])
         # 本效果弃置张数累计（task 026 WP5，D-WP5-1）：供 damage 的

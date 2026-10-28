@@ -366,10 +366,15 @@ class GameEngine:
         for c in evo_candidates:
             for t in in_play:
                 top = t.current
+                # task 071 WP12（伊布 突进进化）：战斗场持有者可跳过登场/最初回合门
+                skip_gates = self._evolution_skip_play_gates(player, t)
                 if (
                     c.card.evolves_from == top.card.name
-                    and top.iid not in p.entered_play_this_turn
                     and top.iid not in p.evolved_this_turn
+                    and (
+                        skip_gates
+                        or top.iid not in p.entered_play_this_turn
+                    )
                 ):
                     actions.append(Action(kind="evolve", iid=c.iid, target_iid=top.iid))
         # 声明驱动进化加宽（task 069 WP1 虹色因子，modify_evolution）：场上宝可梦
@@ -460,10 +465,11 @@ class GameEngine:
             # 不枚举（执行落点 _do_attack 双保险；落点清单见 _tool_suppressed）
             if tool is not None and not self._tool_suppressed(p.active):
                 tool_doc = self._effect_doc(tool.card)
-                combined += [(a, tool_doc) for a in tool.card.attacks]
+                combined += [(a, tool_doc) for a in self._tool_attacks(tool)]
             for i, (attack, doc) in enumerate(combined):
                 # 攻击冷却锁（task 026 WP4 裁决 2，lock_attack）：被锁招式不枚举
-                if attack.name in p.active.attack_locks:
+                # task 071 WP15：attack_lock_all 锁全部招式（含道具授予）
+                if p.active.attack_lock_all or attack.name in p.active.attack_locks:
                     continue
                 # 有效招式费（task 026 WP5，D-WP5-4）：_effective_attack_cost 读 DSL
                 # modify_attack_cost 声明（月月熊 老练招式）；枚举与执行共用求值点
@@ -556,6 +562,9 @@ class GameEngine:
                 continue
             effect = next((e for e in doc.effects if e.trigger == "ability_manual"), None)
             if effect is None:
+                continue
+            # task 071 WP13：含指定原语的特性被场上定向消除（可达鸭 湿气 / ko_self）
+            if self._ability_primitive_suppressed(effect):
                 continue
             if effect.limit is None:
                 raise DslError(f"{top.card.name} 特性未声明 limit（不猜；请在 DSL 补 limit）")
@@ -961,6 +970,8 @@ class GameEngine:
             update["own_ko_during_opponent_turn"] = False
         if p.extra_prize_tera_ko:
             update["extra_prize_tera_ko"] = False
+        if p.extra_prize_attack_ko:
+            update["extra_prize_attack_ko"] = False
         # task 026 WP7：回合级伤害修正标记（D-WP7-3 空手道王的修炼）与精确口径
         # 昏厥标记（D-WP7-7 古玉鱼）同样在持有者回合结束清除
         if p.turn_damage_mods:
@@ -1146,6 +1157,7 @@ class GameEngine:
             # 攻击冷却锁随撤退清除（task 026 WP4 裁决 2，同特殊状态恢复口径）
             "attack_locks": (),
             "attack_lock_turn": None,
+            "attack_lock_all": False,
             # 麻痹施加标记随状态恢复清除（task 026 WP7，D-WP7-2）
             "paralyzed_mark": None,
         })
@@ -1186,7 +1198,7 @@ class GameEngine:
             # （正常路径已被枚举门拦截，此处拦截 apply 之外的直接驱动）
             if self._tool_suppressed(atk):
                 raise IllegalActionError("suppress_tool：授予招式随道具效果消除")
-            attack = tool.card.attacks[action.attack_index - len(own_attacks)]
+            attack = self._tool_attacks(tool)[action.attack_index - len(own_attacks)]
             doc = self._effect_doc(tool.card)
             source = tool
         # 混乱（D1 决议，rules-reference 附录 A）：战斗宝可梦决定使用招式时掷 1 次硬币——
@@ -1243,7 +1255,8 @@ class GameEngine:
                              weakness=self._effective_weakness(player, d.active),
                              damage_mod=self._effective_damage_modifier(
                                  atk, player,
-                                 target_rule_box=d.active.current.card.rule_box))
+                                 target_rule_box=d.active.current.card.rule_box,
+                                 defender=d.active))
         # 满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）
         dmg = self._survival_cap(defender, d.active, dmg)
         target = d.active.model_copy(update={"damage": d.active.damage + dmg})
@@ -1296,7 +1309,8 @@ class GameEngine:
         return hp
 
     def _effective_damage_modifier(
-        self, mon: InPlayPokemon, player: int, target_rule_box: str | None = None
+        self, mon: InPlayPokemon, player: int, target_rule_box: str | None = None,
+        defender: InPlayPokemon | None = None,
     ) -> int:
         """攻方招式伤害修正求和（task 025 不服输头带；task 026 WP7 泛化四来源，D-WP7-3）。
 
@@ -1316,7 +1330,7 @@ class GameEngine:
 
         mod = 0
 
-        def scan(doc, *, source_kind: str) -> None:
+        def scan(doc, *, source_kind: str, source_mon: InPlayPokemon | None = None) -> None:
             nonlocal mod
             for effect in doc.effects:
                 if effect.trigger != "passive_static":
@@ -1324,19 +1338,43 @@ class GameEngine:
                 nodes = [n for n in effect.actions if n.action == "modify_damage"]
                 if not nodes:
                     continue
-                if not condition_met(effect.condition, self, player, mon):
+                # task 071 电蜘蛛 复眼：aura 来源在战斗场（不对攻击方求值，
+                # 以免改掉卡比兽 holder_owner 对攻击方求值的存量口径）
+                if effect.condition == "source_is_active":
+                    if source_kind != "aura" or source_mon is None:
+                        raise DslError(
+                            "source_is_active 仅用于宝可梦 aura modify_damage（不猜）"
+                        )
+                    active = self.state.players[player].active
+                    if (
+                        active is None
+                        or active.current.iid != source_mon.current.iid
+                    ):
+                        continue
+                elif not condition_met(effect.condition, self, player, mon):
                     continue
                 for node in nodes:
                     trb = node.args.get("target_rule_box")
                     if trb is not None and trb != target_rule_box:
                         continue
+                    # task 071 电蜘蛛 复眼：只加成到拥有特性的对手战斗宝可梦
+                    wants_ability = node.args.get("target_has_ability")
+                    if wants_ability and (
+                        defender is None or not defender.current.card.has_ability
+                    ):
+                        continue
                     scope = node.args.get("scope")
                     if source_kind == "aura":
+                        if scope == "self":
+                            continue  # 自身招式加成不走全场 aura
                         if scope != "own_field":
                             raise DslError(
                                 f"宝可梦 aura modify_damage 的 args.scope 须为 own_field"
                                 f"（收到 {scope!r}；不猜）"
                             )
+                    elif source_kind == "self":
+                        if scope != "self":
+                            continue
                     elif scope is not None:
                         raise DslError(
                             f"{source_kind}挂载的 modify_damage 不支持 scope"
@@ -1381,7 +1419,12 @@ class GameEngine:
             ):
                 continue  # 无 aura 声明的卡文档不逐节点校验（同撤退费口径）
             seen.add(m.current.card.name)
-            scan(doc, source_kind="aura")
+            scan(doc, source_kind="aura", source_mon=m)
+        # ③b 攻击者自身 scope=self（task 071 电蜘蛛 复眼：「这只宝可梦所使用的招式」）
+        if not self._ability_suppressed(mon):
+            self_doc = self._effect_doc(mon.current.card)
+            if self_doc is not None:
+                scan(self_doc, source_kind="self", source_mon=mon)
         # ④ 回合级标记（on_play modify_damage 写入；target_rule_box 过滤在求和点）
         for amount, trb in p.turn_damage_mods:
             if trb is None or trb == target_rule_box:
@@ -1461,6 +1504,19 @@ class GameEngine:
                 ):
                     continue  # 无 scope 声明的卡文档不逐节点校验（holder 口径不由本路径读取）
                 scan(doc, m, expect_scope="own_basic_all")
+        # ③ 竞技场（task 071 WP11，N的城堡）：对双方撤退方持有者求值
+        # （condition 如 holder_owner:N）；value=all 与既有减免同一归零旗标，
+        # 任一来源 all → 最终 0（与数值减免无顺序依赖）
+        stadium = self.state.stadium
+        if stadium is not None:
+            sdoc = self._effect_doc(stadium.card)
+            if sdoc is not None and any(
+                node.action == "modify_retreat_cost"
+                for effect in sdoc.effects
+                if effect.trigger == "passive_static"
+                for node in effect.actions
+            ):
+                scan(sdoc, mon, expect_scope=None)
         if zeroed:
             return 0
         return max(0, mon.current.card.retreat_cost - reduction)
@@ -1918,20 +1974,8 @@ class GameEngine:
 
     # ── suppression 统一守卫（task 029，D-029-1/2）────────────────────
 
-    def _suppress_ability_types(self) -> tuple[str, ...] | None:
-        """场上竞技场 passive_static 的 suppress_ability 声明（args.types 属性列表）。
-
-        无竞技场 / 无文档 / 无声明 → None；声明带 condition → DslError（不猜，
-        需要时再扩展逐玩家求值）。求值点实时读声明——竞技场离场/被顶即无声明可读
-        （天然恢复，对齐 provide_energy/bench_size 声明式先例）。
-        """
-        stadium = self.state.stadium
-        if stadium is None:
-            return None
-        doc = self._effect_doc(stadium.card)
-        if doc is None:
-            return None
-        declared: list[str] = []
+    def _collect_suppress_types(self, doc, declared: list[str]) -> None:
+        """从一份文档收集 suppress_ability 的 types。with_primitive 定向声明跳过。"""
         for effect in doc.effects:
             if effect.trigger != "passive_static":
                 continue
@@ -1944,6 +1988,22 @@ class GameEngine:
                 )
             for node in nodes:
                 types = node.args.get("types")
+                primitive = node.args.get("with_primitive")
+                if primitive is not None and types is not None:
+                    raise DslError(
+                        "suppress_ability 的 types 与 with_primitive 互斥（不猜）"
+                    )
+                if primitive is not None:
+                    if not isinstance(primitive, str) or not primitive:
+                        raise DslError(
+                            "suppress_ability 的 with_primitive 须为非空原语名"
+                            f"（收到 {primitive!r}）"
+                        )
+                    continue
+                if types is None:
+                    raise DslError(
+                        "suppress_ability 需要 args.types 或 with_primitive（不猜）"
+                    )
                 if not (
                     isinstance(types, list)
                     and types
@@ -1954,7 +2014,61 @@ class GameEngine:
                         f"（收到 {types!r}；不猜）"
                     )
                 declared.extend(types)
+
+    def _suppress_ability_types(self) -> tuple[str, ...] | None:
+        """场上 suppress_ability 的 types 声明（竞技场 + 双方宝可梦）。
+
+        task 071 WP13：来源从仅竞技场扩到双方场上宝可梦。宝可梦来源若已被
+        竞技场 types 命中则跳过（避免自递归；宝可梦之间的类型消除都生效）。
+        with_primitive 定向声明不进本列表（见 _ability_primitive_suppressed）。
+        声明带 condition → DslError（不猜）。求值点实时读声明。
+        """
+        declared: list[str] = []
+        stadium = self.state.stadium
+        if stadium is not None:
+            doc = self._effect_doc(stadium.card)
+            if doc is not None:
+                self._collect_suppress_types(doc, declared)
+        stadium_types = set(declared)
+        for side in (0, 1):
+            p = self.state.players[side]
+            for m in ([p.active] if p.active else []) + list(p.bench):
+                if m.current.card.energy_type in stadium_types:
+                    continue
+                doc = self._effect_doc(m.current.card)
+                if doc is None:
+                    continue
+                self._collect_suppress_types(doc, declared)
         return tuple(declared) if declared else None
+
+    def _ability_primitive_suppressed(self, effect) -> bool:
+        """定向消除（task 071 WP13 可达鸭 湿气）：双方场上宝可梦声明
+        suppress_ability with_primitive，且本特性 actions 含该原语。
+
+        来源被类型消除（监视塔等）则声明失效。只看 ability_manual 的 actions。
+        """
+        prims = {n.action for n in effect.actions}
+        if not prims:
+            return False
+        type_block = self._suppress_ability_types() or ()
+        for side in (0, 1):
+            p = self.state.players[side]
+            for m in ([p.active] if p.active else []) + list(p.bench):
+                if m.current.card.energy_type in type_block:
+                    continue
+                doc = self._effect_doc(m.current.card)
+                if doc is None:
+                    continue
+                for eff in doc.effects:
+                    if eff.trigger != "passive_static":
+                        continue
+                    for node in eff.actions:
+                        if node.action != "suppress_ability":
+                            continue
+                        primitive = node.args.get("with_primitive")
+                        if isinstance(primitive, str) and primitive in prims:
+                            return True
+        return False
 
     def _ability_suppressed_card(self, card: CardDef) -> bool:
         """特性消除判定（task 029 火箭队的监视塔，D-029-1）：场上竞技场声明
@@ -2018,6 +2132,88 @@ class GameEngine:
             return True
         return False
 
+    def _evolution_skip_play_gates(self, player: int, mon: InPlayPokemon) -> bool:
+        """突进进化（task 071 WP12）：战斗场持有者跳过 entered_play / 最初回合门。
+
+        声明 = passive_static modify_evolution args.skip_play_gates=true
+        （与虹色因子的 match_evolves_from/rule_box 互斥）。特性被消除则不放宽。
+        每回合已进化门（evolved_this_turn）不放宽。
+        """
+        active = self.state.players[player].active
+        if active is None or active.current.iid != mon.current.iid:
+            return False
+        if self._ability_suppressed(mon):
+            return False
+        doc = self._effect_doc(mon.current.card)
+        if doc is None:
+            return False
+        found = False
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            for node in effect.actions:
+                if node.action != "modify_evolution":
+                    continue
+                if not node.args.get("skip_play_gates"):
+                    continue
+                if (
+                    node.args.get("match_evolves_from") is not None
+                    or node.args.get("rule_box") is not None
+                ):
+                    raise DslError(
+                        "modify_evolution 的 skip_play_gates 与 "
+                        "match_evolves_from/rule_box 互斥（不猜）"
+                    )
+                if effect.condition is not None:
+                    raise DslError(
+                        "modify_evolution skip_play_gates 暂不支持 effect.condition"
+                        "（战斗场门由引擎强制；不猜）"
+                    )
+                found = True
+        return found
+
+    def _tool_attacks(self, tool: CardInstance) -> tuple[AttackDef, ...]:
+        """道具授予招式（task 016 既有卡面招式；task 071 WP17 卡面无招式时合成）。
+
+        卡面 attacks 非空 → 原样返回（进化/退化学习器零变化）。
+        卡面为空 → 读 grant_attack args.cost（必填）与 damage（缺省 null）合成
+        AttackDef。无 cost 的旧声明不合成（不把存量「只声明名字」误报错）。
+        """
+        if tool.card.attacks:
+            return tool.card.attacks
+        doc = self._effect_doc(tool.card)
+        if doc is None:
+            return ()
+        out: list[AttackDef] = []
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            for node in effect.actions:
+                if node.action != "grant_attack" or "cost" not in node.args:
+                    continue
+                name = node.args.get("attack")
+                cost = node.args.get("cost")
+                damage = node.args.get("damage", None)
+                if not isinstance(name, str) or not name:
+                    raise DslError(
+                        f"grant_attack 的 attack 须为非空字符串（收到 {name!r}）"
+                    )
+                if (
+                    not isinstance(cost, (list, tuple))
+                    or not all(isinstance(x, str) for x in cost)
+                ):
+                    raise DslError(
+                        f"grant_attack 的 cost 须为属性符号列表（收到 {cost!r}）"
+                    )
+                if damage is not None and (
+                    isinstance(damage, bool) or not isinstance(damage, int)
+                ):
+                    raise DslError(
+                        f"grant_attack 的 damage 须为 int 或 null（收到 {damage!r}）"
+                    )
+                out.append(AttackDef(name=name, cost=tuple(cost), damage=damage))
+        return tuple(out)
+
     def _modify_evolution_args(self, mon: InPlayPokemon) -> Mapping[str, object] | None:
         """声明驱动进化加宽（task 069 WP1 伊布ex 虹色因子，modify_evolution）。
 
@@ -2039,13 +2235,27 @@ class GameEngine:
             if effect.trigger != "passive_static":
                 continue
             nodes = [n for n in effect.actions if n.action == "modify_evolution"]
-            if not nodes:
+            widen = []
+            for node in nodes:
+                if node.args.get("skip_play_gates"):
+                    # task 071 WP12：突进进化由 _evolution_skip_play_gates 读取
+                    if (
+                        node.args.get("match_evolves_from") is not None
+                        or node.args.get("rule_box") is not None
+                    ):
+                        raise DslError(
+                            "modify_evolution 的 skip_play_gates 与 "
+                            "match_evolves_from/rule_box 互斥（不猜）"
+                        )
+                    continue
+                widen.append(node)
+            if not widen:
                 continue
             if effect.condition is not None:
                 raise DslError(
                     "modify_evolution 暂不支持 effect.condition（不猜；需要时再扩展）"
                 )
-            found.extend(nodes)
+            found.extend(widen)
         if not found:
             return None
         if len(found) > 1:
@@ -2262,6 +2472,15 @@ class GameEngine:
         ):
             n += 1  # 白蕾雅：太晶宝可梦招式伤害昏厥对手战斗场 → 多拿 1 张
             self._emit("prize_bonus", taker_idx, source="extra_prize_tera_ko")
+        if (
+            active_ko
+            and attack_ctx is not None
+            and attack_ctx[0] == taker_idx
+            and taker.extra_prize_attack_ko
+        ):
+            # task 071 WP14：多谢款待不限太晶，仍只计招式伤害昏厥战斗场
+            n += 1
+            self._emit("prize_bonus", taker_idx, source="extra_prize_attack_ko")
         taken = taker.prizes[:n]
         self._set_player(taker_idx, taker.model_copy(update={
             "hand": taker.hand + taken, "prizes": taker.prizes[len(taken):],
@@ -2377,6 +2596,8 @@ class GameEngine:
         discarded_count: int = 0,
         attacker_iid: int | None = None,
         flip_heads_count: int | None = None,
+        prev_optional_done: bool | None = None,
+        outer_carry: tuple[int, ...] = (),
     ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
@@ -2423,7 +2644,8 @@ class GameEngine:
             need = run_effect(ctx, effect, start=start, choice=choice, carry=carry,
                               flip=flip, cost_discarded=cost_discarded,
                               discarded_count=discarded_count,
-                              flip_heads_count=flip_heads_count)
+                              flip_heads_count=flip_heads_count,
+                              prev_optional_done=prev_optional_done)
         finally:
             self._in_effect = False
         if need is not None:
@@ -2438,12 +2660,14 @@ class GameEngine:
                     self, player, card, effect_index, need.inner_cursor, need,
                     completion=completion, inner=need.inner,
                     outer_cursor=need.cursor, outer_choice=choice or (),
+                    outer_carry=carry,
                 )
             else:
                 pending = build_pending(
                     self, player, card, effect_index, need.cursor, need,
                     completion=completion, inner=inner,
                     outer_cursor=outer_cursor, outer_choice=outer_choice,
+                    outer_carry=outer_carry,
                 )
             self.state = self.state.model_copy(update={
                 "phase": "choice", "current_player": player, "pending_choice": pending,
@@ -2452,8 +2676,9 @@ class GameEngine:
         if inner is not None and not inner_done:
             # 内层完成 → 带 inner_done 恢复外层 copy 节点（外层后续节点照常执行）
             self._run_or_suspend(player, card, effect_index, start=outer_cursor,
-                                 choice=outer_choice, completion=completion,
-                                 inner_done=True)
+                                 choice=outer_choice, carry=outer_carry,
+                                 completion=completion, inner_done=True,
+                                 prev_optional_done=prev_optional_done)
             return
         # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置；
         # 攻击结算完毕推进对手回合（rules-manual §6：攻击后回合结束）。
@@ -2570,7 +2795,9 @@ class GameEngine:
                              cost_discarded=pc.cost_discarded,
                              discarded_count=pc.discarded_count,
                              attacker_iid=pc.attacker_iid,
-                             flip_heads_count=pc.flip_heads_count)
+                             flip_heads_count=pc.flip_heads_count,
+                             prev_optional_done=pc.prev_optional_done,
+                             outer_carry=pc.outer_carry)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。
@@ -2611,6 +2838,7 @@ class GameEngine:
                 if mon.attack_lock_turn is not None and turn - mon.attack_lock_turn >= 2:
                     return mon.model_copy(update={
                         "attack_locks": (), "attack_lock_turn": None,
+                        "attack_lock_all": False,
                     })
                 return mon
 

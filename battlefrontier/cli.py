@@ -88,11 +88,50 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pairings(args: argparse.Namespace) -> int:
+    """池内 archetype 的真实逐桌对阵对照（task 073）。只读，不跑模拟。"""
+    from battlefrontier.data.pairings import pairing_contrast
+    from battlefrontier.data.pool import load_target_pool
+    from battlefrontier.report.calibration import (
+        REAL_BASIS,
+        REAL_DATE_FROM,
+        REAL_DATE_TO,
+    )
+    from battlefrontier.report.pairing_pack import (
+        format_pairing_contrast,
+        write_pairing_pack,
+    )
+
+    pool = load_target_pool(args.pool)
+    names = [d.en_archetype for d in pool.decks]
+    db_path = args.db or load_db_path()
+    try:
+        rep = pairing_contrast(
+            db_path, names,
+            date_from=args.date_from or REAL_DATE_FROM,
+            date_to=args.date_to or REAL_DATE_TO,
+            basis=args.basis or REAL_BASIS,
+            division=args.division,
+            sample_limit=args.sample_limit,
+        )
+    except ValueError as e:
+        print(f"错误：{e}")
+        return 1
+    text = format_pairing_contrast(rep)
+    stem = Path(args.pool).stem
+    out_dir = Path(args.out) if args.out else Path("results") / f"{stem}-pairings"
+    paths = write_pairing_pack(out_dir, rep)
+    print(text)
+    print("对阵包：" + " ".join(str(p) for p in paths.values()))
+    return 0
+
+
 def _cmd_sensitivity(args: argparse.Namespace) -> int:
     from battlefrontier.report.sensitivity import (
         format_sensitivity,
         sensitivity_report,
     )
+    from battlefrontier.report.swap_pack import swap_replays, write_swap_pack
 
     db = ResultsDB(args.results)
     try:
@@ -101,7 +140,13 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
         except ValueError as e:
             print(f"错误：{e}")
             return 1
-        print(format_sensitivity(rep))
+        replays = swap_replays(db, rep, args.replay_sample)
+        text = format_sensitivity(rep)
+        out_dir = (Path(args.out) if args.out
+                   else Path("results") / f"sensitivity-{args.base_id}")
+        paths = write_swap_pack(out_dir, rep, replays)
+        print(text)
+        print("换卡包：" + " ".join(str(p) for p in paths.values()))
     finally:
         db.close()
     return 0
@@ -121,6 +166,7 @@ def _cmd_calibration(args: argparse.Namespace) -> int:
         calibration_report,
         format_calibration,
     )
+    from battlefrontier.report.deviation_pack import write_deviation_pack
 
     defn = load_experiment(args.experiment)
     if defn.matrix is None:
@@ -139,7 +185,11 @@ def _cmd_calibration(args: argparse.Namespace) -> int:
         rep = calibration_report(db, defn, pool, real.data, dict(real.meta))
     finally:
         db.close()
-    print(format_calibration(rep))
+    text = format_calibration(rep)
+    out_dir = Path(args.out) if args.out else Path("results") / f"{defn.name}-deviation"
+    paths = write_deviation_pack(out_dir, rep)
+    print(text)
+    print("偏差包：" + " ".join(str(p) for p in paths.values()))
     return 0
 
 
@@ -592,6 +642,18 @@ def _cmd_report(args: argparse.Namespace) -> int:
             print(f"错误：{e}")
             return 1
         print(format_report(report))
+        from battlefrontier.report.battle_log import (
+            battle_log_report,
+            format_game_summaries,
+            format_main_actions,
+            write_battle_log_pack,
+        )
+
+        log = battle_log_report(
+            db, args.experiment_id, sample_n=args.replay_sample,
+        )
+        print(format_game_summaries(log))
+        print(format_main_actions(log))
         if args.decisions:
             from battlefrontier.report.decisions import (
                 decision_report,
@@ -606,6 +668,10 @@ def _cmd_report(args: argparse.Namespace) -> int:
             )
 
             print(format_mcts_report(mcts_report(db, args.experiment_id)))
+        out_dir = (Path(args.out) if args.out
+                   else Path("results") / f"report-{args.experiment_id}-log")
+        paths = write_battle_log_pack(out_dir, log)
+        print("对局包：" + " ".join(str(p) for p in paths.values()))
     finally:
         db.close()
     return 0
@@ -627,16 +693,51 @@ def main(argv: list[str] | None = None) -> int:
     rep_p.add_argument("--decisions", action="store_true", help="追加决策聚合分节")
     rep_p.add_argument("--mcts-consider", action="store_true",
                        help="追加 MCTS 决策分析分节（task 042：访问份额/高熵决策点/分桶胜率）")
+    rep_p.add_argument(
+        "--replay-sample", type=int, default=3,
+        help="抽样回放局数（默认 3，完成局按种子升序；0 表示不写回放正文）",
+    )
+    rep_p.add_argument(
+        "--out", default=None,
+        help="对局包目录（默认 results/report-<id>-log）：md/html/csv/json",
+    )
     sen_p = sub.add_parser("sensitivity",
                            help="换卡敏感性：baseline vs variants 并排 ΔWR + 显著性检验")
     sen_p.add_argument("base_id", type=int, help="baseline 实验 id")
     sen_p.add_argument("variant_ids", type=int, nargs="+", help="variant 实验 id 列表")
     sen_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    sen_p.add_argument(
+        "--replay-sample", type=int, default=2,
+        help="换卡前后各抽几局回放（默认 2；0 表示不写回放正文）",
+    )
+    sen_p.add_argument(
+        "--out", default=None,
+        help="换卡包目录（默认 results/sensitivity-<base_id>）：md/html/csv/json",
+    )
     cal_p = sub.add_parser("calibration",
                            help="M6 偏差表：模拟矩阵 vs 真实赛事 matchup（task 030）")
     cal_p.add_argument("experiment", help="matrix 实验定义 YAML 路径")
     cal_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
     cal_p.add_argument("--db", default=None, help="ptcg-cn.db 路径（缺省读本机配置）")
+    cal_p.add_argument(
+        "--out", default=None,
+        help="偏差包目录（默认 results/<实验名>-deviation）：同时写 md/html/csv/json",
+    )
+    pr_p = sub.add_parser(
+        "pairings",
+        help="只读拉取池内 archetype 的真实逐桌对阵（task 073，对照用，不是浏览）",
+    )
+    pr_p.add_argument("--pool", required=True, help="目标卡组池 YAML（用其中 en_archetype）")
+    pr_p.add_argument("--db", default=None, help="ptcg-cn.db 路径（缺省读本机配置）")
+    pr_p.add_argument("--date-from", default=None, help="窗口起（默认与 calibration 相同）")
+    pr_p.add_argument("--date-to", default=None, help="窗口止（默认与 calibration 相同）")
+    pr_p.add_argument("--basis", default=None, help="默认 intl_aligned，与 calibration 相同")
+    pr_p.add_argument("--division", default="master", help="赛区（默认 master；NULL 赛区也保留）")
+    pr_p.add_argument("--sample-limit", type=int, default=20, help="原始行抽样上限（不是分母）")
+    pr_p.add_argument(
+        "--out", default=None,
+        help="对阵包目录（默认 results/<池文件名>-pairings）：同时写 md/html/csv/json",
+    )
     chk_p = sub.add_parser("dsl-check", help="DSL 文件校验（schema + 词表；LLM harness 闸 1）")
     chk_p.add_argument("files", nargs="+", help="DSL YAML 路径（可多个）")
     chk_p.add_argument("--db", default=None,
@@ -774,6 +875,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_sensitivity(args)
     if args.cmd == "calibration":
         return _cmd_calibration(args)
+    if args.cmd == "pairings":
+        return _cmd_pairings(args)
     if args.cmd == "dsl-check":
         return _cmd_dsl_check(args)
     if args.cmd == "tune":

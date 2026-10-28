@@ -1,0 +1,12 @@
+# v2 校准：9 套池 36 无向配对 × 500 局（task 072）
+# 卡组只来自池内 deck_id。正式数字须本机 ptcg-cn.db，本文件不预填结果。
+# bfsim run experiments/v2-calibration.example.yml --workers 8 --results results/v2-calibration.db
+# bfsim calibration experiments/v2-calibration.example.yml --results results/v2-calibration.db --out results/v2-deviation
+name: v2-calibration
+seed_start: 200000
+matrix:
+  pool: config/target-pool.v2.yml
+  games_per_pair: 500
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

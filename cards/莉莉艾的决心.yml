@@ -1,0 +1,13 @@
+# 莉莉艾的决心（30thDC-040，支援者）
+# text_raw 原文：「将自己的手牌全部放回牌库并重洗牌库。然后，从牌库上方抽取6张卡牌。如果自己的剩余奖赏卡张数为6张的话，则抽取的张数变为8张。」
+# 本体打出时已离手（_do_play_trainer 先摘手牌），回库的是其余手牌。
+# 抽 6 + 奖赏恰为 6 再抽 2 = 变为 8（task 071 WP2 节点条件 if_own_prizes_eq:6）。
+card:
+  name_group: 莉莉艾的决心
+  card_ids: [30thDC-040]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: shuffle_hand_into_deck, selector: own_hand}
+      - {action: draw, count: 6}
+      - {action: draw, count: 2, condition: "if_own_prizes_eq:6"}

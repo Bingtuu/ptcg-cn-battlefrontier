@@ -1,0 +1,10 @@
+# v2 校准冒烟：同样 36 对，但每对 1 局。只验证展开与命令，不作为正式偏差表。
+# bfsim run experiments/v2-calibration-smoke.example.yml --workers 4 --results results/v2-calibration-smoke.db
+name: v2-calibration-smoke
+seed_start: 900000
+matrix:
+  pool: config/target-pool.v2.yml
+  games_per_pair: 1
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

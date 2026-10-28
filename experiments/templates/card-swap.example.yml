@@ -1,0 +1,16 @@
+# 换卡报告模板（task 075）。复制后改 deck_id、换出/换入卡名和局数再跑。
+# 只声明这一组 swaps，不扫描卡池。跑完用输出的 id：
+# bfsim sensitivity <base_id> <variant_id> --results results/card-swap.db --out results/card-swap
+name: card-swap-template
+games: 1
+seed_start: 3000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:678647"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: swap-catcher-to-nestball
+    swaps:
+      - {side: a, out: 反击捕捉器, out_count: 2, in: 巢穴球, in_count: 2}

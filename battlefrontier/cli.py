@@ -131,6 +131,7 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
         format_sensitivity,
         sensitivity_report,
     )
+    from battlefrontier.report.swap_pack import swap_replays, write_swap_pack
 
     db = ResultsDB(args.results)
     try:
@@ -139,7 +140,13 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
         except ValueError as e:
             print(f"错误：{e}")
             return 1
-        print(format_sensitivity(rep))
+        replays = swap_replays(db, rep, args.replay_sample)
+        text = format_sensitivity(rep)
+        out_dir = (Path(args.out) if args.out
+                   else Path("results") / f"sensitivity-{args.base_id}")
+        paths = write_swap_pack(out_dir, rep, replays)
+        print(text)
+        print("换卡包：" + " ".join(str(p) for p in paths.values()))
     finally:
         db.close()
     return 0
@@ -699,6 +706,14 @@ def main(argv: list[str] | None = None) -> int:
     sen_p.add_argument("base_id", type=int, help="baseline 实验 id")
     sen_p.add_argument("variant_ids", type=int, nargs="+", help="variant 实验 id 列表")
     sen_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    sen_p.add_argument(
+        "--replay-sample", type=int, default=2,
+        help="换卡前后各抽几局回放（默认 2；0 表示不写回放正文）",
+    )
+    sen_p.add_argument(
+        "--out", default=None,
+        help="换卡包目录（默认 results/sensitivity-<base_id>）：md/html/csv/json",
+    )
     cal_p = sub.add_parser("calibration",
                            help="M6 偏差表：模拟矩阵 vs 真实赛事 matchup（task 030）")
     cal_p.add_argument("experiment", help="matrix 实验定义 YAML 路径")

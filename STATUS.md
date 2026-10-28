@@ -5,11 +5,11 @@
 
 ## 当前
 
-**当前焦点 = task 074 精简对局日志已落在 PR #1**（分支 `cursor/task-071-engine-ext-0053`，代理不合并）。`bfsim report` 默认打印每局汇总与主阶段行动 × 胜率，并写出 `log.md` / `log.html` / `summary.csv` / `actions.csv` / `log.json`。回放走现成 `render_log`，默认只抽种子最小的 3 局完成局。不编造理由，不倾倒合法行动。075 未开始。正式矩阵与真实对阵数字仍未跑。v2 锁定后学习线复跑（D3-5）另立项。
+**当前焦点 = task 072–075 都已落在 PR #1，待负责人统一审**（分支 `cursor/task-071-engine-ext-0053`，代理不合并）。072 校准双轨包、073 三种入口与只读对阵、074 精简对局日志、075 换卡双轨包均有计划与测试。正式 18000 局和真实 |Δ| / 对阵行数仍须本机 `ptcg-cn.db`，本记录不填这些数字。未做：构筑 GUI、全池单卡扫描、JEV、LLM、假理由。v2 锁定后学习线复跑（D3-5）另立项。
 
 **三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（4.05/局 < 5 门槛）/ play_stadium / end_turn / copy_attack 多级嵌套；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
-**卡池 v2 独立线（D3-5）**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 第一批 15 张 ✅（task 070，闸 3 十五张仍待核）；引擎扩展第二批 + 原 blocked 19 张 ✅（task 071，闸 1/闸 3 19/19 与附录 A #1–#7 已核）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。DSL 定义库 134 文件。072 已接上 v2 矩阵展开与 `bfsim calibration --out` 双轨偏差包；正式 18000 局与九卡组 `load_deck` 零缺口复跑仍须本机库，命令见下方工作记录。
+**卡池 v2 独立线（D3-5）**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 第一批 15 张 ✅（task 070，闸 3 十五张仍待核）；引擎扩展第二批 + 原 blocked 19 张 ✅（task 071，闸 1/闸 3 19/19 与附录 A #1–#7 已核）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。DSL 定义库 134 文件。072–075 的管道（矩阵校准、导入模板、对局日志、换卡包）已在 PR #1；正式 18000 局、真实对阵行与九卡组 `load_deck` 零缺口复跑仍须本机库，命令见下方工作记录。
 
 **待用户核销/拍板**：task 070 闸 3 十五张；高级球「才可以使用」/裁判「手牌全部」区分词裁量点；电电虫洗牌 2 次 vs 原文 1 次偏差（🔲）；附录 A 待核攒批（task 069 三条）。
 
@@ -31,6 +31,20 @@
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-28 task 075 ✅：换卡报告双轨（PR #1 未由代理合并）
+
+- **站在现有命令上**：`variants` 跑批仍是 `bfsim run`；报告仍是 `bfsim sensitivity`。新增 `--out` 与 `--replay-sample`（默认各抽 2 局）
+- **导出**：`swap.md` 内嵌 `format_sensitivity`；HTML 由该文转义；CSV/JSON 的 `d_wr` 等于 `VariantComparison.d_wr`。回放复用 074 的 `sample_replays` / `render_log`
+- **模板**：`experiments/templates/card-swap.example.yml` 只声明一组换卡，不扫描卡池
+- **命令**（跑局需要本机库）：
+
+```bash
+bfsim run experiments/templates/card-swap.example.yml --results results/card-swap.db
+bfsim sensitivity <base_id> <variant_id> --results results/card-swap.db --out results/card-swap
+```
+
+072–075 在这条 PR 上收口。代理不合并。
 
 ### 2026-10-28 task 074 ✅：精简对局日志 B（PR #1 未由代理合并）
 

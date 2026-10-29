@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 081 落后抢奖：实现中 / 云端单测（100 局待本机；PR #10，不合并）**。Owner 已拍板 081 Q1–Q8，全部按规格「本文建议」（2026-10-29）。本变更只做计划 Task 1，不实现 082 / `copy_lethal_gate`。云端无 `ptcg-cn.db`，**跳过 100 局**，不跑 `bfsim`。对照 = task 080 同种子 A78/B22（`208000..208099`），失败必须是 0；A 进入 60–70% 算方向有效，到不了写实。不宣称到真实 30.4%，不宣称加权 |Δ| 闭环，不跑 18000。task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–080 全开，code `1afa4e2`，启发式，16 workers）：36×500=18000，**失败 0**；加权 |Δ| **19.0%**（PR #2 修引擎后 18.5%），CI 覆盖 8.3%，低置信 0/72；最大格沙奈朵 vs N的索罗亚克 **sim 80% / real 30.4% / Δ+49.6%**（PR #2 同格 96%/+65.6%）。三刀叠完该格向真实移动，**未落入 60–75% 有效带，写实不凑**；整体 |Δ| 略升因他格对冲。残差深挖 + N索整行扫描见下方。081 落后抢奖：`docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`。082 复制招式击杀前瞻：`docs/superpowers/specs/2026-10-29-task-082-copy-lethal-design.md`。未做：构筑 GUI、全池单卡扫描、JEV、LLM。
+**当前焦点 = task 081 落后抢奖：验收完成，方向无效（PR #10，不合并；待 Owner 拍板是否合并 / 回滚 / 改刀）**。Owner 已拍板 081 Q1–Q8，全部按规格「本文建议」（2026-10-29）。本变更只做计划 Task 1，不实现 082 / `copy_lethal_gate`。Diupi-Yun 同种子 100 局（`208000..208099`，`prize_pressure_gate` 默认开，失败 **0**）：**A80 / B20**，对照 task 080 的 A78 / B22。有效带目标约 78%→60–70%，实际 78%→80%，**方向无效**。不宣称到真实 30.4%，不宣称加权 |Δ| 闭环，不跑 18000。task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–080 全开，code `1afa4e2`，启发式，16 workers）：36×500=18000，**失败 0**；加权 |Δ| **19.0%**（PR #2 修引擎后 18.5%），CI 覆盖 8.3%，低置信 0/72；最大格沙奈朵 vs N的索罗亚克 **sim 80% / real 30.4% / Δ+49.6%**（PR #2 同格 96%/+65.6%）。三刀叠完该格向真实移动，**未落入 60–75% 有效带，写实不凑**；整体 |Δ| 略升因他格对冲。残差深挖 + N索整行扫描见下方。081 落后抢奖：`docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`。082 复制招式击杀前瞻：`docs/superpowers/specs/2026-10-29-task-082-copy-lethal-design.md`。未做：构筑 GUI、全池单卡扫描、JEV、LLM。
 
 **三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（task 077 第一刀已合入，该格仍约 90%，未闭环；蒸馏 4.05/局 < 5 门槛仍在）→ task 078 已合入 main `30d8d352`；task 079 已合入 main `bed68cbe`；task 080 已合入 main `1afa4e2`（本机 100 局 A78/B22；正式矩阵后该格 sim 80%）；play_stadium / end_turn；~~copy_attack 多级嵌套~~ / ~~IndexError（沙奈朵）~~ 已由 task 076 修掉；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
@@ -33,13 +33,22 @@
 ## 工作记录
 
 
-### 2026-10-29 task 081：落后抢奖（实现中 / 云端单测）
+### 2026-10-29 task 081：落后抢奖（验收完成，方向无效）
 
-- **PR**：#10 `cursor/task-081-prize-pressure-3f2d`（不合并）。**100 局待本机**。
+- **PR**：#10 `cursor/task-081-prize-pressure-3f2d`（不合并）。待 Owner 拍板是否合并 / 回滚 / 改刀。
 - **拍板**：Owner 已拍板 Q1–Q8，全部按规格「本文建议」。冻结 `pokemon_score` / `factor_prize_diff`；不重开血月 `modify_attack_cost`；无卡名例外；100 局定有效带（对照 080 的 A78/B22，进入 60–70% 算方向有效）；不允许改 `end_turn` / `play_stadium`；包含落后时 promote 优先能击杀拿奖；`prize_pressure_gate` 默认开、不进 tune。082 另号，本变更不做。
 - **实现**：`HeuristicParams.prize_pressure_gate: bool = True`。`_prize_behind` = `own.prizes_count > opponent.prizes_count`。落后且两边都不能击杀时，撤到已付清有效伤害严格更高的备战；未落后不撤。落后且备战有已付清击杀时，promote 优先该备战；未落后仍按 `pokemon_score`。`board_quality_gate` 关时撤退仍直接走付不起才撤。
 - **单测**：`tests/test_heuristic_prize_pressure.py` 红→绿（落后撤退实际 `attack`、落后 promote 实际 `bench_index=0`、开关关 `TypeError`）。连跑 board / agent / features / tune：**57 passed**。ruff 零告警。`test_features.py` 期望未改。`len(search_space())` 仍是 10；`bool_fields` 含 `prize_pressure_gate`。
-- **云端跳过 100 局**（无 `ptcg-cn.db`，不跑 `bfsim`，不跑 18000）。**100 局待本机**（Diupi-Yun）：`experiments/t078-gard-zoro.example.yml`，种子 `208000..208099`，对照 080 的 A78/B22，失败必须是 0。短行 YAML 不在本变更（计划 Task 3；Q4 已拍短行只作停手，不进 60–70%）。
+- **本机 100 局**（Diupi-Yun，`experiments/t078-gard-zoro.example.yml`，种子 `208000..208099`，`results/t081-gard-zoro.db`，`prize_pressure_gate` 默认开，失败 **0**；对照 task 080 同种子 A78/B22，失败 0）：
+
+| | 080 | 081 |
+|---|---|---|
+| A / B | 78 / 22 | **80 / 20** |
+| A prizes / deck_out / no_pokemon | 56 / 13 / 9 | 57 / 14 / 9 |
+| B prizes / deck_out / no_pokemon | 9 / 3 / 10 | 8 / 2 / 10 |
+| 暗夜王牌 次数 / 触及局 | — | **207 / 67** |
+
+有效带判定：**方向无效**（目标约 78%→60–70%，实际 78%→80%）。胜因几乎不动（A prizes 56→57，B prizes 9→8）。暗夜王牌只记本刀 207 次 / 67 局；080 对照报告曾记 250/74，口径可能不同，不硬比次数。不宣称到真实 30.4%，不宣称加权 |Δ| 闭环，不跑 18000。短行 YAML 未跑（计划 Task 3，只作停手，不进 60–70%）。
 
 ### 2026-10-29 N索整行扫描（矩阵后，定刀前）
 

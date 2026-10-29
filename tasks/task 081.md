@@ -1,6 +1,6 @@
 # task 081 · 落后抢奖
 
-- 状态：实现中 / 云端单测（100 局待本机；PR #10，不合并）
+- 状态：验收完成，方向无效（PR #10，不合并；待 Owner 拍板是否合并 / 回滚 / 改刀）
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-081-prize-pressure.md`
 - 依赖：080 已合入 main `1afa4e2`。100 局对照是当前 main / 080 的同种子 A78/B22。复制招式击杀前瞻是 task 082，不在本任务
 - 拍板：Owner 已拍板 Q1–Q8，全部按规格「本文建议」。本变更只做计划 Task 1，不实现 082 / `copy_lethal_gate`
@@ -37,8 +37,8 @@ bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t
 bfsim report <id> --results results/t081-gard-zoro.db --decisions
 ```
 
-- [ ] 种子 `208000..208099`，失败必须是 0（云端未跑）
-- [ ] 对照 080 的 A78/B22。A 胜率进入 60–70% 算方向有效；到不了写实（云端未跑）
+- [x] 种子 `208000..208099`，失败 0（Diupi-Yun，`results/t081-gard-zoro.db`）
+- [x] 对照 080 的 A78/B22。A 胜率进入 60–70% 算方向有效；到不了写实 → **方向无效**（A78 → A80）
 - 这是 081 自己的带。不把 082 的局数并进来
 - 不宣称到真实 30.4%，不宣称加权 |Δ| 闭环，不跑 18000
 - 短行：Q4 已拍「100 局定有效带；短行建议跑，只作停手」。YAML 与局数不在本变更（计划 Task 3）。本机若跑：沙奈朵 / 多龙巴鲁托 / 玛俐各 50，猛雷鼓 / 电电虫各 20，`seed_start: 220000`。三格 N索胜率更差则停手。不进 60–70%。失败局必须是 0
@@ -56,4 +56,13 @@ bfsim report <id> --results results/t081-gard-zoro.db --decisions
 - **红**：落后撤退实际是 `attack`；落后 promote 实际是 `bench_index=0`；开关关两条在字段不存在时 `TypeError`。未落后两条与 078 击杀撤退已绿。
 - **绿**：`prize_pressure_gate: bool = True`。落后 = `own.prizes_count > opponent.prizes_count`。谁都不能击杀且落后时撤到已付清有效伤害严格更高的备战；落后 promote 优先已付清击杀。`board_quality_gate` 关仍直接走付不起才撤。不进 tune 的 10 维；`bool_fields` 含该字段。
 - **单测**：`tests/test_heuristic_prize_pressure.py` `tests/test_heuristic_board_gate.py` `tests/test_heuristic_agent.py` `tests/test_features.py` `tests/test_tune_space.py` → **57 passed**。ruff 检查上述实现与测试文件，零告警。`test_features.py` 期望未改。
-- **云端跳过 100 局**（无 `ptcg-cn.db`，不跑 `bfsim`，不跑 18000）。**100 局待本机**（Diupi-Yun）：`experiments/t078-gard-zoro.example.yml`，种子 `208000..208099`，对照 080 的 A78/B22，失败必须是 0。不实现 082。
+- **本机 100 局**（Diupi-Yun，`experiments/t078-gard-zoro.example.yml`，种子 `208000..208099`，`results/t081-gard-zoro.db`，`prize_pressure_gate` 默认开，失败 **0**；对照 task 080 同种子 A78/B22，失败 0）：
+
+| | 080 | 081 |
+|---|---|---|
+| A / B | 78 / 22 | **80 / 20** |
+| A prizes / deck_out / no_pokemon | 56 / 13 / 9 | 57 / 14 / 9 |
+| B prizes / deck_out / no_pokemon | 9 / 3 / 10 | 8 / 2 / 10 |
+| 暗夜王牌 | — | 207 次 / 67 局 |
+
+有效带判定：**方向无效**（目标约 78%→60–70%，实际 78%→80%）。暗夜王牌只记本刀；080 对照报告曾记 250/74，口径可能不同，不硬比次数。不宣称到真实 30.4%，不宣称加权 |Δ| 闭环，不跑 18000。短行未跑。待 Owner 拍板是否合并 / 回滚 / 改刀。不实现 082。

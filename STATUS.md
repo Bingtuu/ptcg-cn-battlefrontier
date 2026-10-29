@@ -5,9 +5,9 @@
 
 ## 当前
 
-**当前焦点 = task 079 能量目标（PR #7 本机 100 局已验收；待合并拍板）**。078 已合入 main `30d8d352`（PR #6）。本刀只做计划 Task 2：`energy_target_gate` 默认开，手牌能量优先贴到再贴一张就付清、且新付清招式有效伤害最高的宝可梦。Q4 = 否，不读血月 / `modify_attack_cost`，不做 Task 2b。`pokemon_score` 不动。不进 tune 的 10 维。080 未做。云端无 `ptcg-cn.db`，`bfsim` 100 局跳过，留给父代理在 Diupi-Yun 跑；对照是 **078 默认开（A92/B8）**，不是全关。077 本机验收（种子 `208000..208099`，100 局，失败 0）：A WR **96%→90%**，B **4%→10%**，deck_out **77→27**，N索交易 **11.7→1.35**/局；诚实带命中，**不宣称 |Δ| 闭环**。未做：构筑 GUI、全池单卡扫描、JEV、LLM。v2 锁定后学习线复跑（D3-5）另立项。
+**当前焦点 = task 080 同体招式（实现进 PR；云端无库，100 局未跑；未合并）**。079 已合入 main `bed68cbe`（PR #7，Diupi-Yun A87/B13）。本刀只做计划 Task 3：`opponent_discard_basic_energy_count` 进 `dsl_estimate._visible_counter`（不走开关）；`attack_quality_gate` 默认开，只改复制两段排序（斩杀优先，再比有效伤害，再比 iid / 下标）。Q4 = 否。`pokemon_score` 不动。零卡名例外。不进 tune 的 10 维。云端无 `ptcg-cn.db`，`bfsim` 100 局跳过，留给父代理在 Diupi-Yun 跑；对照是 **079 默认开（A87/B13）**，不是全关。失败必须是 0。胜率待本机回写，不外推。077 本机验收（种子 `208000..208099`，100 局，失败 0）：A WR **96%→90%**，B **4%→10%**，deck_out **77→27**，N索交易 **11.7→1.35**/局；诚实带命中，**不宣称 |Δ| 闭环**。未做：构筑 GUI、全池单卡扫描、JEV、LLM。v2 锁定后学习线复跑（D3-5）另立项。
 
-**三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（task 077 第一刀已合入，该格仍约 90%，未闭环；蒸馏 4.05/局 < 5 门槛仍在）→ task 078 已合入 main `30d8d352`；task 079 能量附着目标实现进 PR（100 局未跑）；080 同体招式未做；play_stadium / end_turn；~~copy_attack 多级嵌套~~ / ~~IndexError（沙奈朵）~~ 已由 task 076 修掉；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
+**三期主线已收官（M11 ✅ M12 ✅ 部分达成收口，D3-7 2026-10-21 用户拍板）**：蒸馏学生正式定位「分钟级粗筛」——锚 1 决策一致率 ✅ / 锚 3 分钟级 ✅（全 matrix 18000 局 7.4min，教师口径 73×）/ 锚 2 过第一门槛（加权 |Δ| 12.5% ≤ 启发式基线 13.2%，未及 M10 9.7%）；跨配对保序两版实证不成立（Spearman≈0），精排/深挖仍归 MCTS。残留盲区 backlog：特性使用质量（task 077 第一刀已合入，该格仍约 90%，未闭环；蒸馏 4.05/局 < 5 门槛仍在）→ task 078 已合入 main `30d8d352`；task 079 已合入 main `bed68cbe`；task 080 复燃计数与复制排序实现进 PR（云端 100 局跳过）；play_stadium / end_turn；~~copy_attack 多级嵌套~~ / ~~IndexError（沙奈朵）~~ 已由 task 076 修掉；事件排序观感债攒批随引擎改动顺手清。M12 终判链路（061 根因诊断 → 062 特征 v2 → 063/064 promote 空场判平修复 → 065/066 盲区归因与处置证伪 → 067 复校准地基 9.715%）细节见归档与 `tasks/done/`。
 
 **卡池 v2 独立线（D3-5）**：v2 已锁定（task 068，`config/target-pool.v2.yml`，覆盖率 80.48%，校准真实侧 72/72 格零低置信）；引擎扩展批 ✅（task 069）；DSL 第一批 15 张 ✅（task 070，闸 3 十五张 ✅ 2026-10-28 助手核销）；引擎扩展第二批 + 原 blocked 19 张 ✅（task 071，闸 1/闸 3 19/19 与附录 A #1–#7 已核）。Mega 线暂缓（2026-10-07 决议：简中环境无 Mega）。DSL 定义库 134 文件。本机正式矩阵已跑完（Diupi-Yun，code `8a3aecb`，启发式，16 workers，约 5.6min）：`load_deck` 九卡组 9/9、n=60、warnings=0；`dsl-check --db` 134/134 OK。数字与失败拆分见下方 task 072 节。换卡正式 `results/*swap*` 未见，只有模板和代码。
 
@@ -32,7 +32,21 @@
 
 ## 工作记录
 
-### 2026-10-28 task 079：能量附着目标（实现 + Diupi-Yun 100 局验收；未合并）
+### 2026-10-29 task 080：同体招式可见伤害与复制目标（实现；云端跳过 100 局；未合并）
+
+- **拍板**：Q4 = 否（不读血月减费）。`attack_quality_gate` 默认开。零卡名例外。`pokemon_score` 公式不动。不进 tune（维仍 10）。复燃计数不包在开关里。
+- **实现**：分支 `cursor/task-080-attack-quality-6192`，从 main `bed68cbe`。`_visible_counter("opponent_discard_basic_energy_count")` 数 `view.opponent.discard` 里 `is_basic_energy`。`_pick_choose` 在 cost / 附伤分支之后：`own_bench` 且当前步骤是 `copy_attack` 时按供体最高有效伤害排（斩杀优先，然后 `-damage`，然后 iid）；文档读不到则回落 `pokemon_score`。`anchored_pokemon_attack` 按招式下标排，供体 iid 读 `pending_choice.payload[0]`（单测断言该字段）。不改 DSL / 引擎原语 / copy 帧栈 / `end_turn`。
+- **单测**：`tests/test_heuristic_attack_quality.py` 红→绿。实现前：复燃估算 `None`、4 张基本能量时 `_pick_attack` 选印面 90、复制选高分供体 iid 70、第二段选下标 0；`attack_quality_gate` 字段不存在为 `TypeError`。60 与 190 两条实现前已绿。连跑 `test_agent_dsl_estimate` / `test_t076_matrix_failures` / `test_primitives_t071` / `test_tune_space` / `test_features` / ability_gate / board_gate / energy_target：**106 passed** + `ruff check .` 净。071/076/077/078/079 旧断言未改。
+- **本机 100 局**：云端无 `ptcg-cn.db`，跳过。父代理在 Diupi-Yun 跑。对照是 **079 默认开（A87/B13）**，不是全关。失败必须是 0。胜率写实，不把这一格外推成 |Δ| 闭环。
+
+```bash
+bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t080-gard-zoro.db
+bfsim report <id> --results results/t080-gard-zoro.db --decisions
+```
+
+- **未做**：矩阵、500 局、JEV、LLM、`end_turn` / `play_stadium`。代理不合并。
+
+### 2026-10-28 task 079：能量附着目标（实现 + Diupi-Yun 100 局验收；已合入 main `bed68cbe`）
 
 - **拍板**：Q4 = 否（不做 Task 2b / 不读血月减费）。`energy_target_gate` 默认开。零卡名。`pokemon_score` 不动。不进 tune（维仍 10）。
 - **实现**：PR #7 `cursor/task-079-energy-target-3493` @ `16a1322`（从 main `30d8d352`）。手牌弹药且战斗场已能打仍 None；有「再贴一张就付清」目标时按新付清招式有效伤害选，平手战斗场优先；否则保持原 `needs_energy`。
@@ -53,7 +67,7 @@
 
 结构：高费用第二招（莱希拉姆）附着下降；暗夜王牌触及上升。血月略降（Q4 未批减费，不凑）。胜率 92%→87% 方向对，本刀不要求进 60–75%。
 
-- **未做**：Task 2b、080、矩阵。代理不合并（待 owner 拍板）
+- **未做（当时）**：Task 2b、矩阵。其后 080 另开。本段已随 PR #7 合入 main `bed68cbe`
 
 
 ### 2026-10-28 task 078：前场与撤退（实现 + Diupi-Yun 100 局验收；已合入 main `30d8d352`）

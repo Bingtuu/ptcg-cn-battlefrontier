@@ -1,6 +1,6 @@
 # task 083 · 共享击杀/拿奖前瞻
 
-- 状态：**promote can_ko 假阳性已修，待重验 100 局**（PR #12 仍不合并；`edf392c` 的 A72 是修前数字）
+- 状态：**假阳性已修，重验完毕；胜率仍 A72/B28；PR #12 待拍板，不合并**
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`
 - 依赖：080 已合入 main `1afa4e2`。**081 搁置**（PR #10 不合并）。**082 并入本任务 WP-copy（F1）**，不再独立硬推
 - 对外中文名：共享击杀/拿奖前瞻（不要「奖杯压力」「王牌转换」）
@@ -60,7 +60,7 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 - 种子 `208000..208099`，失败 0
 - 有效带已拍板（Q12–Q13）：对照 main/080 A78/B22；相对 A78 向 60–70% 或 B prizes 结构改善
 - 不对照 081 的 A80；不宣称 30.4%；不跑 18000 作完成条件
-- **Diupi-Yun 已跑**（代码 `edf392c`，`results/t083-gard-zoro.db`）：A72/B28，失败 0。见结果节。
+- **Diupi-Yun 已重验**（修后 `af48017` / `results/t083-effhp-gard-zoro.db`）：A72/B28，失败 0。修前库保留。见结果节。
 
 ## 实现要点
 
@@ -84,13 +84,14 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 - **F1**：`_ko_prize_lookahead` 覆盖印面招式与一层 `selector=own_bench_attack` 的 `copy_attack`。供体不必付费；未知 filter / 无文档不猜；不递归供体上的再一层 copy。`_lethal_attack` 读该出口。不写 `_attack_table`。
 - **F3**：`_pick_retreat` 与 `_pick_promote` 只读同一出口。复制能击杀则不撤。Q15：换上后 `can_ko` 优先于纯 `pokemon_score`，领先时也选击杀手；开关关仍按分数。两边都不能击杀时不因落后换更高伤。
 - **未做（按拍板）**：F2、F4、`prize_pressure_gate`、PR #10 行为、卡名分支、血月减费、`end_turn` / `play_stadium`、080 chooser。
-- **局级**（Diupi-Yun，代码 `edf392c`，`results/t083-gard-zoro.db`，种子 `208000..208099`，失败 0；对照 main/080 同种子，不是 081 的 A80）：
+- **局级**（Diupi-Yun，种子 `208000..208099`，失败 0；对照 main/080，不是 081 的 A80。修前 `results/t083-gard-zoro.db` = `edf392c`；修后 `results/t083-effhp-gard-zoro.db` = `af48017`。勿再跑）：
 
   | | A/B | prizes | deck_out | no_pokemon | 暗夜王牌 |
   |---|---|---|---|---|---|
   | t080 baseline | A78 / B22 | A56 / B9 | A13 / B3 | 9 / 10 | 250 |
-  | t083 本刀 | A72 / B28 | A53 / B14 | A10 / B4 | 9 / 10 | 262 |
+  | t083 修前 `edf392c` | A72 / B28 | A53 / B14 | A10 / B4 | 9 / 10 | 262 |
+  | t083 修后 `af48017` | A72 / B28 | A55 / B14 | A8 / B4 | 9 / 10 | 268 |
 
-  相对 A78 向 60–70% 有效带（78→72）。B prizes 9→14。未落入带内中心，仍满足 Q13「向 60–70% 或 B prizes 结构改善」。短行不是完成条件。不宣称 30.4%，不跑 18000。这组数字是修前代码 `edf392c`。
-- **假阳性（Owner 拍板先修再重验）**：seed 208060 在莱希昏厥后 promote 索罗亚克ex，复制「火焰」实伤 100，对手愿增猿挂勇气护符（基础 +50）且已伤 20。印面剩余 90，有效剩余 140。前瞻用卡面 HP，100≥90 判 `can_ko`，引擎 100<140 不昏。修法：共享前瞻剩余 HP 改读道具 `modify_hp`（`holder_is_basic` 只加在基础宝可梦上；`suppress_tool` 则不加）。位点：`_copied_strike`、`_lookahead_on_active`、`_one_layer_copy`，经 `_ko_remaining`。未改引擎昏厥，未改弃牌定量斩杀。相关套件 **82 passed**，失败 0。100 局重验由协调侧做，本环境不跑。
-- **遗留**：重验同种子 100 局后再由 Owner 拍板是否合入。代理不合并。
+  相对 t080 仍 78→72，翻转 13/7。修前 vs 修后胜负 **100/100 相同（0 翻转）**。B prizes 修后仍 14。未落入 60–70% 带内中心。短行不是完成条件。不宣称 30.4%，不跑 18000。
+- **假阳性重验**：seed 208060 修前 promote 索罗亚克ex（印面剩余 90 把复制 100 判死；有效剩余 140，引擎不昏）。修后 promote 火红，与 t080 相同。该局胜者仍是 A（t080 该局 B 胜）。个案已修，但不是 A78→72 的主杠杆。
+- **遗留**：PR #12 待 Owner 拍板是否合入。代理不合并。

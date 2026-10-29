@@ -1,6 +1,6 @@
 # task 083 · 共享击杀/拿奖前瞻
 
-- 状态：**规格已拍板；实现进行中**（Q1–Q15 整包按规格「本文建议」；代理不合并）
+- 状态：**单测绿；局级未跑**（Q1–Q15 已拍板；云端无库跳过 `bfsim`；代理不合并）
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`
 - 依赖：080 已合入 main `1afa4e2`。**081 搁置**（PR #10 不合并）。**082 并入本任务 WP-copy（F1）**，不再独立硬推
 - 对外中文名：共享击杀/拿奖前瞻（不要「奖杯压力」「王牌转换」）
@@ -41,14 +41,14 @@ F 阶梯默认：**F1（copy 展开）+ F3（共享消费）**；F2 止血默认
 
 单测 `tests/test_heuristic_ko_prize_lookahead.py`：
 
-- [ ] copy 伤可见：印面 `damage=None` 的复制手，供体足够 → 击杀优先 `attack`
-- [ ] 开关关 → 不可见
-- [ ] 供体未付费、复制手已付清 → 仍可见
-- [ ] 共享接口契约：同一 mon 经 active / `_view_as_active` 口径一致
-- [ ] retreat 消费接口：复制能击杀则不撤
-- [ ] promote：按 Q15（建议：能击杀优先于纯 `pokemon_score`；不看落后）
-- [ ] 无 081「落后且都不能击杀则撤更高伤」断言
-- [ ] `pokemon_score` / `factor_prize_diff` / tune 10 维 / 080 chooser 不改
+- [x] copy 伤可见：印面 `damage=None` 的复制手，供体足够 → 击杀优先 `attack`
+- [x] 开关关 → 不可见
+- [x] 供体未付费、复制手已付清 → 仍可见
+- [x] 共享接口契约：同一 mon 经 active / `_view_as_active` 口径一致
+- [x] retreat 消费接口：复制能击杀则不撤
+- [x] promote：Q15 = 是，能击杀优先于纯 `pokemon_score`（不看落后；领先时仍选击杀手）
+- [x] 无 081「落后且都不能击杀则撤更高伤」（有反例：落后且两边都不能击杀则不撤）
+- [x] `pokemon_score` / `factor_prize_diff` / tune 10 维 / 080 chooser 不改
 
 局级（Diupi-Yun；建议对照 main/080 同种子 A78/B22）：
 
@@ -58,8 +58,9 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 ```
 
 - 种子 `208000..208099`，失败 0
-- 有效带建议待拍板（规格 Q12–Q13）
+- 有效带已拍板（Q12–Q13）：对照 main/080 A78/B22；相对 A78 向 60–70% 或 B prizes 结构改善
 - 不对照 081 的 A80；不宣称 30.4%；不跑 18000 作完成条件
+- **本环境跳过**：无 `ptcg-cn.db`，未跑 `bfsim`
 
 ## 实现要点
 
@@ -78,4 +79,10 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 
 ## 结果与遗留
 
-（实现进行中。单测绿后回写本节能做完的部分。局级 `bfsim` 按 Q13：云端无 `ptcg-cn.db`，本刀跳过，不对照 081 的 A80。）
+- **单测**：计划所列套件 `test_heuristic_ko_prize_lookahead` / `test_heuristic_board_gate` / `test_heuristic_agent` / `test_heuristic_attack_quality` / `test_features` / `test_tune_space` **74 passed**，失败 0。`ruff check` 上述改动文件 0。`len(search_space())==10`，`ko_prize_lookahead_gate` 默认 True 且不在搜索维里。`tests/test_features.py` 期望未改。
+- **全库**：`pytest -q` 1595 passed / 23 skipped；另 1 failed + 7 errors 均为本机缺 `config/battlefrontier.local.yml` 与 `ptcg-cn.db`（`test_cli_train_policy`、`test_deckload`），与本刀启发式无关。
+- **F1**：`_ko_prize_lookahead` 覆盖印面招式与一层 `selector=own_bench_attack` 的 `copy_attack`。供体不必付费；未知 filter / 无文档不猜；不递归供体上的再一层 copy。`_lethal_attack` 读该出口。不写 `_attack_table`。
+- **F3**：`_pick_retreat` 与 `_pick_promote` 只读同一出口。复制能击杀则不撤。Q15：换上后 `can_ko` 优先于纯 `pokemon_score`，领先时也选击杀手；开关关仍按分数。两边都不能击杀时不因落后换更高伤。
+- **未做（按拍板）**：F2、F4、`prize_pressure_gate`、PR #10 行为、卡名分支、血月减费、`end_turn` / `play_stadium`、080 chooser。
+- **局级**：云端无库，跳过 `bfsim`。对照仍是 main/080 同种子 A78/B22，不是 081 的 A80。短行不是完成条件。未宣称胜率移动。
+- **遗留**：Diupi-Yun 补跑 `experiments/t078-gard-zoro.example.yml` 种子 `208000..208099`，回写 A/B 与 prizes 结构。代理不合并。

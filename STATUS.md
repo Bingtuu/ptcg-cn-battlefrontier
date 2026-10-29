@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 083 · 共享击杀/拿奖前瞻（规格已拍板；实现进行中）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。代理不合并。
+**当前焦点 = task 083 · 共享击杀/拿奖前瞻（单测绿；局级未跑）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。代理不合并。
 
 **Owner 拍板（2026-10-29，Q1–Q15 整包按规格「本文建议」）**：Q1 用 083；Q2 不合并 081 / 不合入 PR #10；Q3 082 并入为 F1/WP-copy；Q4 不做 F2；Q5 不做 F4 / 不实现 `prize_pressure_gate`；Q6 只做 F1+F3；Q7 开关 `ko_prize_lookahead_gate` 默认 True，不进 tune 10 维；Q8 冻结 `pokemon_score` / `factor_prize_diff`；Q9 不重开血月减费；Q10 无卡名例外；Q11 不改 `end_turn` / `play_stadium`；Q12 局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；Q13 先单测绿，局级相对 A78 向 60–70% 或 B prizes 结构改善（云端无库跳过 `bfsim`）；Q14 短行不作完成条件；**Q15 是**——promote 存在换上后 `can_ko` 候选时优先于纯 `pokemon_score`（不看是否落后）。
 
@@ -41,12 +41,14 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-29 task 083：共享击杀/拿奖前瞻（规格已拍板；实现进行中）
+### 2026-10-29 task 083：共享击杀/拿奖前瞻（单测绿；局级未跑）
 
 - **Owner 拍板（Q1–Q15 整包 = 规格「本文建议」）**：083；不合并 PR #10；082 并入 F1；不做 F2/F4；不实现 `prize_pressure_gate`；F1+F3；`ko_prize_lookahead_gate` 默认开且不进 tune；冻结 `pokemon_score` / `factor_prize_diff`；不重开血月；无卡名例外；不改 end_turn/stadium；局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；先单测，局级向 60–70% 或 B prizes 结构改善；短行非完成条件；**Q15 是**（promote 换上后能击杀则优先于纯 `pokemon_score`，不看落后）
 - **证据（规格已载，本刀不重跑）**：A78→80；六格 ΔA +4/+0/+6/0/+2/0；copy 估 0 → 索ex→含羞苞；`_copy_attack_key` 攻击路径已有可见性；`prizes_count`=剩余、落后定义正确
-- **文档**：规格 + 计划 + `tasks/task 083.md`；081/082 task/规格头注疏导到 083
-- **进行中**：按计划 Task 1（F1）→ Task 2（F3）TDD。Task 3 局级 `bfsim` 云端无库跳过。单测绿后回写结果节。不合并 PR
+- **F1**：共享 `_ko_prize_lookahead`（`best_damage` / `can_ko` / `via`）。一层 `own_bench_attack`；供体不必付费；无文档 / 未知 filter 不猜；不递归。`_lethal_attack` 读该出口。不写 `_attack_table`。
+- **F3**：`_pick_retreat` / `_pick_promote` 只读同一出口。复制能击杀则不撤。Q15：换上后能击杀优先于纯 `pokemon_score`，不看落后。不做落后换更高非击杀。
+- **单测**：计划套件 **74 passed**，失败 0；ruff 0。tune 仍 10 维。`tests/test_features.py` 期望未改。全库 1595 passed / 23 skipped；1 failed + 7 errors 是缺本机配置与 `ptcg-cn.db`，不是本刀。
+- **局级**：云端无库，**跳过 `bfsim`**。不对照 081 的 A80，不写胜率。遗留 Diupi-Yun 同种子 100 局。代理不合并。
 
 ### 2026-10-29 N索整行扫描（矩阵后，定刀前）
 

@@ -55,7 +55,7 @@
 - Produces: `_lethal_attack` 与「最高已付清有效输出」查询在开关开时看见一层 copy
 - 不产生：`prize_pressure_gate`、`_attack_table` 改动、080 chooser 改动
 
-- [ ] **Step 1: Write the failing tests（copy 可见 + 接口契约）**
+- [x] **Step 1: Write the failing tests（copy 可见 + 接口契约）**
 
 覆盖规格 D-083-7 单测清单中与 F1 相关的条目。夹具可参考 `docs/superpowers/plans/2026-10-29-task-082-copy-lethal.md` 的 COPY_DOC / 供体 stub（历史参考，实现以 083 规格为准）。
 
@@ -66,24 +66,24 @@
 3. 供体费用未满足、复制手费用满足 → 仍 `attack`（供体不必付费）
 4. 共享接口对同一 `view`：`can_ko` 与 `best_damage` 稳定；无文档时不猜
 
-- [ ] **Step 2: Run tests — expect FAIL**
+- [x] **Step 2: Run tests — expect FAIL**
 
 ```bash
 python -m pytest tests/test_heuristic_ko_prize_lookahead.py -q
 ```
 
-- [ ] **Step 3: Implement minimal F1**
+- [x] **Step 3: Implement minimal F1**
 
 抽出 `_ko_prize_lookahead`；copy 分支复用 `_copied_strike`；`_lethal_attack` 与 `_max_paid_ko_damage`（或内联替换为读 lookahead 的 `best_damage`）在开关开时合并前瞻。不改 `_attack_table`。
 
-- [ ] **Step 4: Run tests — expect PASS；ruff clean**
+- [x] **Step 4: Run tests — expect PASS；ruff clean**
 
 ```bash
 python -m pytest tests/test_heuristic_ko_prize_lookahead.py tests/test_heuristic_attack_quality.py tests/test_tune_space.py -q
 python -m ruff check battlefrontier/agent/heuristic.py tests/test_heuristic_ko_prize_lookahead.py tests/test_tune_space.py
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add battlefrontier/agent/heuristic.py tests/test_heuristic_ko_prize_lookahead.py tests/test_tune_space.py
@@ -105,25 +105,25 @@ git commit -m "task(083): F1 shared KO/prize lookahead with copy expand"
 - Produces（若 Q15=是）：promote 在存在「换上后 can_ko」候选时优先于纯 `pokemon_score`
 - 不产生：落后判定、`prize_pressure_gate`、非击杀高低伤换人
 
-- [ ] **Step 1: Write failing F3 tests**
+- [x] **Step 1: Write failing F3 tests**
 
 1. 战斗场复制能击杀、备战印面也能击杀 → 不撤（复制可见）
 2. 两边都不能击杀 → 行为与今天 078 一致（付不起才撤）；**不要**写 081 落后撤更高伤
 3. （Q15=是）promote：墙高分 vs 能击杀的低分打手 → 选击杀手；开关关 → 仍墙
 4. （Q15=否）跳过 promote 行为测；可保留「接口对 `_view_as_active` 可调用」的单元契约
 
-- [ ] **Step 2: Implement — retreat/attack 只读共享出口；promote 按 Q15**
+- [x] **Step 2: Implement — retreat/attack 只读共享出口；promote 按 Q15**
 
 删除或内联不再分叉的重复伤害循环。禁止在 `_pick_retreat` 里再手写一份 copy 展开。
 
-- [ ] **Step 3: Regression suite**
+- [x] **Step 3: Regression suite**
 
 ```bash
 python -m pytest tests/test_heuristic_ko_prize_lookahead.py tests/test_heuristic_board_gate.py tests/test_heuristic_agent.py tests/test_heuristic_attack_quality.py tests/test_features.py tests/test_tune_space.py -q
 python -m ruff check battlefrontier/agent/heuristic.py tests/test_heuristic_ko_prize_lookahead.py
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "task(083): F3 retreat/promote/attack consume shared lookahead"
@@ -133,7 +133,7 @@ git commit -am "task(083): F3 retreat/promote/attack consume shared lookahead"
 
 ### Task 3 — 局级验收（Diupi-Yun；云端跳过）
 
-仅当 Q12/Q13 拍板后执行。对照 **main/080 A78/B22**，种子 `208000..208099`。
+Q12/Q13 已拍板。对照 **main/080 A78/B22**，种子 `208000..208099`。**云端无 `ptcg-cn.db`，本刀跳过，不跑下面的命令。**
 
 ```bash
 bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t083-gard-zoro.db
@@ -150,13 +150,13 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 
 ### Task 4 — 明确不做（实现 PR 自检清单）
 
-- [ ] 无 `prize_pressure_gate` 字段
-- [ ] 未 cherry-pick PR #10 行为
-- [ ] 无卡名分支
-- [ ] `tests/test_features.py` 未改期望
-- [ ] tune `len(search_space()) == 10`
-- [ ] 未读 `modify_attack_cost`
-- [ ] 未改 `end_turn` / `play_stadium` / 080 chooser
+- [x] 无 `prize_pressure_gate` 字段
+- [x] 未 cherry-pick PR #10 行为
+- [x] 无卡名分支
+- [x] `tests/test_features.py` 未改期望
+- [x] tune `len(search_space()) == 10`
+- [x] 未读 `modify_attack_cost`
+- [x] 未改 `end_turn` / `play_stadium` / 080 chooser
 
 ## 与历史计划的关系
 

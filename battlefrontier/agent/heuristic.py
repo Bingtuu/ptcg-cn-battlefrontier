@@ -11,6 +11,9 @@
 同体招式（task 080，D-078-7）：`attack_quality_gate` 开时，复制供体与招式下标按
 对对手战斗场的有效伤害排，斩杀优先。关则回到 `pokemon_score` / 下标最小。
 复燃计数不走这个开关。
+落后抢奖（task 081，D-081-5）：`prize_pressure_gate` 开且我方剩余奖赏多于对手时，
+谁都不能击杀则撤到已付清有效伤害严格更高的备战；promote 优先已付清且能击杀的备战。
+关或未落后：撤退回到 078，promote 回到 `pokemon_score`。不读 `factor_prize_diff`。
 D10：不做单卡组定制——评分只用通用字段（HP/招式伤害/撤退费/进化链/卡片类别）
 与效果形态，不按卡名分支。
 
@@ -112,6 +115,9 @@ class HeuristicParams:
     # 复制目标（task 080，D-078-4/7）。False = own_bench 回到 pokemon_score，
     # anchored_pokemon_attack 回到下标最小。不进 tune。复燃计数不走这里。
     attack_quality_gate: bool = True
+    # 落后抢奖（task 081，D-081-4/5）。False = 撤退与 promote 回到今天。
+    # 不进 tune。落后 = 我方剩余奖赏 > 对手剩余奖赏。不读 factor_prize_diff。
+    prize_pressure_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -136,6 +142,11 @@ def _in_play(active: InPlayPokemon | None, bench: tuple[InPlayPokemon, ...]) -> 
 def factor_prize_diff(view: VisibleGameState) -> float:
     """五因子之一：奖赏差（对手奖赏剩得少 = 我方领先）。M11 WP1 特征层共享。"""
     return float(view.own.prizes_count - view.opponent.prizes_count)
+
+
+def _prize_behind(view: VisibleGameState) -> bool:
+    """落后（task 081，D-081-5）：我方剩余奖赏多于对手。不读 factor_prize_diff。"""
+    return view.own.prizes_count > view.opponent.prizes_count
 
 
 def factor_board_score(view: VisibleGameState, params: HeuristicParams) -> float:
@@ -378,10 +389,37 @@ class HeuristicAgent:
         return next(a for a in by_kind["confirm_setup"])
 
     def _pick_promote(self, view: VisibleGameState, acts: list[Action]) -> Action:
+        def by_score(pool: list[Action]) -> Action:
+            return min(
+                pool,
+                key=lambda a: (
+                    -pokemon_score(view.own.bench[a.bench_index], self.params),
+                    a.bench_index,
+                ),
+            )
+
+        if not (self.params.prize_pressure_gate and _prize_behind(view)):
+            return by_score(acts)
+        opp = view.opponent.active
+        if opp is None:
+            return by_score(acts)
+        remaining = (opp.current.card.hp or 0) - opp.damage
+        ko: list[tuple[int, Action]] = []
+        for act in acts:
+            mon = view.own.bench[act.bench_index]
+            best = self._max_paid_ko_damage(self._view_as_active(view, mon))
+            if best is not None and best >= remaining:
+                ko.append((best, act))
+        if not ko:
+            return by_score(acts)
         return min(
-            acts,
-            key=lambda a: (-pokemon_score(view.own.bench[a.bench_index], self.params), a.bench_index),
-        )
+            ko,
+            key=lambda item: (
+                -item[0],
+                -pokemon_score(view.own.bench[item[1].bench_index], self.params),
+                item[1].bench_index,
+            ),
+        )[1]
 
     # ── chooser 选择 ────────────────────────────────────
 
@@ -796,7 +834,9 @@ class HeuristicAgent:
         """D-078-5：开关开时，战斗场斩杀不了、备战已付清招式能斩杀则换上。
 
         战斗场自己已能斩杀则不撤（斩杀分支仍在撤退之前，这里是双保险）。
-        谁都不能斩杀，或开关关：回到「付不起才撤」。
+        谁都不能斩杀：落后且 prize_pressure_gate 开时，换上已付清有效伤害
+        严格更高的备战（task 081，D-081-5）。否则回到「付不起才撤」。
+        board_quality_gate 关：直接「付不起才撤」，不走落后换人。
         """
         if not self.params.board_quality_gate:
             return self._pick_retreat_powerless(view, acts)
@@ -815,6 +855,19 @@ class HeuristicAgent:
             if best is not None and best >= remaining:
                 ko_targets.append((best, act))
         if not ko_targets:
+            if (
+                self.params.prize_pressure_gate
+                and _prize_behind(view)
+                and active_best is not None
+            ):
+                higher: list[tuple[int, Action]] = []
+                for act in acts:
+                    mon = view.own.bench[act.bench_index]
+                    best = self._max_paid_ko_damage(self._view_as_active(view, mon))
+                    if best is not None and best > active_best:
+                        higher.append((best, act))
+                if higher:
+                    return min(higher, key=lambda item: (-item[0], item[1].bench_index))[1]
             return self._pick_retreat_powerless(view, acts)
         return min(ko_targets, key=lambda item: (-item[0], item[1].bench_index))[1]
 

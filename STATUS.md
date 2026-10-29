@@ -5,7 +5,9 @@
 
 ## 当前
 
-**当前焦点 = task 083 · 共享击杀/拿奖前瞻（规格待拍板；文档 PR，代理不合并，不开 TDD）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。
+**当前焦点 = task 083 · 共享击杀/拿奖前瞻（假阳性已修，重验完毕；胜率仍 A72/B28；PR #12 待拍板，不合并）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。代码 `af48017`，`results/t083-effhp-gard-zoro.db`，种子 `208000..208099`，失败 0。相对 t080 仍是 78→72；修前 `edf392c` 与修后胜负 100/100 相同（0 翻转）。seed 208060 已改 promote 火红，但该局胜者仍是 A。其后补了一刀印面 HP 残留：伤害关联弃牌与附伤目标改走 `_ko_remaining` / `_effective_max_hp`。
+
+**Owner 拍板（2026-10-29，Q1–Q15 整包按规格「本文建议」）**：Q1 用 083；Q2 不合并 081 / 不合入 PR #10；Q3 082 并入为 F1/WP-copy；Q4 不做 F2；Q5 不做 F4 / 不实现 `prize_pressure_gate`；Q6 只做 F1+F3；Q7 开关 `ko_prize_lookahead_gate` 默认 True，不进 tune 10 维；Q8 冻结 `pokemon_score` / `factor_prize_diff`；Q9 不重开血月减费；Q10 无卡名例外；Q11 不改 `end_turn` / `play_stadium`；Q12 局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；Q13 先单测绿，局级相对 A78 向 60–70% 或 B prizes 结构改善（Diupi-Yun 已回写：A78→72，B prizes 9→14）；Q14 短行不作完成条件；**Q15 是**——promote 存在换上后 `can_ko` 候选时优先于纯 `pokemon_score`（不看是否落后）。
 
 **PR #10（task 081 落后抢奖）不合并**：同种子 100 局 A78→**A80** 方向无效；六格 ON/OFF（N索为 B，各 50）ΔA **+4/+0/+6/0/+2/0** 对 N索无益/有害；根因 `_max_paid_ko_damage` 不展开 `copy_attack`（暗夜王牌估 0）→ 落后时系统性索罗亚克ex→含羞苞自残。停窄门补丁。`prize_pressure_gate` **不进 main**（若保留概念则标为依赖共享前瞻之后的可选 F4，本刀默认不实现）。
 
@@ -39,12 +41,22 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-29 task 083：共享击杀/拿奖前瞻（规格待拍板）
+### 2026-10-29 task 083：共享击杀/拿奖前瞻（假阳性已修，重验完毕，胜率仍 72）
 
-- **Owner 拍板（方向）**：不合并 PR #10；停 081 窄门；开 083 收口（含 copy 可见性）。082 并入，不独立硬推
-- **证据写入规格**：A78→80；六格 ΔA +4/+0/+6/0/+2/0；copy 估 0 → 索ex→含羞苞；`_copy_attack_key` 攻击路径已有可见性；`prizes_count`=剩余、落后定义正确
-- **文档**：规格 + 计划 + `tasks/task 083.md`；081/082 task/规格头注疏导到 083
-- **未做**：改启发式、TDD、合并任何 PR、局级重跑
+- **Owner 拍板（Q1–Q15 整包 = 规格「本文建议」）**：083；不合并 PR #10；082 并入 F1；不做 F2/F4；不实现 `prize_pressure_gate`；F1+F3；`ko_prize_lookahead_gate` 默认开且不进 tune；冻结 `pokemon_score` / `factor_prize_diff`；不重开血月；无卡名例外；不改 end_turn/stadium；局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；先单测，局级向 60–70% 或 B prizes 结构改善；短行非完成条件；**Q15 是**（promote 换上后能击杀则优先于纯 `pokemon_score`，不看落后）
+- **证据（规格已载，本刀不重跑）**：A78→80；六格 ΔA +4/+0/+6/0/+2/0；copy 估 0 → 索ex→含羞苞；`_copy_attack_key` 攻击路径已有可见性；`prizes_count`=剩余、落后定义正确
+- **F1**：共享 `_ko_prize_lookahead`（`best_damage` / `can_ko` / `via`）。一层 `own_bench_attack`；供体不必付费；无文档 / 未知 filter 不猜；不递归。`_lethal_attack` 读该出口。不写 `_attack_table`。
+- **F3**：`_pick_retreat` / `_pick_promote` 只读同一出口。复制能击杀则不撤。Q15：换上后能击杀优先于纯 `pokemon_score`，不看落后。不做落后换更高非击杀。
+- **单测**：计划套件 **74 passed**，失败 0；ruff 0。tune 仍 10 维。`tests/test_features.py` 期望未改。全库 1595 passed / 23 skipped；1 failed + 7 errors 是缺本机配置与 `ptcg-cn.db`，不是本刀。
+- **局级**（Diupi-Yun，同种子 `208000..208099`，失败 0；对照 main/080，不是 081 的 A80。修前库 `results/t083-gard-zoro.db` = `edf392c`；修后库 `results/t083-effhp-gard-zoro.db` = `af48017`。勿再跑）：
+  - t080 baseline：A78 / B22；prizes A56/B9，deck_out A13/B3，no_pokemon 9/10；暗夜王牌 250
+  - t083 修前 `edf392c`：A72 / B28；prizes A53/B14，deck_out A10/B4，no_pokemon 9/10；暗夜王牌 262
+  - t083 修后 `af48017`：A72 / B28；prizes A55/B14，deck_out A8/B4，no_pokemon 9/10；暗夜王牌 268
+  - 相对 t080 翻转仍 13/7。修前 vs 修后胜负 **100/100 相同（0 翻转）**。胜率仍 72，未再向 60–70% 移动。B prizes 修后仍 14（相对 t080 的 9）。A prizes 53→55，deck_out A 10→8。
+- **假阳性个案**：seed 208060 修前 promote 索罗亚克ex，修后 promote 火红（与 t080 相同）。该局胜者仍是 A（t080 该局 B 胜）。个案已修，但不是 A78→72 的主杠杆。
+- **修法（已进 `af48017`）**：`_ko_remaining` 与引擎 `_effective_hp` 同口径。单测 82 passed。未改引擎昏厥。
+- **遗留**：PR #12 待 Owner 拍板是否合入。代理不合并。不宣称 30.4%，不跑 18000。
+- **印面 HP 残留（正确性，不改胜率结论）**：`_pick_damage_linked_discard` 与 `_attach_targets`（含 `would_survive_20`）仍用卡面 HP。已改走同一有效 HP：护符下 50× 弃牌要多弃一张才算斩杀；再放指示物印面会昏厥、有效 HP 还活着的目标不再被丢掉。`holder_is_basic` / `suppress_tool` / 无道具回归仍过。`pokemon_score` 的卡面 HP 是评分权重，不是斩杀阈值，未改。相关套件 `test_agent_dsl_estimate` + `test_heuristic_ability_gate` + `test_heuristic_ko_prize_lookahead` + `test_heuristic_attack_quality` + `test_heuristic_board_gate` + `test_heuristic_agent` **109 passed**，失败 0，ruff 0。未引入 copy-not-lethal。100 局不重跑。
 
 ### 2026-10-29 N索整行扫描（矩阵后，定刀前）
 

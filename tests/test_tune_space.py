@@ -2,7 +2,8 @@
 
 网格点不含默认值（默认值即当前点，不重复评估）；布尔开关不进空间（固定全开，
 含 task 077 的 ability_quality_gate、task 078 的 board_quality_gate、
-task 079 的 energy_target_gate、task 080 的 attack_quality_gate）。
+task 079 的 energy_target_gate、task 080 的 attack_quality_gate、
+task 081 的 prize_pressure_gate）。
 """
 
 import pytest
@@ -31,11 +32,11 @@ def test_空间维度构成():
     assert names[8:] == list(INTEGER_DIMS) == ["max_bench_setup", "deck_low_threshold"]
     assert all(d.kind == "continuous" for d in space[:8])
     assert all(d.kind == "integer" for d in space[8:])
-    # 布尔开关不进空间（含特性 / 前场 / 能量目标 / 复制招式质量门控）
+    # 布尔开关不进空间（含特性 / 前场 / 能量目标 / 复制招式 / 落后抢奖）
     bool_fields = {"use_abilities", "play_items", "play_supporters", "play_stadiums",
                    "attach_tools", "retreat_when_powerless", "deck_protect",
                    "ability_quality_gate", "board_quality_gate", "energy_target_gate",
-                   "attack_quality_gate"}
+                   "attack_quality_gate", "prize_pressure_gate"}
     assert not (set(names) & bool_fields)
 
 

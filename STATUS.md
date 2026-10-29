@@ -56,6 +56,7 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - **假阳性个案**：seed 208060 修前 promote 索罗亚克ex，修后 promote 火红（与 t080 相同）。该局胜者仍是 A（t080 该局 B 胜）。个案已修，但不是 A78→72 的主杠杆。
 - **修法（已进 `af48017`）**：`_ko_remaining` 与引擎 `_effective_hp` 同口径。单测 82 passed。未改引擎昏厥。
 - **遗留**：PR #12 待 Owner 拍板是否合入。代理不合并。不宣称 30.4%，不跑 18000。
+- **印面 HP 残留（正确性，不改胜率结论）**：`_pick_damage_linked_discard` 与 `_attach_targets`（含 `would_survive_20`）仍用卡面 HP。已改走同一有效 HP：护符下 50× 弃牌要多弃一张才算斩杀；再放指示物印面会昏厥、有效 HP 还活着的目标不再被丢掉。`holder_is_basic` / `suppress_tool` / 无道具回归仍过。`pokemon_score` 的卡面 HP 是评分权重，不是斩杀阈值，未改。相关套件 `test_agent_dsl_estimate` + `test_heuristic_ability_gate` + `test_heuristic_ko_prize_lookahead` + `test_heuristic_attack_quality` + `test_heuristic_board_gate` + `test_heuristic_agent` **109 passed**，失败 0，ruff 0。未引入 copy-not-lethal。100 局不重跑。
 
 ### 2026-10-29 N索整行扫描（矩阵后，定刀前）
 

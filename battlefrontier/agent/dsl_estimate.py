@@ -145,6 +145,9 @@ def _visible_counter(
         )
     if word == "damage_counters_on_self":
         return (own.active.damage // 10) if own.active else 0
+    # 对手弃牌区公开（task 080，D-078-7）。不走 attack_quality_gate。
+    if word == "opponent_discard_basic_energy_count":
+        return sum(1 for c in opp.discard if c.card.is_basic_energy)
     return None
 
 

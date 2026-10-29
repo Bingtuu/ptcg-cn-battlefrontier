@@ -8,6 +8,9 @@
 斩杀不了、备战已付清且能斩杀时撤退。关则回到 `pokemon_score` / 付不起才撤。
 能量（task 079，D-078-6）：`energy_target_gate` 开时，手牌能量优先贴到再贴一张
 就付清、且新付清招式有效伤害最高的宝可梦。关则回到战斗场任一招没付清就喂战斗场。
+同体招式（task 080，D-078-7）：`attack_quality_gate` 开时，复制供体与招式下标按
+对对手战斗场的有效伤害排，斩杀优先。关则回到 `pokemon_score` / 下标最小。
+复燃计数不走这个开关。
 D10：不做单卡组定制——评分只用通用字段（HP/招式伤害/撤退费/进化链/卡片类别）
 与效果形态，不按卡名分支。
 
@@ -106,6 +109,9 @@ class HeuristicParams:
     # 能量附着目标（task 079，D-078-4/6）。False = 战斗场任一招没付清就喂战斗场。
     # 不进 tune。第一刀不读 modify_attack_cost（Q4 = 否）。
     energy_target_gate: bool = True
+    # 复制目标（task 080，D-078-4/7）。False = own_bench 回到 pokemon_score，
+    # anchored_pokemon_attack 回到下标最小。不进 tune。复燃计数不走这里。
+    attack_quality_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -433,7 +439,85 @@ class HeuristicAgent:
                 return (role_rank, -score(a), a.choices)
 
             return min(acts, key=rank)
+        # 复制两段（task 080，D-078-7）：斩杀优先，再比有效伤害，再比 iid / 下标。
+        # own_bench 读不到 copy_attack 文档则不猜，落到下面的 pokemon_score。
+        if (
+            self.params.attack_quality_gate
+            and pc is not None
+            and pc.pool == "own_bench"
+            and self._pending_is_copy_attack(view)
+        ):
+            return min(acts, key=lambda a: self._copy_donor_key(view, a))
+        if (
+            self.params.attack_quality_gate
+            and pc is not None
+            and pc.pool == "anchored_pokemon_attack"
+        ):
+            return min(acts, key=lambda a: self._copy_attack_key(view, a))
         return min(acts, key=lambda a: (-score(a), a.choices))
+
+    def _pending_is_copy_attack(self, view: VisibleGameState) -> bool:
+        """当前挂起步骤是 copy_attack。文档读不到则 False，调用方不猜。"""
+        pc = view.pending_choice
+        if pc is None or self.card_effects is None:
+            return False
+        doc = doc_for(self.card_effects, pc.source.card)
+        if doc is None or not (0 <= pc.effect_index < len(doc.effects)):
+            return False
+        steps = flatten_steps(doc.effects[pc.effect_index])
+        if not (0 <= pc.cursor < len(steps)):
+            return False
+        return steps[pc.cursor][1].action == "copy_attack"
+
+    def _copy_donor_key(self, view: VisibleGameState, action: Action) -> tuple:
+        """供体键：能斩杀为 0，否则 1；然后 -最高有效伤害；然后 iid。"""
+        iid = action.choices[0] if action.choices else 0
+        mon = _mon_by_iid(view, iid)
+        best = (1, 0)
+        if mon is not None:
+            for index in range(len(mon.current.card.attacks)):
+                damage, ko = self._copied_strike(view, mon, index)
+                best = min(best, (0 if ko else 1, -damage))
+        return (*best, iid)
+
+    def _copy_attack_key(self, view: VisibleGameState, action: Action) -> tuple:
+        """招式下标键。供体 iid 在 pending payload[0]；下标是 choices[0]。"""
+        pc = view.pending_choice
+        donor_iid = pc.payload[0] if pc is not None and pc.payload else -1
+        index = action.choices[0] if action.choices else 0
+        damage, ko = self._copied_strike(view, _mon_by_iid(view, donor_iid), index)
+        return (0 if ko else 1, -damage, index)
+
+    def _copied_strike(
+        self, view: VisibleGameState, mon: InPlayPokemon | None, index: int,
+    ) -> tuple[int, bool]:
+        """这只备战的第 index 招，被复制后打对手战斗场的（有效伤害, 能否斩杀）。
+
+        弱点 / 抗性用宣言方（战斗场）属性，与 copy_attack 白板结算同口径。
+        估算读供体卡面；None 回退印面伤害。
+        """
+        if mon is None or not (0 <= index < len(mon.current.card.attacks)):
+            return 0, False
+        atk = mon.current.card.attacks[index]
+        est = estimate_attack_damage(
+            view, atk.name, atk.damage, mon.current.card, self.card_effects,
+        )
+        if est is None:
+            damage, lethal_ok = atk.damage or 0, True
+        else:
+            damage, lethal_ok = est.amount, est.lethal_ok
+        opp = view.opponent.active
+        attacker = view.own.active
+        if opp is not None and damage and attacker is not None:
+            own_type = attacker.current.card.energy_type
+            if opp.current.card.weakness and own_type == opp.current.card.weakness:
+                damage *= 2
+            if opp.current.card.resistance and own_type == opp.current.card.resistance:
+                damage = max(0, damage - RESISTANCE_AMOUNT)
+        if opp is None or not lethal_ok:
+            return damage, False
+        remaining = (opp.current.card.hp or 0) - opp.damage
+        return damage, damage >= remaining
 
     def _pick_damage_linked_discard(
         self, view: VisibleGameState, acts: list[Action], pc: PendingChoice

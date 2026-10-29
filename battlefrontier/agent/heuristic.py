@@ -31,6 +31,7 @@ from battlefrontier.agent.dsl_estimate import (
     damage_formula,
     doc_for,
     estimate_attack_damage,
+    find_attack_effect,
     has_hand_ammo_pattern,
     pending_damage_link,
 )
@@ -112,6 +113,9 @@ class HeuristicParams:
     # 复制目标（task 080，D-078-4/7）。False = own_bench 回到 pokemon_score，
     # anchored_pokemon_attack 回到下标最小。不进 tune。复燃计数不走这里。
     attack_quality_gate: bool = True
+    # 击杀/拿奖前瞻（task 083，D-083-5/6）。False = 复制与共享出口回到印面。
+    # 不进 tune。不改 _attack_table，因此不改非击杀 _pick_attack 的排序。
+    ko_prize_lookahead_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -312,6 +316,22 @@ def _line_names(root: str, hand: tuple) -> set[str]:
                 names.add(card.card.name)
                 changed = True
     return names
+
+
+@dataclass(frozen=True)
+class KoPrizeLookahead:
+    """把某只宝可梦当成战斗场时，这一步的击杀/拿奖前瞻（task 083）。
+
+    best_damage：已付清路径上的最高有效输出。有击杀时只在击杀路径里取最大。
+    can_ko：该输出 ≥ 对手剩余 HP，且 lethal_ok。
+    via：``print`` 印面 / ``copy`` 一层复制 / ``none`` 没有可计的招式。
+    attack_index：打出该输出的招式下标；没有则为 None。
+    """
+
+    best_damage: int | None
+    can_ko: bool
+    via: str
+    attack_index: int | None = None
 
 
 class HeuristicAgent:
@@ -824,27 +844,120 @@ class HeuristicAgent:
             "own": view.own.model_copy(update={"active": mon}),
         })
 
+    def _ko_prize_lookahead(
+        self, view: VisibleGameState, mon: InPlayPokemon | None = None,
+    ) -> KoPrizeLookahead:
+        """共享出口：mon 为 None 时用当前战斗场，否则先当成战斗场再估。
+
+        自己招式走印面 `_attack_table`。`ko_prize_lookahead_gate` 开时，已付清的
+        `copy_attack`（只 `selector=own_bench_attack`、只一层）并进来；供体不必
+        自己付费。不写进 `_attack_table`。
+        """
+        scoring = view if mon is None else self._view_as_active(view, mon)
+        return self._lookahead_on_active(scoring)
+
+    def _lookahead_on_active(self, view: VisibleGameState) -> KoPrizeLookahead:
+        active = view.own.active
+        if active is None:
+            return KoPrizeLookahead(None, False, "none")
+        opp = view.opponent.active
+        remaining = None if opp is None else (opp.current.card.hp or 0) - opp.damage
+        attacks, _sources = self._attack_sources(view)
+        table = self._attack_table(view)
+        best: tuple[tuple, int, bool, str, int] | None = None
+        for index, atk in enumerate(attacks):
+            if not _energy_satisfied(active.attached_energy, atk.cost):
+                continue
+            copied = self._one_layer_copy(view, index)
+            if copied is not None:
+                damage, ko = copied
+                via = "copy"
+            else:
+                damage, lethal_ok = table[index]
+                if not lethal_ok:
+                    continue
+                ko = remaining is not None and damage >= remaining
+                via = "print"
+            # 有击杀则只比击杀；否则比伤害。同伤取下标小的。
+            rank = (0 if ko else 1, -damage, index)
+            if best is None or rank < best[0]:
+                best = (rank, damage, ko, via, index)
+        if best is None:
+            return KoPrizeLookahead(None, False, "none")
+        _rank, damage, ko, via, index = best
+        return KoPrizeLookahead(damage, ko, via, index)
+
+    def _one_layer_copy(
+        self, view: VisibleGameState, index: int,
+    ) -> tuple[int, bool] | None:
+        """这一招若是已付清的一层 own_bench_attack 复制，返回（伤害, 能否击杀）。
+
+        不是这种招式、没文档、或未知 filter → None（调用方维持印面，不猜）。
+        供体招式只走 `_copied_strike`，不再展开供体上的 copy_attack。
+        """
+        if not self.params.ko_prize_lookahead_gate or self.card_effects is None:
+            return None
+        active = view.own.active
+        if active is None:
+            return None
+        attacks, sources = self._attack_sources(view)
+        if not (0 <= index < len(attacks)):
+            return None
+        atk = attacks[index]
+        if not _energy_satisfied(active.attached_energy, atk.cost):
+            return None
+        doc = doc_for(self.card_effects, sources[index])
+        if doc is None:
+            return None
+        effect = find_attack_effect(doc, atk.name)
+        if effect is None:
+            return None
+        node = next(
+            (
+                step for _phase, step in flatten_steps(effect)
+                if step.action == "copy_attack" and step.selector == "own_bench_attack"
+            ),
+            None,
+        )
+        if node is None:
+            return None
+        active_iid = active.current.iid
+        try:
+            donors = [
+                m for m in view.own.bench
+                if m.current.iid != active_iid and matches_in_play(m, tuple(node.filters))
+            ]
+        except DslError:
+            return None
+        opp = view.opponent.active
+        remaining = None if opp is None else (opp.current.card.hp or 0) - opp.damage
+        best_ko: int | None = None
+        best_chip: int | None = None
+        saw = False
+        for mon in donors:
+            for atk_index in range(len(mon.current.card.attacks)):
+                damage, ko = self._copied_strike(view, mon, atk_index)
+                # 伤害够、但 _copied_strike 说不能斩杀 = lethal_ok 不成立，不计入。
+                if remaining is not None and not ko and damage >= remaining:
+                    continue
+                saw = True
+                if ko and (best_ko is None or damage > best_ko):
+                    best_ko = damage
+                if best_chip is None or damage > best_chip:
+                    best_chip = damage
+        if best_ko is not None:
+            return best_ko, True
+        if saw and best_chip is not None:
+            return best_chip, False
+        return None
+
     def _max_paid_ko_damage(self, view: VisibleGameState) -> int | None:
         """已付清、且可参与斩杀判定的招式里，对对手战斗场的最高有效伤害。
 
         弱点 / 抗性走 `_attack_table`。费用仍是印面 `_energy_satisfied`（D-WP8-5）。
-        没有这样的招式则 None。
+        开关开时并入一层 copy（task 083）。没有这样的招式则 None。
         """
-        active = view.own.active
-        if active is None:
-            return None
-        attacks, _sources = self._attack_sources(view)
-        table = self._attack_table(view)
-        best: int | None = None
-        for index, atk in enumerate(attacks):
-            if not _energy_satisfied(active.attached_energy, atk.cost):
-                continue
-            damage, lethal_ok = table[index]
-            if not lethal_ok:
-                continue
-            if best is None or damage > best:
-                best = damage
-        return best
+        return self._ko_prize_lookahead(view).best_damage
 
     def _pick_retreat_powerless(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """保守撤退：仅当战斗场无可支付招式且备战区有已就绪打手时撤退。"""
@@ -918,20 +1031,19 @@ class HeuristicAgent:
         return [dmg for dmg, _ in self._attack_table(view)]
 
     def _lethal_attack(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
-        """斩杀检测：能直接昏厥对手战斗场且可参与斩杀判定的招式，取有效伤害最高者
-        （tie 取下标小者）。"""
-        opp = view.opponent.active
-        if opp is None:
+        """斩杀检测：能直接昏厥对手战斗场的招式，取有效伤害最高者（tie 取下标小者）。
+
+        读共享 `_ko_prize_lookahead`。开关开时一层复制击杀算进来；印面排序不变。
+        """
+        if view.opponent.active is None:
             return None
-        table = self._attack_table(view)
-        remaining = (opp.current.card.hp or 0) - opp.damage
-        lethal = [
-            a for a in acts
-            if table[a.attack_index][1] and table[a.attack_index][0] >= remaining
-        ]
-        if not lethal:
+        look = self._ko_prize_lookahead(view)
+        if not look.can_ko or look.attack_index is None:
             return None
-        return max(lethal, key=lambda a: (table[a.attack_index][0], -a.attack_index))
+        for act in acts:
+            if act.attack_index == look.attack_index:
+                return act
+        return None
 
     def _pick_attack(self, view: VisibleGameState, acts: list[Action]) -> Action:
         """无斩杀时取有效伤害最高的招式（tie 取下标小者）。

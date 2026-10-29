@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **待 Owner 拍板。** 拍板前不执行。Q1–Q15 以 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md` 拍板后的值为准。下文按「本文建议」起草：**F1+F3**；跳过 F2；不实现 F4 / 不合并 081；082 并入为 WP-copy。
+> **已拍板（2026-10-29）。** Q1–Q15 取规格「本文建议」整列（Q15 = 是）。下文执行 **F1+F3**；跳过 F2；不实现 F4 / 不合并 081；082 并入为 WP-copy。
 
 **Goal:** 提供一个共享击杀/拿奖前瞻接口（自己招式 / 一层 copy / promote 后同一口径），让撤退、promote、攻击击杀分支消费同一出口；修复「暗夜王牌估 0 → 换含羞苞」类自残，而不把 081 的落后策略门合进 main。
 

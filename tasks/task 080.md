@@ -1,6 +1,6 @@
 # task 080 · 同体招式的可见伤害，与复制目标
 
-- 状态：实现完成（分支 `cursor/task-080-attack-quality-6192`，从 main `bed68cbe`）；云端 100 局跳过；未合并
+- 状态：实现完成（PR #8，`cursor/task-080-attack-quality-6192` @ `97ded0a`，从 main `bed68cbe`）；云端 100 局跳过；未合并
 - 关联：规格 D-078-7、假说 H/I/J；计划 Task 3
 - 依赖：单测不依赖 078/079。本机 100 局在两刀都默认开启之后跑
 

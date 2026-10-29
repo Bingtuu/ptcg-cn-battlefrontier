@@ -1,6 +1,6 @@
 # task 081 · 落后抢奖
 
-> **搁置（2026-10-29 Owner）**：PR #10 **不合并**——同种子 100 局 A78→A80 方向无效；六格 ON/OFF 对 N索无益/有害；`_max_paid_ko_damage` 不展开 copy → 索ex→含羞苞自残。窄门补丁停。后续见 **task 083 · 共享击杀/拿奖前瞻**（`prize_pressure_gate` 若保留则仅为依赖共享前瞻之后的可选 F4，083 默认不实现本任务行为）。
+> **搁置（2026-10-29 Owner）**：PR #10 **不合并**——同种子 100 局 A78→A80 方向无效；六格 ON/OFF 对 N索无益/有害；`_max_paid_ko_damage` 不展开 copy → 索ex→含羞苞自残。窄门补丁停。083 已合入 main `4262a9f`。`prize_pressure_gate` 不进 main。复制击杀短路见 **task 084**，不重开本任务。
 
 - 状态：**搁置 / 不合并**（规格留档；实现 PR #10 仅作记录）
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-081-prize-pressure.md`；收口 **task 083**

@@ -1,6 +1,8 @@
 # task 083 · 共享击杀/拿奖前瞻
 
-- 状态：**假阳性已修，重验完毕；胜率仍 A72/B28；PR #12 待拍板，不合并**
+> **已合入 main `4262a9f`（PR #12，2026-10-29）**。Owner 拍板 A：正确性子集合入。复制击杀进 `_lethal_attack` 短路的策略债 → **task 084**（`docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`）。本文件不再改行为。
+
+- 状态：**已合入 main `4262a9f`（PR #12）**。策略债见 task 084
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`
 - 依赖：080 已合入 main `1afa4e2`。**081 搁置**（PR #10 不合并）。**082 并入本任务 WP-copy（F1）**，不再独立硬推
 - 对外中文名：共享击杀/拿奖前瞻（不要「奖杯压力」「王牌转换」）
@@ -94,4 +96,4 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 
   相对 t080 仍 78→72，翻转 13/7。修前 vs 修后胜负 **100/100 相同（0 翻转）**。B prizes 修后仍 14。未落入 60–70% 带内中心。短行不是完成条件。不宣称 30.4%，不跑 18000。
 - **假阳性重验**：seed 208060 修前 promote 索罗亚克ex（印面剩余 90 把复制 100 判死；有效剩余 140，引擎不昏）。修后 promote 火红，与 t080 相同。该局胜者仍是 A（t080 该局 B 胜）。个案已修，但不是 A78→72 的主杠杆。
-- **遗留**：PR #12 待 Owner 拍板是否合入。代理不合并。
+- **其后**：PR #12 已合入 main `4262a9f`。Owner 拍板 A = 正确性合入。复制击杀短路的策略债另开 task 084，不在本文件改 `_lethal_attack`。

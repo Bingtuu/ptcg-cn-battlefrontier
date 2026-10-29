@@ -281,6 +281,90 @@ def test_nonlethal_discard_dumps_all() -> None:
         kind="choose", choices=(50, 51, 52, 53))
 
 
+CHARM_DOC = parse_card_doc("""
+card:
+  name_group: 勇气护符
+effects:
+  - trigger: passive_static
+    condition: holder_is_basic
+    actions:
+      - {action: modify_hp, args: {amount: 50}}
+""")
+TOWER_DOC = parse_card_doc("""
+card:
+  name_group: 阻碍之塔
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: suppress_tool}
+""")
+
+
+def _charm_card() -> CardDef:
+    return CardDef(
+        card_id="stub-勇气护符", name="勇气护符", supertype="trainer",
+        trainer_subtype="宝可梦道具",
+    )
+
+
+def _discard_vs_charm(*, tool: bool, stage: int = 0, stadium: CardDef | None = None):
+    """卡面 HP 110、已伤 20。印面剩余 90；基础挂护符后有效剩余 140。50×2=100，50×3=150。"""
+    state = _pending_discard_state(opp_hp=110)
+    card = CardDef(
+        card_id="stub-靶", name="靶", supertype="pokemon",
+        hp=110, stage=stage,
+        attacks=(AttackDef(name="撞击", cost=("无",), damage=10),),
+    )
+    opp = in_play(2, card, energies=0).model_copy(update={"damage": 20})
+    if tool:
+        opp = opp.model_copy(update={"attached_tool": inst(80, _charm_card())})
+    p1 = state.players[1].model_copy(update={"active": opp})
+    updates: dict = {"players": (state.players[0], p1)}
+    if stadium is not None:
+        updates["stadium"] = inst(90, stadium)
+    return state.model_copy(update=updates)
+
+
+def test_lethal_discard_uses_effective_hp_not_printed() -> None:
+    """印面剩余 90 时 2 张就够；护符后有效剩余 140，要 3 张才够斩杀。"""
+    state = _discard_vs_charm(tool=True)
+    fx = {**GHOLDENGO_FX, "勇气护符": CHARM_DOC}
+    engine = engine_at(state)
+    act = decide(engine, HeuristicAgent(card_effects=fx))
+    assert act == Action(kind="choose", choices=(50, 51, 52))
+
+
+def test_lethal_discard_without_tool_stays_on_printed_remaining() -> None:
+    """无道具：印面剩余 90，2 张（100）仍是最小斩杀张数。"""
+    state = _discard_vs_charm(tool=False)
+    fx = {**GHOLDENGO_FX, "勇气护符": CHARM_DOC}
+    engine = engine_at(state)
+    act = decide(engine, HeuristicAgent(card_effects=fx))
+    assert act == Action(kind="choose", choices=(50, 51))
+
+
+def test_lethal_discard_charm_on_evolved_does_not_add_hp() -> None:
+    """holder_is_basic 不成立：护符不加 HP，仍按印面剩余选 2 张。"""
+    state = _discard_vs_charm(tool=True, stage=1)
+    fx = {**GHOLDENGO_FX, "勇气护符": CHARM_DOC}
+    engine = engine_at(state)
+    act = decide(engine, HeuristicAgent(card_effects=fx))
+    assert act == Action(kind="choose", choices=(50, 51))
+
+
+def test_lethal_discard_suppress_tool_ignores_charm() -> None:
+    """阻碍之塔消除道具后，护符不加 HP，仍选 2 张。"""
+    tower = CardDef(
+        card_id="stub-阻碍之塔", name="阻碍之塔", supertype="trainer",
+        trainer_subtype="竞技场",
+    )
+    state = _discard_vs_charm(tool=True, stadium=tower)
+    fx = {**GHOLDENGO_FX, "勇气护符": CHARM_DOC, "阻碍之塔": TOWER_DOC}
+    engine = engine_at(state)
+    act = decide(engine, HeuristicAgent(card_effects=fx))
+    assert act == Action(kind="choose", choices=(50, 51))
+
+
 def test_discard_choice_without_effects_keeps_highest_score() -> None:
     """无 card_effects → 回退 actions 段最高分（能量各 1 分 → 全选）。"""
     engine = engine_at(_pending_discard_state(opp_hp=150))

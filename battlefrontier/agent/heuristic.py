@@ -280,7 +280,9 @@ def _mon_by_iid(view: VisibleGameState, iid: int) -> InPlayPokemon | None:
 
 def _attach_targets(
     view: VisibleGameState, holder: InPlayPokemon, node: ActionNode,
+    hp_of=None,
 ) -> list[InPlayPokemon]:
+    """附伤目标。hp_of 给有效最大 HP（含道具 modify_hp）；缺省退回卡面 HP。"""
     pool = node.args.get("target_pool", "own_pokemon_in_play")
     if pool == "self":
         mons = [holder]
@@ -294,11 +296,11 @@ def _attach_targets(
     for mon in mons:
         if filters:
             try:
-                if not matches_in_play(mon, filters):
+                if not matches_in_play(mon, filters, hp_of=hp_of):
                     continue
             except DslError:
                 continue
-        hp = mon.current.card.hp or 0
+        hp = hp_of(mon) if hp_of is not None else (mon.current.card.hp or 0)
         if mon.damage + counters * 10 >= hp:
             continue
         kept.append(mon)
@@ -563,7 +565,9 @@ class HeuristicAgent:
         opp = view.opponent.active
         if opp is None:
             return None
-        remaining = (opp.current.card.hp or 0) - opp.damage
+        remaining = self._ko_remaining(view, opp)
+        if remaining is None:
+            return None
         target: int | None = None
         for n in range(pc.min_choose, pc.max_choose + 1):
             dmg = damage_formula(node, n)
@@ -699,7 +703,9 @@ class HeuristicAgent:
         add = _energy_symbol(node)
         active_iid = view.own.active.current.iid if view.own.active else None
         best = 0.0
-        for mon in _attach_targets(view, holder, node):
+        for mon in _attach_targets(
+            view, holder, node, hp_of=lambda m: self._effective_max_hp(view, m),
+        ):
             role = _mon_energy_role(mon, add)
             if role == 2:
                 continue

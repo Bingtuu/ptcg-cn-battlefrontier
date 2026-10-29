@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 083 · 共享击杀/拿奖前瞻（假阳性已修，重验完毕；胜率仍 A72/B28；PR #12 待拍板，不合并）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。代码 `af48017`，`results/t083-effhp-gard-zoro.db`，种子 `208000..208099`，失败 0。相对 t080 仍是 78→72；修前 `edf392c` 与修后胜负 100/100 相同（0 翻转）。seed 208060 已改 promote 火红，但该局胜者仍是 A。
+**当前焦点 = task 083 · 共享击杀/拿奖前瞻（假阳性已修，重验完毕；胜率仍 A72/B28；PR #12 待拍板，不合并）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。代码 `af48017`，`results/t083-effhp-gard-zoro.db`，种子 `208000..208099`，失败 0。相对 t080 仍是 78→72；修前 `edf392c` 与修后胜负 100/100 相同（0 翻转）。seed 208060 已改 promote 火红，但该局胜者仍是 A。其后补了一刀印面 HP 残留：伤害关联弃牌与附伤目标改走 `_ko_remaining` / `_effective_max_hp`。
 
 **Owner 拍板（2026-10-29，Q1–Q15 整包按规格「本文建议」）**：Q1 用 083；Q2 不合并 081 / 不合入 PR #10；Q3 082 并入为 F1/WP-copy；Q4 不做 F2；Q5 不做 F4 / 不实现 `prize_pressure_gate`；Q6 只做 F1+F3；Q7 开关 `ko_prize_lookahead_gate` 默认 True，不进 tune 10 维；Q8 冻结 `pokemon_score` / `factor_prize_diff`；Q9 不重开血月减费；Q10 无卡名例外；Q11 不改 `end_turn` / `play_stadium`；Q12 局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；Q13 先单测绿，局级相对 A78 向 60–70% 或 B prizes 结构改善（Diupi-Yun 已回写：A78→72，B prizes 9→14）；Q14 短行不作完成条件；**Q15 是**——promote 存在换上后 `can_ko` 候选时优先于纯 `pokemon_score`（不看是否落后）。
 

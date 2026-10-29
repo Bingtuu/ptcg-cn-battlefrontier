@@ -243,6 +243,62 @@ def test_attach_damage_used_when_energy_progresses():
     assert decide(engine) == Action(kind="use_ability", iid=1)
 
 
+CHARM_DOC = parse_card_doc("""
+card:
+  name_group: 勇气护符
+effects:
+  - trigger: passive_static
+    condition: holder_is_basic
+    actions:
+      - {action: modify_hp, args: {amount: 50}}
+""")
+
+
+def _charm_tool() -> CardDef:
+    return CardDef(
+        card_id="stub-勇气护符", name="勇气护符", supertype="trainer",
+        trainer_subtype="宝可梦道具",
+    )
+
+
+def _hurt_attach_value(*, tool: bool, stage: int = 0) -> float:
+    """HP 30、已伤 20、再放 2 个指示物（20）。印面会昏厥；基础挂护符后有效 HP 80，还活着。"""
+    card = mon("附伤手", energy_type="超", cost=("超",), hp=30)
+    if stage:
+        card = card.model_copy(update={"stage": stage})
+    active = placed(1, card, energies=0)
+    updates: dict = {"damage": 20}
+    if tool:
+        updates["attached_tool"] = inst(81, _charm_tool())
+    active = active.model_copy(update=updates)
+    effects = {"附伤手": ATTACH_DOC, "勇气护符": CHARM_DOC}
+    engine = board(
+        active,
+        [inst(50, basic("手牌"))],
+        deck_n=20,
+        discard=(inst(90, psychic_energy()),),
+        effects=effects,
+    )
+    agent = HeuristicAgent(card_effects=effects)
+    view = engine.state.visible_state(0)
+    return agent._ability_value(view, Action(kind="use_ability", iid=1))
+
+
+def test_charm_keeps_counter_target_printed_hp_would_ko():
+    """印面剩余不够再放 20，护符后还活着 → 附伤特性仍有价值。"""
+    assert _hurt_attach_value(tool=True) > 0
+
+
+def test_no_charm_drops_counter_target_that_would_ko():
+    """无道具：再放 20 会昏厥，附伤特性没有活着的目标。"""
+    assert _hurt_attach_value(tool=False) == 0
+
+
+def test_charm_on_evolved_does_not_save_counter_target():
+    """holder_is_basic 不成立：护符不加 HP，再放 20 仍视为会昏厥。"""
+    assert _hurt_attach_value(tool=True, stage=1) == 0
+
+
 def test_attach_choice_prefers_pokemon_that_still_needs_energy():
     """两只同分：chooser 选还没付清的那只，不取较小 iid 的已付清战斗场。"""
     card = mon("附伤手", energy_type="超", cost=("超",))

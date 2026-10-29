@@ -1,10 +1,12 @@
 # task 081 · 落后抢奖
 
-- 状态：规格待拍板（文档 PR；本文件不授权改代码）
-- 关联：规格 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-081-prize-pressure.md`
-- 依赖：080 已合入 main `1afa4e2`。100 局对照是当前 main / 080 的同种子 A78/B22。复制招式击杀前瞻是 task 082，不在本任务
+> **搁置（2026-10-29 Owner）**：PR #10 **不合并**——同种子 100 局 A78→A80 方向无效；六格 ON/OFF 对 N索无益/有害；`_max_paid_ko_damage` 不展开 copy → 索ex→含羞苞自残。窄门补丁停。后续见 **task 083 · 共享击杀/拿奖前瞻**（`prize_pressure_gate` 若保留则仅为依赖共享前瞻之后的可选 F4，083 默认不实现本任务行为）。
 
-开关代码标识：`prize_pressure_gate`（建议默认开，不进 tune）。
+- 状态：**搁置 / 不合并**（规格留档；实现 PR #10 仅作记录）
+- 关联：规格 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-081-prize-pressure.md`；收口 **task 083**
+- 依赖：080 已合入 main `1afa4e2`。100 局对照是当前 main / 080 的同种子 A78/B22。复制招式击杀前瞻原 task 082，已并入 083
+
+开关代码标识：`prize_pressure_gate`（**不进 main**）。
 
 ## 目标
 

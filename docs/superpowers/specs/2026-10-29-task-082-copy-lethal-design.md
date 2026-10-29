@@ -1,12 +1,14 @@
 # task 082 · 复制招式击杀前瞻
 
+> **并入 task 083（2026-10-29 Owner）**：不再独立窄门硬推。copy 展开估值 = **083 的 F1 / WP-copy**。权威规格改读 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`。081 已搁置（PR #10 不合并）。本文留档；实现计划以 083 为准。
+
 - 日期：2026-10-29
-- 状态：**待 Owner 拍板**（本节 Q1–Q9）。2026-10-29 owner 已拍板：与 task 081（落后抢奖）拆成两个号。082 只做复制招式的击杀可见性。
-- 本文不授权改 `heuristic.py`、不写测试、不跑 `bfsim`。拍板之后才按 `docs/superpowers/plans/2026-10-29-task-082-copy-lethal.md` 开 TDD。代理不合并。
-- 前置：task 080 已合入 main `1afa4e2`。081 的规格在 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`，本文不重复实现它。
+- 状态：**并入 083 / 规格留档**（勿按本文单独开 TDD 或单独有效带）
+- 本文不授权改 `heuristic.py`、不写测试、不跑 `bfsim`。代理不合并。
+- 前置：task 080 已合入 main `1afa4e2`。081 搁置。收口见 task 083。
 - 权威：一期 PRD D10。078 的 Q4 = 否（不读血月 `modify_attack_cost`）继续有效。
 
-开关的代码标识是 `copy_lethal_gate`。对外中文用「复制招式击杀前瞻」「暗夜王牌击杀可见性」「击杀拿奖」。
+开关的代码标识原为 `copy_lethal_gate`；083 建议总闸 `ko_prize_lookahead_gate`（待拍板）。对外中文跟 083「共享击杀/拿奖前瞻」。
 
 ## 1. 背景
 

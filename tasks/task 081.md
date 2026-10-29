@@ -1,6 +1,6 @@
 # task 081 · 落后抢奖
 
-- 状态：实现中 / 云端单测（100 局待本机）
+- 状态：实现中 / 云端单测（100 局待本机；PR #10，不合并）
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-081-prize-pressure.md`
 - 依赖：080 已合入 main `1afa4e2`。100 局对照是当前 main / 080 的同种子 A78/B22。复制招式击杀前瞻是 task 082，不在本任务
 - 拍板：Owner 已拍板 Q1–Q8，全部按规格「本文建议」。本变更只做计划 Task 1，不实现 082 / `copy_lethal_gate`

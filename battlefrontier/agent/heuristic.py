@@ -549,8 +549,8 @@ class HeuristicAgent:
                 damage = max(0, damage - RESISTANCE_AMOUNT)
         if opp is None or not lethal_ok:
             return damage, False
-        remaining = (opp.current.card.hp or 0) - opp.damage
-        return damage, damage >= remaining
+        remaining = self._ko_remaining(view, opp)
+        return damage, remaining is not None and damage >= remaining
 
     def _pick_damage_linked_discard(
         self, view: VisibleGameState, acts: list[Action], pc: PendingChoice
@@ -855,6 +855,66 @@ class HeuristicAgent:
             "own": view.own.model_copy(update={"active": mon}),
         })
 
+    def _ko_remaining(
+        self, view: VisibleGameState, mon: InPlayPokemon | None,
+    ) -> int | None:
+        """剩余 HP = 有效最大 HP − 已受伤害。无这只宝可梦则 None。
+
+        有效最大 HP 与引擎 `_effective_hp` 同口径：道具 `passive_static` 的
+        `modify_hp`（`holder_is_basic` 看栈顶 stage==0）。场上竞技场
+        `suppress_tool` 时道具修正不算。无道具、无文档、或读不懂的 condition
+        不加 HP（不猜）。
+        """
+        if mon is None:
+            return None
+        return self._effective_max_hp(view, mon) - mon.damage
+
+    def _effective_max_hp(self, view: VisibleGameState, mon: InPlayPokemon) -> int:
+        hp = mon.current.card.hp or 0
+        tool = mon.attached_tool
+        if tool is None or self.card_effects is None or self._tool_suppressed(view):
+            return hp
+        doc = doc_for(self.card_effects, tool.card)
+        if doc is None:
+            return hp
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            nodes = [n for n in effect.actions if n.action == "modify_hp"]
+            if not nodes or not self._modify_hp_applies(effect.condition, mon):
+                continue
+            for node in nodes:
+                amount = node.args.get("amount")
+                if isinstance(amount, int) and not isinstance(amount, bool):
+                    hp += amount
+        return hp
+
+    def _modify_hp_applies(self, condition: str | None, mon: InPlayPokemon) -> bool:
+        """modify_hp 的 effect.condition。None 恒真；holder_is_basic = 栈顶基础。
+
+        其它词不加这层 HP（不猜）。引擎对未知词会报错；这里没有引擎可抛。
+        """
+        if condition is None:
+            return True
+        if condition == "holder_is_basic":
+            return mon.current.card.stage == 0
+        return False
+
+    def _tool_suppressed(self, view: VisibleGameState) -> bool:
+        """竞技场 passive_static suppress_tool（阻碍之塔）。带 condition 的不猜。"""
+        stadium = view.stadium
+        if stadium is None or self.card_effects is None:
+            return False
+        doc = doc_for(self.card_effects, stadium.card)
+        if doc is None:
+            return False
+        for effect in doc.effects:
+            if effect.trigger != "passive_static" or effect.condition is not None:
+                continue
+            if any(node.action == "suppress_tool" for node in effect.actions):
+                return True
+        return False
+
     def _ko_prize_lookahead(
         self, view: VisibleGameState, mon: InPlayPokemon | None = None,
     ) -> KoPrizeLookahead:
@@ -872,7 +932,7 @@ class HeuristicAgent:
         if active is None:
             return KoPrizeLookahead(None, False, "none")
         opp = view.opponent.active
-        remaining = None if opp is None else (opp.current.card.hp or 0) - opp.damage
+        remaining = self._ko_remaining(view, opp)
         attacks, _sources = self._attack_sources(view)
         table = self._attack_table(view)
         best: tuple[tuple, int, bool, str, int] | None = None
@@ -942,7 +1002,7 @@ class HeuristicAgent:
         except DslError:
             return None
         opp = view.opponent.active
-        remaining = None if opp is None else (opp.current.card.hp or 0) - opp.damage
+        remaining = self._ko_remaining(view, opp)
         best_ko: int | None = None
         best_chip: int | None = None
         saw = False

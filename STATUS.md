@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 083 · 共享击杀/拿奖前瞻（100 局方向有效，待 Owner 拍板；代理不合并）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。PR #12。Diupi-Yun 同种子 `208000..208099`（代码 `edf392c`，`results/t083-gard-zoro.db`）：**A78→A72 / B22→B28**，失败 0；B prizes **9→14**。满足 Q13，未落入 60–70% 带内中心。
+**当前焦点 = task 083 · 共享击杀/拿奖前瞻（promote can_ko 假阳性已修，待重验 100 局；PR #12 不合并）**。规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。修前 Diupi-Yun（代码 `edf392c`）A78→A72 / B prizes 9→14。seed 208060 把勇气护符的有效 HP 当成印面 HP，`can_ko` 假阳性抬了索罗亚克ex。单测已改剩余 HP 口径；100 局重验不在本环境跑。
 
 **Owner 拍板（2026-10-29，Q1–Q15 整包按规格「本文建议」）**：Q1 用 083；Q2 不合并 081 / 不合入 PR #10；Q3 082 并入为 F1/WP-copy；Q4 不做 F2；Q5 不做 F4 / 不实现 `prize_pressure_gate`；Q6 只做 F1+F3；Q7 开关 `ko_prize_lookahead_gate` 默认 True，不进 tune 10 维；Q8 冻结 `pokemon_score` / `factor_prize_diff`；Q9 不重开血月减费；Q10 无卡名例外；Q11 不改 `end_turn` / `play_stadium`；Q12 局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；Q13 先单测绿，局级相对 A78 向 60–70% 或 B prizes 结构改善（Diupi-Yun 已回写：A78→72，B prizes 9→14）；Q14 短行不作完成条件；**Q15 是**——promote 存在换上后 `can_ko` 候选时优先于纯 `pokemon_score`（不看是否落后）。
 
@@ -41,7 +41,7 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-29 task 083：共享击杀/拿奖前瞻（100 局方向有效，待 Owner 拍板）
+### 2026-10-29 task 083：共享击杀/拿奖前瞻（假阳性已修，待重验 100 局）
 
 - **Owner 拍板（Q1–Q15 整包 = 规格「本文建议」）**：083；不合并 PR #10；082 并入 F1；不做 F2/F4；不实现 `prize_pressure_gate`；F1+F3；`ko_prize_lookahead_gate` 默认开且不进 tune；冻结 `pokemon_score` / `factor_prize_diff`；不重开血月；无卡名例外；不改 end_turn/stadium；局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；先单测，局级向 60–70% 或 B prizes 结构改善；短行非完成条件；**Q15 是**（promote 换上后能击杀则优先于纯 `pokemon_score`，不看落后）
 - **证据（规格已载，本刀不重跑）**：A78→80；六格 ΔA +4/+0/+6/0/+2/0；copy 估 0 → 索ex→含羞苞；`_copy_attack_key` 攻击路径已有可见性；`prizes_count`=剩余、落后定义正确
@@ -52,7 +52,10 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
   - t080 baseline：A78 / B22；胜因 prizes A56/B9，deck_out A13/B3，no_pokemon 9/10；暗夜王牌 250
   - t083 本刀：A72 / B28；胜因 prizes A53/B14，deck_out A10/B4，no_pokemon 9/10；暗夜王牌 262
   - 方向：相对 A78 向 60–70%（78→72）；B prizes 结构改善（9→14）。未落入带内中心，仍满足 Q13。短行非完成条件。不宣称 30.4%，不跑 18000。
-- **遗留**：待 Owner 拍板是否合入。代理不合并。
+- **遗留（修前）**：上面 100 局是代码 `edf392c`。Owner 随后拍板先修 promote `can_ko` 假阳性，再重验；PR #12 仍不合并。
+- **假阳性**：seed 208060，A 击杀莱希后 083 promote 索罗亚克ex，暗夜王牌复制「火焰」实伤 100；对手愿增猿 t1 勇气护符（基础最大 HP +50）且沙奈朵叠了 20 伤。印面剩余 110−20=90，有效剩余 160−20=140。100≥90 被前瞻判死，引擎 100<140 不昏。不是弱点漏乘，也不是 survival_cap。
+- **修法**：`_ko_remaining` = 有效最大 HP − 已伤，与引擎 `_effective_hp` 同口径（道具 `passive_static modify_hp`；`holder_is_basic` 只认栈顶 stage 0；竞技场 `suppress_tool` 不加）。接入 `_copied_strike`、`_lookahead_on_active`、`_one_layer_copy`。未改引擎昏厥，未改 `_pick_damage_linked_discard` 的印面剩余。
+- **单测**：`test_charm_blocks_print_ko_between_printed_and_effective_hp`、`test_charm_blocks_copy_ko_between_printed_and_effective_hp`、`test_promote_does_not_prefer_false_copy_ko_under_charm` 先红后绿；无道具 / 进化持有者 / 阻碍之塔 回归仍过。相关套件 **82 passed**，失败 0，ruff 0。100 局重验由协调侧做。
 
 ### 2026-10-29 N索整行扫描（矩阵后，定刀前）
 

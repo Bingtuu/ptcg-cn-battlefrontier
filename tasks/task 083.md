@@ -1,6 +1,6 @@
 # task 083 · 共享击杀/拿奖前瞻
 
-- 状态：**100 局方向有效，待 Owner 拍板**（单测绿；Diupi-Yun 同种子 A78→A72，失败 0；满足 Q13，未落入 60–70% 带内中心；代理不合并）
+- 状态：**promote can_ko 假阳性已修，待重验 100 局**（PR #12 仍不合并；`edf392c` 的 A72 是修前数字）
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`
 - 依赖：080 已合入 main `1afa4e2`。**081 搁置**（PR #10 不合并）。**082 并入本任务 WP-copy（F1）**，不再独立硬推
 - 对外中文名：共享击杀/拿奖前瞻（不要「奖杯压力」「王牌转换」）
@@ -91,5 +91,6 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
   | t080 baseline | A78 / B22 | A56 / B9 | A13 / B3 | 9 / 10 | 250 |
   | t083 本刀 | A72 / B28 | A53 / B14 | A10 / B4 | 9 / 10 | 262 |
 
-  相对 A78 向 60–70% 有效带（78→72）。B prizes 9→14。未落入带内中心，仍满足 Q13「向 60–70% 或 B prizes 结构改善」。短行不是完成条件。不宣称 30.4%，不跑 18000。
-- **遗留**：待 Owner 拍板是否合入。代理不合并。
+  相对 A78 向 60–70% 有效带（78→72）。B prizes 9→14。未落入带内中心，仍满足 Q13「向 60–70% 或 B prizes 结构改善」。短行不是完成条件。不宣称 30.4%，不跑 18000。这组数字是修前代码 `edf392c`。
+- **假阳性（Owner 拍板先修再重验）**：seed 208060 在莱希昏厥后 promote 索罗亚克ex，复制「火焰」实伤 100，对手愿增猿挂勇气护符（基础 +50）且已伤 20。印面剩余 90，有效剩余 140。前瞻用卡面 HP，100≥90 判 `can_ko`，引擎 100<140 不昏。修法：共享前瞻剩余 HP 改读道具 `modify_hp`（`holder_is_basic` 只加在基础宝可梦上；`suppress_tool` 则不加）。位点：`_copied_strike`、`_lookahead_on_active`、`_one_layer_copy`，经 `_ko_remaining`。未改引擎昏厥，未改弃牌定量斩杀。相关套件 **82 passed**，失败 0。100 局重验由协调侧做，本环境不跑。
+- **遗留**：重验同种子 100 局后再由 Owner 拍板是否合入。代理不合并。

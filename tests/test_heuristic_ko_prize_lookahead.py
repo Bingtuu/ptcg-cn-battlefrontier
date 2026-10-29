@@ -325,3 +325,194 @@ def test_lookahead_matches_view_as_active():
     assert (passed.can_ko, passed.best_damage, passed.via) == (
         swapped.can_ko, swapped.best_damage, swapped.via,
     )
+
+
+# ── 有效 HP（勇气护符 modify_hp）────────────────────────────────────────
+
+CHARM_DOC = parse_card_doc("""
+card:
+  name_group: 勇气护符
+effects:
+  - trigger: passive_static
+    condition: holder_is_basic
+    actions:
+      - {action: modify_hp, args: {amount: 50}}
+""")
+TOWER_DOC = parse_card_doc("""
+card:
+  name_group: 阻碍之塔
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: suppress_tool}
+""")
+CHARM_FX = {**FX, "勇气护符": CHARM_DOC}
+
+
+def _charm_card() -> CardDef:
+    return CardDef(
+        card_id="stub-勇气护符", name="勇气护符", supertype="trainer",
+        trainer_subtype="宝可梦道具",
+    )
+
+
+def _dark_copier() -> CardDef:
+    return CardDef(
+        card_id="stub-复制手", name="复制手", supertype="pokemon",
+        hp=160, stage=0, retreat_cost=0, energy_type="恶",
+        attacks=(AttackDef(name="暗夜", cost=("无",), damage=None),),
+    )
+
+
+def _dark_striker() -> CardDef:
+    return CardDef(
+        card_id="stub-恶攻", name="恶攻", supertype="pokemon",
+        hp=160, stage=0, retreat_cost=0, energy_type="恶",
+        attacks=(AttackDef(name="打击", cost=("无",), damage=50),),
+    )
+
+
+def _setup_mon() -> CardDef:
+    return CardDef(
+        card_id="stub-铺场", name="铺场", supertype="pokemon",
+        hp=220, stage=0, retreat_cost=0,
+        attacks=(AttackDef(name="打击", cost=("无",), damage=30),),
+    )
+
+
+def _willing(*, tool: bool, stage: int = 0):
+    """卡面 HP 110、已伤 20。印面剩余 90；基础宝可梦挂护符后有效剩余 140。"""
+    card = CardDef(
+        card_id="stub-靶", name="靶", supertype="pokemon",
+        hp=110, stage=stage, retreat_cost=1, weakness="恶",
+        attacks=(AttackDef(name="撞击", cost=("无",), damage=10),),
+    )
+    mon = in_play(2, card, energies=0)
+    updates: dict = {"damage": 20}
+    if tool:
+        updates["attached_tool"] = inst(80, _charm_card())
+    return mon.model_copy(update=updates)
+
+
+def _charm_print_state(*, tool: bool, stage: int = 0, stadium=None):
+    state = main_state()
+    p0 = state.players[0].model_copy(update={
+        "active": in_play(1, _dark_striker(), energies=1),
+        "bench": (),
+        "hand": (),
+    })
+    p1 = state.players[1].model_copy(update={"active": _willing(tool=tool, stage=stage)})
+    return state.model_copy(update={
+        "players": (p0, p1),
+        "stadium": stadium,
+    })
+
+
+def _charm_copy_state(*, tool: bool):
+    donor = _mon("供体", owner="N", hp=70, damage=50, cost=())
+    state = main_state()
+    p0 = state.players[0].model_copy(update={
+        "active": in_play(1, _dark_copier(), energies=1),
+        "bench": (in_play(70, donor, energies=0),),
+        "hand": (),
+    })
+    p1 = state.players[1].model_copy(update={"active": _willing(tool=tool)})
+    return state.model_copy(update={"players": (p0, p1)})
+
+
+def _charm_promote_state(*, tool: bool):
+    donor = _mon("供体", owner="N", hp=70, damage=50, cost=())
+    state = main_state()
+    p0 = state.players[0].model_copy(update={
+        "active": None,
+        "bench": (
+            in_play(3, _dark_copier(), energies=1),
+            in_play(70, donor, energies=0),
+            in_play(4, _setup_mon(), energies=1),
+        ),
+        "hand": (),
+    })
+    p1 = state.players[1].model_copy(update={"active": _willing(tool=tool)})
+    return state.model_copy(update={"players": (p0, p1), "phase": "promote"})
+
+
+def test_charm_blocks_print_ko_between_printed_and_effective_hp():
+    """印面招式 100 介于印面剩余 90 与有效剩余 140 之间 → 不能击杀。"""
+    agent, view = _agent_view(
+        _charm_print_state(tool=True), card_effects={"勇气护符": CHARM_DOC},
+    )
+    look = agent._ko_prize_lookahead(view)
+    assert look.best_damage == 100
+    assert look.via == "print"
+    assert look.can_ko is False
+
+
+def test_no_tool_print_ko_unchanged():
+    """无道具：同一 100 伤仍按印面剩余 90 击杀。"""
+    agent, view = _agent_view(
+        _charm_print_state(tool=False), card_effects={"勇气护符": CHARM_DOC},
+    )
+    look = agent._ko_prize_lookahead(view)
+    assert look.best_damage == 100
+    assert look.can_ko is True
+
+
+def test_charm_on_evolved_does_not_raise_hp():
+    """holder_is_basic 不成立：护符不加 HP，100 ≥ 印面剩余 90，仍能击杀。"""
+    agent, view = _agent_view(
+        _charm_print_state(tool=True, stage=1), card_effects={"勇气护符": CHARM_DOC},
+    )
+    look = agent._ko_prize_lookahead(view)
+    assert look.best_damage == 100
+    assert look.can_ko is True
+
+
+def test_suppress_tool_ignores_charm_hp():
+    """阻碍之塔消除道具后，护符不加 HP，击杀回到印面剩余。"""
+    stadium = inst(90, CardDef(
+        card_id="stub-阻碍之塔", name="阻碍之塔", supertype="trainer",
+        trainer_subtype="竞技场",
+    ))
+    agent, view = _agent_view(
+        _charm_print_state(tool=True, stadium=stadium),
+        card_effects={"勇气护符": CHARM_DOC, "阻碍之塔": TOWER_DOC},
+    )
+    look = agent._ko_prize_lookahead(view)
+    assert look.best_damage == 100
+    assert look.can_ko is True
+
+
+def test_charm_blocks_copy_ko_between_printed_and_effective_hp():
+    """复制 50 × 恶弱点 = 100，护符后有效剩余 140 → can_ko 为假，伤害仍是 100。"""
+    agent, view = _agent_view(_charm_copy_state(tool=True), card_effects=CHARM_FX)
+    look = agent._ko_prize_lookahead(view)
+    assert look.via == "copy"
+    assert look.best_damage == 100
+    assert look.can_ko is False
+
+
+def test_no_tool_copy_ko_unchanged():
+    """无道具：复制 100 ≥ 印面剩余 90，仍然击杀。"""
+    agent, view = _agent_view(_charm_copy_state(tool=False), card_effects=CHARM_FX)
+    look = agent._ko_prize_lookahead(view)
+    assert look.via == "copy"
+    assert look.best_damage == 100
+    assert look.can_ko is True
+
+
+def test_promote_does_not_prefer_false_copy_ko_under_charm():
+    """护符把复制击杀打成假阳性时，promote 回到 pokemon_score，不抬复制手。"""
+    state = _charm_promote_state(tool=True)
+    params = HeuristicParams()
+    copier = state.players[0].bench[0]
+    setup = state.players[0].bench[2]
+    assert pokemon_score(setup, params) > pokemon_score(copier, params)
+    act = _observe(state, card_effects=CHARM_FX)
+    assert act == Action(kind="promote", bench_index=2)
+
+
+def test_promote_still_prefers_real_copy_ko_without_tool():
+    """无道具时复制确实击杀，promote 仍优先复制手，不看分数。"""
+    state = _charm_promote_state(tool=False)
+    act = _observe(state, card_effects=CHARM_FX)
+    assert act == Action(kind="promote", bench_index=0)

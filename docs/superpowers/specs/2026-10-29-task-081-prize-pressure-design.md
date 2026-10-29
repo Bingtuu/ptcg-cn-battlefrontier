@@ -1,6 +1,6 @@
 # task 081 · 落后抢奖
 
-> **搁置（2026-10-29 Owner）**：实现 PR #10 **不合并**（A78→A80 方向无效；六格 ON/OFF 对 N索无益/有害；copy 估 0 → 索ex→含羞苞）。停窄门。当前焦点 = **task 083 · 共享击杀/拿奖前瞻**（`docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`）。本文仅作证据与历史规格留档；`prize_pressure_gate` 不进 main（083 标为可选 F4）。
+> **搁置（2026-10-29 Owner）**：实现 PR #10 **不合并**（A78→A80 方向无效；六格 ON/OFF 对 N索无益/有害；copy 估 0 → 索ex→含羞苞）。停窄门。083 已合入 main `4262a9f`（PR #12）。复制击杀短路的策略债见 **task 084**（`docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`）。本文仅作证据与历史规格留档；`prize_pressure_gate` 不进 main（083 标为可选 F4，084 不重开）。
 
 - 日期：2026-10-29
 - 状态：**搁置 / 不合并**（原 Q1–Q8 拍板过程被 083 收口取代；勿按本文开 TDD）

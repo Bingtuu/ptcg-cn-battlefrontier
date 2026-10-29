@@ -1,7 +1,9 @@
 # task 083 · 共享击杀/拿奖前瞻
 
+> **已合入 main `4262a9f`（PR #12）**。正确性（共享前瞻、有效 HP、印面 HP 残留）维持。复制击杀是否占用 `_lethal_attack` 短路，改读 task 084 规格，不在本文重开。
+
 - 日期：2026-10-29
-- 状态：**规格已拍板**（2026-10-29 Owner：Q1–Q15 整包按本节「本文建议」）。实现按 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md` TDD。代理不合并。
+- 状态：**已合入**（2026-10-29 Owner：Q1–Q15 整包按本节「本文建议」；PR #12 → `4262a9f`）。策略债见 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`。
 - 前置：task 080 已合入 main `1afa4e2`（PR #8）。081 实现 PR #10 **不合并**（见 §1）。082 规格文档已在 main，**并入本收口为 WP-copy（F1）**，不再当独立窄门硬推。
 - 权威：一期 PRD D10（通用启发式，不为单卡组写死）。078 的 Q4 = 否（不读血月 `modify_attack_cost`）继续有效，本刀不重开。
 

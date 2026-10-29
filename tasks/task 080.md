@@ -1,6 +1,6 @@
 # task 080 · 同体招式的可见伤害，与复制目标
 
-- 状态：实现完成（PR #8，`cursor/task-080-attack-quality-6192` @ `97ded0a`，从 main `bed68cbe`）；云端 100 局跳过；未合并
+- 状态：实现完成（PR #8）；Diupi-Yun 100 局已验收；待合并拍板
 - 关联：规格 D-078-7、假说 H/I/J；计划 Task 3
 - 依赖：单测不依赖 078/079。本机 100 局在两刀都默认开启之后跑
 
@@ -52,14 +52,6 @@ bfsim report <id> --results results/t080-gard-zoro.db --decisions
 
 ## 结果与遗留
 
-- **实现**：`HeuristicParams.attack_quality_gate = True`，不进 tune（`len(search_space())==10`）。`_visible_counter` 增加 `opponent_discard_basic_energy_count`。复制第一段仅当 `doc_for` + `effect_index` + `cursor` 指向 `copy_attack` 时改排序；读不到文档回落今天的 `pokemon_score`。第二段池名 `anchored_pokemon_attack`，供体 iid = `payload[0]`，`choices[0]` 是招式下标。有效伤害含弱点 ×2 / 抗性 -30，属性用宣言方（与 `copy_attack` 白板结算同口径）；估算 `None` 回退印面。不改 `pokemon_score`、DSL、引擎、copy 帧栈、`end_turn`
-- **红→绿**：见上列验收。连跑 `test_heuristic_attack_quality.py` `test_agent_dsl_estimate.py` `test_t076_matrix_failures.py` `test_primitives_t071.py` `test_tune_space.py` `test_features.py` `test_heuristic_ability_gate.py` `test_heuristic_board_gate.py` `test_heuristic_energy_target.py`：**106 passed**。`ruff check .` 零告警。071/076/077/078/079 断言未改
-- **本机 100 局**：云端无 `ptcg-cn.db`，跳过。父代理在 Diupi-Yun 跑，对照 **079 默认开（A87/B13）**，不是全关。失败必须是 0。胜率写实
-
-```bash
-bfsim run experiments/t078-gard-zoro.example.yml --workers 8 --results results/t080-gard-zoro.db
-bfsim report <id> --results results/t080-gard-zoro.db --decisions
-```
-
-- owner 闸门（本任务不做）：N索对其余对手的行、沙奈朵对其余对手的加权 \|Δ\|。要用新代码重跑矩阵，不能用 `c436471` 或这 100 局外推
-- `play_stadium` / `end_turn` 仍是 backlog。代理不合并
+- **实现**：PR #8 @ `97ded0a`（STATUS 回写本提交）。云端单测 106 passed；本机 100 局失败 0，A 87%→**78%**，B 13%→**22%**；复燃 28/13→**44/20**，焚身加农炮 12→7；暗夜王牌 272/73→250/74；血月 5/2 不变。三刀叠完未落入 60–75% 有效带，写实。
+- owner 闸门（本任务不做）：N索对其余对手的行、沙奈朵对其余对手的加权 |Δ|。要用新代码重跑矩阵，不能用 `c436471` 或这 100 局外推
+- `play_stadium` / `end_turn` 仍是 backlog。代理不合并（待 owner 拍板）

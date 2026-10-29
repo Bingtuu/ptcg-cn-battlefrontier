@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **待 Owner 拍板。拍板前不执行。** Q1–Q8 以 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md` 勾选后的值为准。下文按「本文建议」起草：**Q2=C 则本计划在 Task 1 停止。** 若 Owner 改选 B（或 A），才做 Task 2 起。
+> **已拍板（2026-10-29）。** Q1–Q8 整包按规格「本文建议」。**Q2=C**：维持 main `4262a9f` 的复制击杀短路。不加字段，不改 `heuristic.py`，不重跑 100 局。**本计划在 Task 1 停止。Task 2 起不执行**（留作若将来重开 B/A 时的草稿，不是本刀授权）。
 
 **Goal:** 决定复制击杀（`via=="copy"` 且 `can_ko`）是否占用 `_lethal_attack` 的「先于训练家」短路；前瞻本身的 `can_ko` 保持 083 合入后的语义。
 
@@ -47,21 +47,19 @@
 - Modify: `tasks/task 084.md`
 - Modify: `STATUS.md`
 
-- [ ] **Step 1: 按 Owner 勾选改 Q 表**
+- [x] **Step 1: 按 Owner 勾选改 Q 表**
 
-把「本文建议（待拍板）」改成「已拍板」，写上 Q1–Q8 的值。规格状态改为「规格已拍板」。
+Q1–Q8 已写入规格第 5 节。Q2=C。
 
-- [ ] **Step 2: Q2=C 时收口并停止**
+- [x] **Step 2: Q2=C 时收口并停止**
 
-`tasks/task 084.md` 结果节写：行为维持 main `4262a9f`；策略债记录在案；不重跑 100 局；同格残差不由本刀关。`STATUS.md` 焦点从「待拍板」改为「084 维持短路，残差另计」。
+行为维持 main `4262a9f`。策略债记录在案。不重跑 100 局。同格 \|Δ\| 47.2 不由本刀关。`STATUS.md` 焦点改为「084 维持短路，残差另计」。未改 `heuristic.py`。未做 Task 2。
 
-不要改 `heuristic.py`。不要做 Task 2。
+- [x] **Step 3: Q2=A 或 B 时才继续**
 
-- [ ] **Step 3: Q2=A 或 B 时才继续**
+跳过。Q2=C。
 
-在 task 文档写明默认政策字符串：`"never"` 或 `"unless_setup_trainer"`。Q3 的训练家定义若 Owner 改了，先改规格第 2.1 节再写测试。
-
-- [ ] **Step 4: Commit（无论 C 还是继续）**
+- [x] **Step 4: Commit（无论 C 还是继续）**
 
 ```bash
 git add docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md tasks/task\ 084.md STATUS.md
@@ -70,7 +68,9 @@ git commit -m "docs(084): record owner decision on copy lethal short-circuit"
 
 ---
 
-### Task 2 — 红测（仅 Q2=A 或 B）
+Task 2–5 **不执行**。Q2=C 已收口。下面的红测与实现草稿留档，不是本分支的授权。
+
+### Task 2 — 红测（仅 Q2=A 或 B；本次跳过）
 
 **Files:**
 - Modify: `tests/test_heuristic_ko_prize_lookahead.py`

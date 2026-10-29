@@ -5,11 +5,11 @@
 
 ## 当前
 
-**当前焦点 = task 084 · 复制击杀短路（策略债；规格待拍板；文档 PR，不开 TDD）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-084-copy-lethal-short-circuit.md`。
+**当前焦点 = task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由本刀关。
 
 **task 083 已合入 main `4262a9f`（PR #12）**。Owner 拍板 A：正确性子集合入（共享 `_ko_prize_lookahead` + 有效 HP `_ko_remaining` + 印面 HP 残留的弃牌定量 / 附伤目标）。**copy→`_lethal_attack` 短路另开 084，不回滚 083。** 100 局（种子 `208000..208099`，失败 0，`results/t083-effhp-gard-zoro.db`，代码 `af48017`）相对 t080 为 A78→**A72** / B28，B prizes 9→14；修前 `edf392c` 与有效 HP 重验胜负 100/100 相同（翻转 13/7）。seed 208060 promote 已与 t080 同为火红，该局胜者仍是 A。印面 HP 残留再叠上之后，同 100 种子胜率与有效 HP 版相同。消融 `ABLATION_COPY_NOT_LETHAL=1`（只把复制击杀排除出短路，F1 仍看见 copy；未进 main）：A**75** / B25，相对 t080 的翻转收窄，B prizes 回到 9。同格 500：sim 80.0%→**77.6%**，相对 real 30.4% 的 |Δ| **49.6→47.2**（−2.4pp），不够单独关掉该格残差。
 
-本文建议 Q2=**C（维持短路）**。若要改行为，选 B（有物品/支援者则推迟），不选 A（消融当默认）。拍板前不改 `heuristic.py`。
+**Owner 拍板（2026-10-29，084 的 Q1–Q8 整包按规格「本文建议」）**：**Q2=C** 维持短路。Q4 不加 `copy_lethal_policy`。Q6 不重跑 100 局。Q7 同格 500 不是完成条件。Q8 不回滚有效 HP / 印面 HP，不重开 081。未改 `heuristic.py`。
 
 **Owner 拍板（2026-10-29，Q1–Q15 整包按规格「本文建议」）**：Q1 用 083；Q2 不合并 081 / 不合入 PR #10；Q3 082 并入为 F1/WP-copy；Q4 不做 F2；Q5 不做 F4 / 不实现 `prize_pressure_gate`；Q6 只做 F1+F3；Q7 开关 `ko_prize_lookahead_gate` 默认 True，不进 tune 10 维；Q8 冻结 `pokemon_score` / `factor_prize_diff`；Q9 不重开血月减费；Q10 无卡名例外；Q11 不改 `end_turn` / `play_stadium`；Q12 局级对照 main/080 A78/B22（种子 `208000..208099`），不对照 081 的 A80；Q13 先单测绿，局级相对 A78 向 60–70% 或 B prizes 结构改善（Diupi-Yun 已回写：A78→72，B prizes 9→14）；Q14 短行不作完成条件；**Q15 是**——promote 存在换上后 `can_ko` 候选时优先于纯 `pokemon_score`（不看是否落后）。
 
@@ -45,14 +45,13 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-29 task 084：复制击杀短路（策略债，规格待拍板）
+### 2026-10-29 task 084：复制击杀短路（Q2=C 收口，行为不改）
 
 - **083 已合入**：PR #12 → main `4262a9f`。Owner 拍板 A = 正确性子集（共享前瞻、有效 HP、印面 HP 的弃牌/附伤）。不回滚
-- **策略债**：复制击杀（`via=="copy"`）是否占用 `_lethal_attack` 在训练家之前的短路。前瞻 `can_ko` 保持为真
-- **证据（本会话不重跑）**：100 局 A78→A72（083）→ 消融 A75 / B prizes 回到 9；同格 500 sim 80.0%→77.6%，|Δ| 49.6→47.2（−2.4pp）；印面 HP 残留与有效 HP 同 100 种子胜率相同
-- **建议（待勾选）**：Q2=C 维持。要改则 B，不选 A。Q2=C 不加字段、不重跑。同格 500 不是完成条件
-- **文档**：规格 + 计划 + `tasks/task 084.md`。083 的 task / 规格头注改为已合入，并指向 084
-- **未做**：改启发式、TDD、局级重跑、合并
+- **拍板（Q1–Q8 整包 = 规格「本文建议」）**：**Q2=C** 维持复制击杀短路。Q4 不加字段。Q6 不重跑 100 局。Q7 同格 500 不是完成条件。Q8 不回滚、不重开 081
+- **证据（不重跑）**：100 局 A78→A72（083）；消融 A75 / B prizes 回到 9；同格 500 sim 80.0%→77.6%，|Δ| 49.6→47.2（−2.4pp）；印面 HP 残留与有效 HP 同 100 种子胜率相同
+- **收口**：行为维持 `4262a9f`。同格残差不由本刀关。计划 Task 2 起不执行
+- **未做**：改 `heuristic.py`、TDD、局级重跑、18000
 
 ### 2026-10-29 task 083：共享击杀/拿奖前瞻（假阳性已修，重验完毕，胜率仍 72）
 

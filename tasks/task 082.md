@@ -1,10 +1,12 @@
 # task 082 · 复制招式击杀前瞻
 
-- 状态：规格待拍板（文档 PR；本文件不授权改代码）
-- 关联：规格 `docs/superpowers/specs/2026-10-29-task-082-copy-lethal-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-082-copy-lethal.md`
-- 依赖：080 已合入 main `1afa4e2`。落后抢奖是 task 081，本任务不实现。局级对照的建议是 **081 合入后** 的同种子 100 局，不是当前 main 的 A78/B22（Q1，待拍板）
+> **并入 task 083（2026-10-29 Owner）**：不再当独立窄门硬推。实质工作 = **083 的 WP-copy（F1）**。对外中文名跟 083「共享击杀/拿奖前瞻」，不要单独推「复制招式击杀前瞻」有效带。081 已搁置（PR #10 不合并），本号原「等 081 合入再局级」前提作废。
 
-开关代码标识：`copy_lethal_gate`（建议默认开，不进 tune）。
+- 状态：**并入 083 / 规格留档**（本文不授权改代码；实现跟 083 计划）
+- 关联：规格 `docs/superpowers/specs/2026-10-29-task-082-copy-lethal-design.md`（历史）；收口规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划以 083 为准
+- 依赖：080 已合入 main `1afa4e2`。081 搁置。局级对照改跟 083（建议 main/080 的 A78/B22）
+
+开关代码标识：原建议 `copy_lethal_gate`；083 建议总闸 `ko_prize_lookahead_gate`（待拍板）。
 
 ## 目标
 

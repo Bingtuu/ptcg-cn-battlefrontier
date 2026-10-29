@@ -1,8 +1,8 @@
 # 081 落后抢奖 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **搁置（2026-10-29 Owner）：本计划不执行。** PR #10 不合并。后续实现跟 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`（默认不含本计划的 `prize_pressure_gate` 行为）。
 >
-> **待 Owner 拍板。** 拍板前不执行。Q1–Q8 以 `docs/superpowers/specs/2026-10-29-task-081-prize-pressure-design.md` 拍板后的值为准。下文按「本文建议」起草。复制招式击杀前瞻是 task 082，不在本计划。
+> **For agentic workers:** 不要按本文件开 TDD。历史参考 only。
 
 **Goal:** 落后时，谁都不能击杀就换上已付清、输出更高的备战；promote 优先能击杀拿奖的备战。同种子 100 局看 A 胜率是否从约 78% 往 60–70% 走。
 

@@ -1,12 +1,14 @@
 # task 081 · 落后抢奖
 
-- 日期：2026-10-29
-- 状态：**待 Owner 拍板**（本节 Q1–Q8）。2026-10-29 owner 已拍板：与「复制招式击杀前瞻」拆成两个号。081 只做落后抢奖。复制招式见 task 082，不在本文。
-- 本文不授权改 `heuristic.py`、不写测试、不跑 `bfsim`。拍板之后才按 `docs/superpowers/plans/2026-10-29-task-081-prize-pressure.md` 开 TDD。代理不合并。
-- 前置：task 080 已合入 main `1afa4e2`（PR #8）。其后文档 `609d22b`（矩阵 + 残差）、`e19efbf`（N索整行）。启发式行号以 `1afa4e2` 为准。
-- 权威：一期 PRD D10（通用启发式，不为单卡组写死）。078 的 Q4 = 否（不读血月 `modify_attack_cost`）继续有效，本刀不重开。
+> **搁置（2026-10-29 Owner）**：实现 PR #10 **不合并**（A78→A80 方向无效；六格 ON/OFF 对 N索无益/有害；copy 估 0 → 索ex→含羞苞）。停窄门。当前焦点 = **task 083 · 共享击杀/拿奖前瞻**（`docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`）。本文仅作证据与历史规格留档；`prize_pressure_gate` 不进 main（083 标为可选 F4）。
 
-开关的代码标识是 `prize_pressure_gate`。对外中文用「落后抢奖」「抢奖节奏」「拿奖」「击杀拿奖」。
+- 日期：2026-10-29
+- 状态：**搁置 / 不合并**（原 Q1–Q8 拍板过程被 083 收口取代；勿按本文开 TDD）
+- 本文不授权改 `heuristic.py`、不写测试、不跑 `bfsim`。代理不合并。
+- 前置：task 080 已合入 main `1afa4e2`（PR #8）。其后文档 `609d22b`（矩阵 + 残差）、`e19efbf`（N索整行）。启发式行号以 `1afa4e2` 为准。
+- 权威：一期 PRD D10（通用启发式，不为单卡组写死）。078 的 Q4 = 否（不读血月 `modify_attack_cost`）继续有效。
+
+开关的代码标识是 `prize_pressure_gate`（**不进 main**）。对外历史用词「落后抢奖」；新工作对外用 083「共享击杀/拿奖前瞻」。
 
 ## 1. 背景
 

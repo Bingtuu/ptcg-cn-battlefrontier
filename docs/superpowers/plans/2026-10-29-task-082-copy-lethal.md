@@ -1,8 +1,8 @@
 # 082 复制招式击杀前瞻 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **并入 083（2026-10-29 Owner）：本计划不单独执行。** copy 场景可被 083 计划 Task 1（WP-copy）吸收。权威计划：`docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`。
 >
-> **待 Owner 拍板。** 拍板前不执行。Q1–Q9 以 `docs/superpowers/specs/2026-10-29-task-082-copy-lethal-design.md` 拍板后的值为准。下文按「本文建议」起草：100 局对照是 081 合入后的同种子，不是当前 main 的 A78。不要在本计划里实现 `prize_pressure_gate`。
+> **For agentic workers:** 不要按本文件单独开 TDD / 单独有效带。历史参考 only。
 
 **Goal:** 已付清的 `copy_attack` 按一层供体前瞻参与击杀判定，使暗夜王牌这类印面 0 伤的复制招式在能击杀拿奖时走现有的击杀优先，并且不因此被 078 的撤退换下去。
 

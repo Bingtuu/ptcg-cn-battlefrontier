@@ -398,10 +398,23 @@ class HeuristicAgent:
         return next(a for a in by_kind["confirm_setup"])
 
     def _pick_promote(self, view: VisibleGameState, acts: list[Action]) -> Action:
-        return min(
-            acts,
-            key=lambda a: (-pokemon_score(view.own.bench[a.bench_index], self.params), a.bench_index),
-        )
+        """换上：开关开且有人换上后能击杀，则击杀优先于纯 pokemon_score。
+
+        不看是否落后（Q15 = 是）。开关关回到分数，再按下标。
+        """
+        def score_key(act: Action) -> tuple:
+            mon = view.own.bench[act.bench_index]
+            return (-pokemon_score(mon, self.params), act.bench_index)
+
+        if not self.params.ko_prize_lookahead_gate:
+            return min(acts, key=score_key)
+
+        def ko_key(act: Action) -> tuple:
+            mon = view.own.bench[act.bench_index]
+            ko = self._ko_prize_lookahead(view, mon=mon).can_ko
+            return (0 if ko else 1, *score_key(act))
+
+        return min(acts, key=ko_key)
 
     # ── chooser 选择 ────────────────────────────────────
 
@@ -813,10 +826,10 @@ class HeuristicAgent:
         return best
 
     def _pick_retreat(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
-        """D-078-5：开关开时，战斗场斩杀不了、备战已付清招式能斩杀则换上。
+        """D-078-5：开关开时，战斗场击杀不了、备战换上后能击杀则换上。
 
-        战斗场自己已能斩杀则不撤（斩杀分支仍在撤退之前，这里是双保险）。
-        谁都不能斩杀，或开关关：回到「付不起才撤」。
+        能否击杀只读 `_ko_prize_lookahead`（含一层复制）。战斗场自己已能击杀则不撤。
+        谁都不能击杀，或开关关：回到「付不起才撤」。不因落后换更高的非击杀。
         """
         if not self.params.board_quality_gate:
             return self._pick_retreat_powerless(view, acts)
@@ -824,16 +837,14 @@ class HeuristicAgent:
         opp = view.opponent.active
         if active is None or opp is None:
             return self._pick_retreat_powerless(view, acts)
-        remaining = (opp.current.card.hp or 0) - opp.damage
-        active_best = self._max_paid_ko_damage(view)
-        if active_best is not None and active_best >= remaining:
+        if self._ko_prize_lookahead(view).can_ko:
             return None
         ko_targets: list[tuple[int, Action]] = []
         for act in acts:
             mon = view.own.bench[act.bench_index]
-            best = self._max_paid_ko_damage(self._view_as_active(view, mon))
-            if best is not None and best >= remaining:
-                ko_targets.append((best, act))
+            look = self._ko_prize_lookahead(view, mon=mon)
+            if look.can_ko:
+                ko_targets.append((look.best_damage or 0, act))
         if not ko_targets:
             return self._pick_retreat_powerless(view, acts)
         return min(ko_targets, key=lambda item: (-item[0], item[1].bench_index))[1]
@@ -925,7 +936,8 @@ class HeuristicAgent:
         try:
             donors = [
                 m for m in view.own.bench
-                if m.current.iid != active_iid and matches_in_play(m, tuple(node.filters))
+                if m.current.iid != active_iid
+                and matches_in_play(m, tuple(node.filters))
             ]
         except DslError:
             return None
@@ -950,14 +962,6 @@ class HeuristicAgent:
         if saw and best_chip is not None:
             return best_chip, False
         return None
-
-    def _max_paid_ko_damage(self, view: VisibleGameState) -> int | None:
-        """已付清、且可参与斩杀判定的招式里，对对手战斗场的最高有效伤害。
-
-        弱点 / 抗性走 `_attack_table`。费用仍是印面 `_energy_satisfied`（D-WP8-5）。
-        开关开时并入一层 copy（task 083）。没有这样的招式则 None。
-        """
-        return self._ko_prize_lookahead(view).best_damage
 
     def _pick_retreat_powerless(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """保守撤退：仅当战斗场无可支付招式且备战区有已就绪打手时撤退。"""

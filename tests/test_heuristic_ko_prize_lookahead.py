@@ -1,11 +1,16 @@
-"""task 083 F1：共享击杀/拿奖前瞻看见一层 copy_attack。
+"""task 083：共享击杀/拿奖前瞻。
 
+F1 看见一层 copy_attack。F3 让撤退、攻击击杀与 promote 只读该出口。
 不改 `_attack_table`，不改 080 的 chooser，不引入 `prize_pressure_gate`。
 """
 
 from helpers import basic, engine_at, in_play, inst, main_state
 
-from battlefrontier.agent.heuristic import HeuristicAgent, HeuristicParams
+from battlefrontier.agent.heuristic import (
+    HeuristicAgent,
+    HeuristicParams,
+    pokemon_score,
+)
 from battlefrontier.dsl import parse_card_doc
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.state import AttackDef, CardDef
@@ -209,3 +214,114 @@ effects:
     assert look.via == "copy"
     act = agent.observe(view, _engine(state).legal_actions(0))
     assert act == Action(kind="retreat", bench_index=0)
+
+
+def test_copy_ko_does_not_retreat_onto_bench_that_also_kos():
+    """战斗场复制能击杀，备战印面也能击杀 → 不撤，打出复制。"""
+    donor = _mon("供体", owner="N", hp=100, damage=200, cost=())
+    state = _base(donor=donor, opp_hp=100, hand=())
+    act = _observe(state)
+    assert act == Action(kind="attack", attack_index=0)
+    agent, view = _agent_view(state)
+    retreats = [a for a in _engine(state).legal_actions(0) if a.kind == "retreat"]
+    assert retreats
+    assert agent._pick_retreat(view, retreats) is None
+
+
+def test_neither_ko_does_not_retreat_just_because_behind():
+    """两边都不能击杀：落后也不撤到更高的非击杀。不做 081。"""
+    chip = CardDef(
+        card_id="stub-低伤", name="低伤", supertype="pokemon",
+        hp=110, stage=0, retreat_cost=0,
+        attacks=(AttackDef(name="打击", cost=("无",), damage=60),),
+    )
+    bigger = CardDef(
+        card_id="stub-中伤", name="中伤", supertype="pokemon",
+        hp=100, stage=0, retreat_cost=0,
+        attacks=(AttackDef(name="打击", cost=("无",), damage=120),),
+    )
+    state = main_state()
+    p0 = state.players[0].model_copy(update={
+        "active": in_play(1, chip, energies=1),
+        "bench": (in_play(3, bigger, energies=1),),
+        "hand": (),
+        "prizes": state.players[0].prizes,
+    })
+    p1 = state.players[1].model_copy(update={
+        "active": in_play(2, basic("靶", hp=300), energies=0),
+        "prizes": state.players[1].prizes[:2],
+    })
+    state = state.model_copy(update={"players": (p0, p1)})
+    assert len(state.players[0].prizes) > len(state.players[1].prizes)
+    act = _observe(state)
+    assert act.kind == "attack"
+    assert act != Action(kind="retreat", bench_index=0)
+
+
+def _wall_and_striker() -> tuple[CardDef, CardDef]:
+    wall = CardDef(
+        card_id="stub-墙", name="墙", supertype="pokemon",
+        hp=250, stage=0, retreat_cost=0,
+        attacks=(AttackDef(name="撞击", cost=("无",), damage=10),),
+    )
+    striker = CardDef(
+        card_id="stub-打手", name="打手", supertype="pokemon",
+        hp=30, stage=0, retreat_cost=2,
+        attacks=(AttackDef(name="打击", cost=("无",), damage=50),),
+    )
+    return wall, striker
+
+
+def _promote_state():
+    """打手在备战 0，墙在备战 1。打手能击杀，墙分更高。我方奖赏更少（领先）。"""
+    wall, striker = _wall_and_striker()
+    state = main_state()
+    p0 = state.players[0].model_copy(update={
+        "active": None,
+        "bench": (in_play(3, striker, energies=1), in_play(4, wall, energies=1)),
+        "hand": (),
+        "prizes": state.players[0].prizes[:1],
+    })
+    p1 = state.players[1].model_copy(update={
+        "active": in_play(2, basic("靶", hp=50), energies=0),
+    })
+    return state.model_copy(update={"players": (p0, p1), "phase": "promote"})
+
+
+def test_promote_prefers_ko_over_higher_score_even_when_ahead():
+    """Q15：换上后能击杀就优先于纯 pokemon_score，不看是否落后。"""
+    wall, striker = _wall_and_striker()
+    params = HeuristicParams()
+    assert pokemon_score(in_play(4, wall), params) > pokemon_score(in_play(3, striker), params)
+    state = _promote_state()
+    assert len(state.players[0].prizes) < len(state.players[1].prizes)
+    act = _observe(state)
+    assert act == Action(kind="promote", bench_index=0)
+
+
+def test_promote_gate_off_keeps_higher_score():
+    wall, _striker = _wall_and_striker()
+    state = _promote_state()
+    params = HeuristicParams(ko_prize_lookahead_gate=False)
+    act = _observe(state, params)
+    assert pokemon_score(in_play(4, wall), params) > pokemon_score(
+        state.players[0].bench[0], params,
+    )
+    assert act == Action(kind="promote", bench_index=1)
+
+
+def test_lookahead_matches_view_as_active():
+    """同一只宝可梦，直接当战斗场和经 `_view_as_active` 口径一致。"""
+    state = _ko_state()
+    agent, view = _agent_view(state)
+    direct = agent._ko_prize_lookahead(view)
+    via_mon = agent._ko_prize_lookahead(view, mon=view.own.active)
+    assert (via_mon.can_ko, via_mon.best_damage, via_mon.via) == (
+        direct.can_ko, direct.best_damage, direct.via,
+    )
+    bench = view.own.bench[0]
+    swapped = agent._ko_prize_lookahead(agent._view_as_active(view, bench))
+    passed = agent._ko_prize_lookahead(view, mon=bench)
+    assert (passed.can_ko, passed.best_damage, passed.via) == (
+        swapped.can_ko, swapped.best_damage, swapped.via,
+    )

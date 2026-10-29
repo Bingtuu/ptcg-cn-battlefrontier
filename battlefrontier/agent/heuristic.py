@@ -6,6 +6,8 @@
 加伤按效果形态估价值，其余特性仍优先于进化。前场（task 078，D-078-5）：
 `board_quality_gate` 开时，手里能接上进化线的基础优先上场；战斗场已付清招式
 斩杀不了、备战已付清且能斩杀时撤退。关则回到 `pokemon_score` / 付不起才撤。
+能量（task 079，D-078-6）：`energy_target_gate` 开时，手牌能量优先贴到再贴一张
+就付清、且新付清招式有效伤害最高的宝可梦。关则回到战斗场任一招没付清就喂战斗场。
 D10：不做单卡组定制——评分只用通用字段（HP/招式伤害/撤退费/进化链/卡片类别）
 与效果形态，不按卡名分支。
 
@@ -101,6 +103,9 @@ class HeuristicParams:
     # 前场质量门控（task 078，D-078-4/5）。False = 布阵回到 pokemon_score，
     # 撤退回到「付不起才撤」。不进 tune。默认是第一刀，不是已拍板最优。
     board_quality_gate: bool = True
+    # 能量附着目标（task 079，D-078-4/6）。False = 战斗场任一招没付清就喂战斗场。
+    # 不进 tune。第一刀不读 modify_attack_cost（Q4 = 否）。
+    energy_target_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -619,6 +624,11 @@ class HeuristicAgent:
     def _pick_energy_attach(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """能量目标：仍有付不起的招式才补能（全就绪则不浪费每回合 1 次的附着）。
 
+        D-078-6（energy_target_gate，task 079）：D-032-5 手牌弹药例外之后，若贴
+        这一张就能让某招从付不起变成付得起，选新付清招式有效伤害最高的那只（平手
+        战斗场优先，再 iid 小）。没有这种目标，或开关关：下面的 needs_energy
+        语义不变。费用仍是印面（D-WP8-5），不读 modify_attack_cost。
+
         战斗场未就绪优先补给；否则补给备战区未就绪最高分者；全都就绪返回 None 跳过。
         A3 囤能例外（task 032 WP2，D-032-5 修订）：主动宝可梦为手牌弹药型（on_attack
         含 discard own_hand + 后续 damage count=discarded_this_effect）且已能开打
@@ -647,8 +657,56 @@ class HeuristicAgent:
                 return None
             best = min(candidates, key=lambda b: (-pokemon_score(b, self.params), b.current.iid))
             target_iid = best.current.iid
+        if self.params.energy_target_gate and acts:
+            add = next(
+                (
+                    c.card.energy_type
+                    for c in view.own.hand
+                    if c.iid == min(a.iid for a in acts)
+                ),
+                None,
+            )
+            ranked: list[tuple[int, int, int, InPlayPokemon]] = []
+            active_iid = active.current.iid if active is not None else None
+            for mon in _in_play(view.own.active, view.own.bench):
+                if _mon_energy_role(mon, add) != 0:
+                    continue
+                dmg = self._newly_enabled_damage(view, mon, add)
+                on_active = 0 if mon.current.iid == active_iid else 1
+                ranked.append((-dmg, on_active, mon.current.iid, mon))
+            if ranked:
+                _, _, target_iid, _ = min(ranked)
         targeted = [a for a in acts if a.target_iid == target_iid]
         return min(targeted or acts, key=lambda a: (a.target_iid or 0, a.iid))
+
+    def _newly_enabled_damage(
+        self, view: VisibleGameState, mon: InPlayPokemon, add: str | None,
+    ) -> int:
+        """贴上 add 后新付清的招式里，对对手战斗场的最高有效伤害。
+
+        只计 `_energy_role == "enable"` 的印面招式。估算为 None 时用印面伤害。
+        弱点 ×2 / 抗性 -30 与 `_attack_table` 同口径，来源属性用这只宝可梦的
+        `energy_type`。打分用可见视图副本，不写回引擎。
+        """
+        types = [e.card.energy_type for e in mon.attached_energy]
+        scoring = self._view_as_active(view, mon)
+        opp = scoring.opponent.active
+        own_type = mon.current.card.energy_type
+        best = 0
+        for atk in mon.current.card.attacks:
+            if _energy_role(types, atk.cost, add) != "enable":
+                continue
+            est = estimate_attack_damage(
+                scoring, atk.name, atk.damage, mon.current.card, self.card_effects,
+            )
+            dmg = (atk.damage or 0) if est is None else est.amount
+            if opp is not None and dmg:
+                if opp.current.card.weakness and own_type == opp.current.card.weakness:
+                    dmg *= 2
+                if opp.current.card.resistance and own_type == opp.current.card.resistance:
+                    dmg = max(0, dmg - RESISTANCE_AMOUNT)
+            best = max(best, dmg)
+        return best
 
     def _pick_retreat(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """D-078-5：开关开时，战斗场斩杀不了、备战已付清招式能斩杀则换上。

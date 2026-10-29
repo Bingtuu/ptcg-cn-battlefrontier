@@ -1,6 +1,6 @@
 # task 083 · 共享击杀/拿奖前瞻
 
-- 状态：**单测绿；局级未跑**（Q1–Q15 已拍板；云端无库跳过 `bfsim`；代理不合并）
+- 状态：**100 局方向有效，待 Owner 拍板**（单测绿；Diupi-Yun 同种子 A78→A72，失败 0；满足 Q13，未落入 60–70% 带内中心；代理不合并）
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-083-shared-ko-prize-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-083-shared-ko-prize-lookahead.md`
 - 依赖：080 已合入 main `1afa4e2`。**081 搁置**（PR #10 不合并）。**082 并入本任务 WP-copy（F1）**，不再独立硬推
 - 对外中文名：共享击杀/拿奖前瞻（不要「奖杯压力」「王牌转换」）
@@ -23,7 +23,7 @@
 | Q10 | 无卡名例外 |
 | Q11 | 不改 `end_turn` / `play_stadium` |
 | Q12 | 局级对照 main/080 的 A78/B22，种子 `208000..208099`；不对照 081 的 A80 |
-| Q13 | 先单测绿；局级相对 A78 向 60–70% 移动，或 B prizes 结构改善，算方向有效（云端无库跳过 `bfsim`） |
+| Q13 | 先单测绿；局级相对 A78 向 60–70% 移动，或 B prizes 结构改善，算方向有效（Diupi-Yun 已回写：A78→72，B prizes 9→14） |
 | Q14 | 短行不作完成条件 |
 | Q15 | **是**：promote 存在换上后 `can_ko` 候选时优先于纯 `pokemon_score`（不看是否落后） |
 
@@ -60,7 +60,7 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 - 种子 `208000..208099`，失败 0
 - 有效带已拍板（Q12–Q13）：对照 main/080 A78/B22；相对 A78 向 60–70% 或 B prizes 结构改善
 - 不对照 081 的 A80；不宣称 30.4%；不跑 18000 作完成条件
-- **本环境跳过**：无 `ptcg-cn.db`，未跑 `bfsim`
+- **Diupi-Yun 已跑**（代码 `edf392c`，`results/t083-gard-zoro.db`）：A72/B28，失败 0。见结果节。
 
 ## 实现要点
 
@@ -84,5 +84,12 @@ bfsim report <id> --results results/t083-gard-zoro.db --decisions
 - **F1**：`_ko_prize_lookahead` 覆盖印面招式与一层 `selector=own_bench_attack` 的 `copy_attack`。供体不必付费；未知 filter / 无文档不猜；不递归供体上的再一层 copy。`_lethal_attack` 读该出口。不写 `_attack_table`。
 - **F3**：`_pick_retreat` 与 `_pick_promote` 只读同一出口。复制能击杀则不撤。Q15：换上后 `can_ko` 优先于纯 `pokemon_score`，领先时也选击杀手；开关关仍按分数。两边都不能击杀时不因落后换更高伤。
 - **未做（按拍板）**：F2、F4、`prize_pressure_gate`、PR #10 行为、卡名分支、血月减费、`end_turn` / `play_stadium`、080 chooser。
-- **局级**：云端无库，跳过 `bfsim`。对照仍是 main/080 同种子 A78/B22，不是 081 的 A80。短行不是完成条件。未宣称胜率移动。
-- **遗留**：Diupi-Yun 补跑 `experiments/t078-gard-zoro.example.yml` 种子 `208000..208099`，回写 A/B 与 prizes 结构。代理不合并。
+- **局级**（Diupi-Yun，代码 `edf392c`，`results/t083-gard-zoro.db`，种子 `208000..208099`，失败 0；对照 main/080 同种子，不是 081 的 A80）：
+
+  | | A/B | prizes | deck_out | no_pokemon | 暗夜王牌 |
+  |---|---|---|---|---|---|
+  | t080 baseline | A78 / B22 | A56 / B9 | A13 / B3 | 9 / 10 | 250 |
+  | t083 本刀 | A72 / B28 | A53 / B14 | A10 / B4 | 9 / 10 | 262 |
+
+  相对 A78 向 60–70% 有效带（78→72）。B prizes 9→14。未落入带内中心，仍满足 Q13「向 60–70% 或 B prizes 结构改善」。短行不是完成条件。不宣称 30.4%，不跑 18000。
+- **遗留**：待 Owner 拍板是否合入。代理不合并。

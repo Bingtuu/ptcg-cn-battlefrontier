@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 093 100局 B41 fail0 PASS 但电电虫 Δ+8pp 否决（2026-10-30 Asia/Shanghai）。** 沙奈朵×N索 100 局（种子 `208000..208099`）A59/B**41**/失败**0** → 硬门 **PASS**（B≥34；基线 A69/B31）。电电虫并列 tip ON 56% vs tip OFF 48% → **ΔN索 +8.0pp ≥+3pp，Q6 否决**。**PR #27 已关不合**（机制 R / `convert_timing_hybrid_gate` 未进 main）。**heuristic 仍 main 无 R**。证据 dig `docs/digs/2026-10-30-task-093-100-hard-accept.md`；摘要 `results/t093-100-SUMMARY.md`。**下一刀待 Owner 拍板**。Q3 仍记 **PASS 49/236**（已在 main `57e86f4`）。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
+**当前焦点 = task 093 电电虫 +8pp 过冲 dig 已完成（2026-10-30 Asia/Shanghai）；下一刀仍待 Owner 拍板。** 复述确认 tip ON A**56**/B44 vs OFF A**48**/B52 → ΔN索 **+8.0pp**。翻转 10=帮N索9−害1；OFF 下 A 落后 place=0；R 签名局 13/100（供体莱希拉姆/索罗亚）；电电虫无暗夜王牌、B place 不变 → R 单边加速 N索追奖。dig `docs/digs/2026-10-30-task-093-joltik-overshoot.md`。**推荐：放弃 R**（收窄/换门为备选）。**PR #27 仍关不合**；heuristic main 无 R；**未实现新刀**。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 PASS 49/236。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
 
 
 
@@ -47,6 +47,15 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-30 task 093：电电虫 +8pp 过冲 dig（完成；未实现新刀）
+
+- **范围**：只读 tip ON/OFF 两库事件；重计 WR；翻转拆分；R 开火/place_bench/奖杯时点。不改 `heuristic.py`，不合 #27。
+- **复述**：ON A56/B44；OFF A48/B52；ΔN索 **+8.0pp**。终局 ON prizes55/deck33 vs OFF prizes48/deck40。
+- **开火**：A 落后 place ON **30**（25局）vs OFF **0**；首次 ACE 前签名 **13** 局；同回合 place→ACE **13**；供体莱希拉姆×8 / 索罗亚×4 / 火红×1。B 暗夜王牌 **0**、B place **91=91**。
+- **翻转**：帮 N索 **9**、害 **1**、净 **+8**。直接签名 4 + ACE 后窗 5；帮翻几乎全 ON prizes 收官；8/9 电电虫先拿第一奖。
+- **推荐下一刀**：**放弃 R**（备选：收窄仅首次 ACE 前 ± 奖差≥2；换门）。**实现另开，本步未做。**
+- **产物**：dig `docs/digs/2026-10-30-task-093-joltik-overshoot.md`；JSON `results/t093-joltik-dig-summary.json`。
 
 ### 2026-10-30 task 093：100局硬接受 PASS + 电电虫否决写回（#27 已关不合）
 

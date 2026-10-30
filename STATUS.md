@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 093 Q3 PASS（2026-10-30 Asia/Shanghai）：首触转化×时序混合 / convert+timing hybrid。** 机制只 **R**（`convert_timing_hybrid_gate` 不进 tune）。**Q3 = PASS 49/236**（权威分母 236；R would-change ≥15）。证据 dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`；摘要 `results/t093-q3-frequency.json`。**下一闸 = TDD**：另开实现 `convert_timing_hybrid_gate`（先红测，再改 `_decide_main`）；**本步未开 TDD、未改 heuristic**。硬接受仍锁定：100 局种子 `208000..208099` **B≥34 且失败 0，否则回滚**（基线 A69/B31）；电电虫 **≥+3pp** 否决；18000 非完成；冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
+**当前焦点 = task 093 100局 B41 fail0 PASS 但电电虫 Δ+8pp 否决（2026-10-30 Asia/Shanghai）。** 沙奈朵×N索 100 局（种子 `208000..208099`）A59/B**41**/失败**0** → 硬门 **PASS**（B≥34；基线 A69/B31）。电电虫并列 tip ON 56% vs tip OFF 48% → **ΔN索 +8.0pp ≥+3pp，Q6 否决**。**PR #27 已关不合**（机制 R / `convert_timing_hybrid_gate` 未进 main）。**heuristic 仍 main 无 R**。证据 dig `docs/digs/2026-10-30-task-093-100-hard-accept.md`；摘要 `results/t093-100-SUMMARY.md`。**下一刀待 Owner 拍板**。Q3 仍记 **PASS 49/236**（已在 main `57e86f4`）。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
 
 
 
@@ -48,7 +48,16 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
+### 2026-10-30 task 093：100局硬接受 PASS + 电电虫否决写回（#27 已关不合）
+
+- **硬门**：沙奈朵×N索 100 局种子 `208000..208099` → A**59**/B**41**/失败 **0** → **PASS**（B≥34）。相对基线 A69/B31，B +10；触及后 B WR 47.5%（+12.5pp）。
+- **电电虫否决**：同种子 tip ON N索 WR 56% vs tip OFF 48% → **Δ+8.0pp ≥+3pp**，Q6 触发。
+- **PR #27**：已关、**不合**。机制 R / `convert_timing_hybrid_gate` **未进 main**；**heuristic 仍 main 无 R**。
+- **本步**：只写 dig / STATUS；**未改 `heuristic.py`**。dig `docs/digs/2026-10-30-task-093-100-hard-accept.md`；摘要 `results/t093-100-SUMMARY.md`（results/ gitignore，仅本机）。
+- **下一刀待 Owner 拍板**。不宣称 30.4%。
+
 ### 2026-10-30 task 093：Q3 频数门 PASS 49/236（未开 TDD）
+
 
 - **Q3**：同种子引擎重放 `results/t092-gard-zoro-500.db`，分母 **236=权威**；机制 R would-change **49/236 PASS**（门槛 ≥15）。dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`；JSON `results/t093-q3-frequency.json`。
 - **诊断（非门禁）**：落后失败 67；挥击伤害 >0 100；无 place_bench 基础 13；过滤不过 7；`_copied_strike` 全 0 = 0。

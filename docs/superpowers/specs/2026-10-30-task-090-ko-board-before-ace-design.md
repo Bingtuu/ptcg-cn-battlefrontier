@@ -1,7 +1,7 @@
 # task 090 · 先制造可 KO 局面再转化
 
 - 日期：2026-10-30
-- 状态：**已拍板**（2026-10-30 Asia/Shanghai Owner：Q1–Q9 整包按本节「本文建议」；另锁硬门 1–4，见 §5.1；离线自治授权按建议推进、硬门失败回滚换向）。本文**仍不**授权改 `heuristic.py`、不授权写测试，直到 Q3 频数门过线。过线后才另开 TDD。
+- 状态：**已收口**（2026-10-30 Asia/Shanghai：Q3 **0/40 FAIL**）。曾拍板 Q1–Q9 + 硬门；按硬门不写测试、不改 `heuristic.py`。不放宽 15/40，不改去 H/Y。下一刀文档 task 091（B 约束 A 侧发动机）。
 - 前置：main `0a47c96`（089 Q3 **0/39 FAIL** 收口）。088 文档在 main，Q3 **1/40 FAIL** 收口。086 `prize_race_gate` 已合入，同种子 100 局相对 085 持平 A69/B31。087 `setup_before_chip_gate` 不合，PR #17 关闭。085 `copy_conversion_gate`、084 Q2=C、083 共享前瞻均在。081 搁置，PR #10 不合并。
 - 权威：一期 PRD D10（通用启发式，不为单卡组写死）。078 Q4 / 083 Q9（不读血月减费）继续有效。
 - 证据：`docs/digs/2026-10-30-posttouch-ace-still-lose.md`；`docs/digs/2026-10-30-task-088-q3-frequency.md`；`docs/digs/2026-10-30-task-089-q3-frequency.md`。库 `results/t086-gard-zoro.db`，代码 `fc25648`。本会话未重跑、未打开该库。

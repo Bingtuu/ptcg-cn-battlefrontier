@@ -1,8 +1,8 @@
 # task 089 · 触及时点 / 早期奖杯止血
 
-> **已拍板**（2026-10-30 Asia/Shanghai：Q1–Q9 整包按本文建议 + 硬门 1–4）。本文件与规格 **不改** `heuristic.py`，**不写**测试，**TDD 阻塞于 Q3**。088 已按 Q3 **1/40 FAIL** 收口，不重开。禁止 `prize_pressure_gate` / 081 / 死名。禁止把新行为写进已合入的 `prize_race_gate`。禁止再做一扇「落后 → 撤退/换上」门。
+> **已收口**（2026-10-30 Asia/Shanghai：Q1–Q9 曾整包按本文建议；Q3 **0/39 FAIL**）。不改 `heuristic.py`，不写测试，不放宽 15/39，不改去 K/E/G 再计一次当过。088 已按 Q3 **1/40 FAIL** 收口，不重开。禁止 `prize_pressure_gate` / 081 / 死名。禁止把新行为写进已合入的 `prize_race_gate`。重设计文档是 task 090，不在本任务里开 TDD。
 
-- 状态：**已拍板 / 文档待合**（2026-10-30 Asia/Shanghai；docs-only；TDD 阻塞于 Q3）
+- 状态：**已收口**（2026-10-30 Asia/Shanghai；Q3 **0/39 FAIL**；不写测试、不改 `heuristic.py`）。下一刀文档是 task 090，不重开本任务。
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-089-early-prize-keep-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-089-early-prize-keep.md`（停在文档；TDD 步骤故意不写）
 - 依赖：088 收口（机制 C，Q3 **1/40**，`docs/digs/2026-10-30-task-088-q3-frequency.md`）；086 已在 main（`prize_race_gate`，100 局相对 085 **持平 A69/B31**）；087 Owner A **不合**。证据 dig `docs/digs/2026-10-30-posttouch-ace-still-lose.md`（库 `results/t086-gard-zoro.db` @ `fc25648`）。39/52 权威，结构表 0 行不是
 - 对外中文名：触及时点 / 早期奖杯止血
@@ -64,9 +64,9 @@
 
 ### 状态
 
-- 文档 PR（#19）下一步合并 main。
-- **TDD 阻塞于 Q3**：本拍板不授权改 `heuristic.py`、不授权写测试，直到 Q3 计数过线并写回。
+- 文档 PR #19 已合并。Q3 **0/39 FAIL**，按硬门收口。
+- 不授权改 `heuristic.py`、不授权写测试。不改去 K/E/G 当通过。重设计见 task 090，不在本任务里放宽阈值。
 
 ## 结果与遗留
 
-拍板已写回。Q3 计数 **0/39 FAIL**（`docs/digs/2026-10-30-task-089-q3-frequency.md`）。按硬门 **收口 089**：不写测试、不改 `heuristic.py`、不开 TDD。
+拍板已写回。Q3 计数 **0/39 FAIL**（`docs/digs/2026-10-30-task-089-q3-frequency.md`）。按硬门 **收口 089**：不写测试、不改 `heuristic.py`、不开 TDD。重设计文档是 task 090。

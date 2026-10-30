@@ -1,8 +1,8 @@
 # task 089 · 触及时点 / 早期奖杯止血
 
-> **待拍板**（2026-10-30 Asia/Shanghai）。本文件与规格 **不改** `heuristic.py`，**不写**测试。088 已按 Q3 **1/40 FAIL** 收口，不重开。禁止 `prize_pressure_gate` / 081 / 死名。禁止把新行为写进已合入的 `prize_race_gate`。禁止再做一扇「落后 → 撤退/换上」门。
+> **已拍板**（2026-10-30 Asia/Shanghai：Q1–Q9 整包按本文建议 + 硬门 1–4）。本文件与规格 **不改** `heuristic.py`，**不写**测试，**TDD 阻塞于 Q3**。088 已按 Q3 **1/40 FAIL** 收口，不重开。禁止 `prize_pressure_gate` / 081 / 死名。禁止把新行为写进已合入的 `prize_race_gate`。禁止再做一扇「落后 → 撤退/换上」门。
 
-- 状态：**文档待拍板**（2026-10-30 Asia/Shanghai；docs-only；TDD 阻塞于 Q3）
+- 状态：**已拍板 / 文档待合**（2026-10-30 Asia/Shanghai；docs-only；TDD 阻塞于 Q3）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-089-early-prize-keep-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-089-early-prize-keep.md`（停在文档；TDD 步骤故意不写）
 - 依赖：088 收口（机制 C，Q3 **1/40**，`docs/digs/2026-10-30-task-088-q3-frequency.md`）；086 已在 main（`prize_race_gate`，100 局相对 085 **持平 A69/B31**）；087 Owner A **不合**。证据 dig `docs/digs/2026-10-30-posttouch-ace-still-lose.md`（库 `results/t086-gard-zoro.db` @ `fc25648`）。39/52 权威，结构表 0 行不是
 - 对外中文名：触及时点 / 早期奖杯止血
@@ -36,11 +36,13 @@
 | Q8 | 「已经落后」当启用条件？ | **不当**。窗口只看「复制伤害尚未付清」和「可见招式能 KO 这只 ≥2 奖」，不看奖差 |
 | Q9 | 本 PR 停哪？ | **只文档**。拍板前不改 `heuristic.py`、不写测试 |
 
+> **拍板写回**：上表九行全部 = 「本文建议」。硬验收/回滚见「Owner 拍板」节（Q3≥15/39；100 局 B≥34 且失败 0；电电虫 +≥3pp 否决；18000 非完成条件）。
+
 ## 验收清单
 
 - [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
-- [ ] Owner 勾选 Q1–Q9
-- [ ] Q3 计数（Diupi-Yun）：39 局中换上机会 ≥15 才继续；低于则收口
+- [x] Owner 勾选 Q1–Q9（整包按本文建议；硬门见下）
+- [ ] Q3 计数（Diupi-Yun）：39 局中换上机会 ≥15 才继续；低于则收口；拍板后跑，写回后才允许 TDD
 - [ ] 计数过线之后才允许单测与 `heuristic.py`（另开，不在本 PR）
 - [ ] 一百局种子 `208000..208099`，实验 `experiments/t078-gard-zoro.example.yml`，失败 0；过线见 Q5
 - [ ] 无 `prize_pressure_gate`；无卡名；`prize_race_gate` 的现有撤退/换上行为不改；084 斩杀短路回归仍绿
@@ -49,6 +51,22 @@
 
 081 复活、`prize_pressure_gate` 及任何 pressure 死名、把新行为塞进 `prize_race_gate`、再做一扇落后才撤退/换上的门、`setup_before_chip_gate`、088 的触后目标重选、推迟 `can_ko`、为了磨血重排物品/支援者、改 `pokemon_score` / `factor_prize_diff`、卡名分支、约束沙奈朵发动机、宣称 30.4%、本 PR 改启发式或写测试。100 局持平回滚，不追加第二扇窄门。
 
+## Owner 拍板（2026-10-30 Asia/Shanghai）
+
+**整包按「本文建议」**：Q1–Q9 全部勾选规格/本 task 的「本文建议」列（机制只 P；新字段 `early_prize_keep_gate`；禁止写入 `prize_race_gate`；禁止 081/`prize_pressure_gate`/死名/卡名；不读奖差；087 维持不合；088 不重开）。
+
+### 硬门（Owner 聊天锁定；未达则回滚本步重设计）
+
+1. **Q3 频数门（TDD 之前）**：在 dig 的 **39** 局触及负且首触时已奖杯落后局里，机制 P 的换上「可改人」机会 **≥15/39** 才写测试、才改启发式。低于则 **收口 089**，不写测试、不改 `heuristic.py`。
+2. **100 局主门（TDD 之后，本步不做）**：沙奈朵 `678647` × N索 `690359`，种子 `208000..208099`，基线 post-086 **A69/B31**。要求 **B 胜 ≥34（≥+3pp）且失败 0**。持平定义：A 胜场变化 ≤2 **且** 触及后 WR 抬升 <3pp **且** B prizes ≤16 → **回滚 089、重设计**。
+3. **电电虫否决**：同种子相对 post-086 过冲再 **+≥3pp** → 即使主门过也否决/回滚。
+4. **全矩阵 18000 不是完成条件**。
+
+### 状态
+
+- 文档 PR（#19）下一步合并 main。
+- **TDD 阻塞于 Q3**：本拍板不授权改 `heuristic.py`、不授权写测试，直到 Q3 计数过线并写回。
+
 ## 结果与遗留
 
-待 Owner 勾选 Q 表。未改 `heuristic.py`。未写测试。未跑 Q3。
+拍板已写回。Q3 计数见 `docs/digs/2026-10-30-task-089-q3-frequency.md`（若已生成）。TDD 未开。未改 `heuristic.py`。

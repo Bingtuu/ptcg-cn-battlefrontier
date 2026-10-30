@@ -1,8 +1,8 @@
 # task 085 · 王牌转换质量
 
-> 局级 100 局 + 四格行诊断已回写。待 Owner 拍板是否合并 PR #14。
+> 已合入 main `5a29664`（PR #14）。局级与行诊断见下。
 
-- 状态：**局级已回写，待合并拍板（PR #14）**
+- 状态：**已合入 main `5a29664`（PR #14）**
 - 关联：规格 `docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-085-ace-conversion-quality.md`（Task 2–3 完成；Task 4 未跑）
 - 依赖：083 已合入 main `4262a9f`（PR #12）。084 已收口（Q2=C，main `a3f1937`）。**081 搁置**（PR #10 不合并）
 - 对外中文名：王牌转换质量
@@ -61,4 +61,4 @@ Owner 已选残差方向 A（2026-10-29）：王牌招式被摸到之后要转�
 - 偏差：`test_promote_does_not_prefer_false_copy_ko_under_charm` 按 Q4 保守层改写——护符仍挡住 `can_ko`；转换开时非斩杀层按前瞻伤害抬复制；转换关回到 pokemon_score。
 - **Task 4（2026-10-30 Diupi-Yun）**：`results/t085-gard-zoro.db`，代码 `635c053`。A**69**/B31，失败 0。对照 t080 A78/B22（B prizes 9）与 t083 A72/B28（B prizes 14）。B prizes **16**；暗夜王牌 **293/80**；触及后 B 胜率 **35.0%**（t080 24.3% / t083 32.0%）。相对 t083 翻转 A→B 5 / B→A 2。方向落入 60–70% 带，杠杆未证伪。
 - **Task 5**：`experiments/t085-nzoro-row/` 三份 + 沙奈朵格。多龙 88/12；黑夜 70/30；玛俐 48/52。不设过线。
-- 未做：同格 500、18000、宣称到 30.4%、**合并 PR #14**（待拍板）。
+- 合并：Owner 拍板 A → PR #14 @ `5a29664`。未做：同格 500、18000、宣称到 30.4%。

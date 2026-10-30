@@ -116,6 +116,9 @@ class HeuristicParams:
     # 击杀/拿奖前瞻（task 083，D-083-5/6）。False = 复制与共享出口回到印面。
     # 不进 tune。不改 _attack_table，因此不改非击杀 _pick_attack 的排序。
     ko_prize_lookahead_gate: bool = True
+    # 非斩杀路径是否采用一层复制的前瞻伤害（task 085）。
+    # 不改变 _lethal_attack。不进 tune。关 = 能量/撤退/换上/_pick_attack 回到印面。
+    copy_conversion_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -411,10 +414,27 @@ class HeuristicAgent:
         if not self.params.ko_prize_lookahead_gate:
             return min(acts, key=score_key)
 
+        looks = {
+            act.bench_index: self._ko_prize_lookahead(
+                view, mon=view.own.bench[act.bench_index],
+            )
+            for act in acts
+        }
+        if self.params.copy_conversion_gate and any(
+            look.via == "copy" and (look.best_damage or 0) > 0
+            for look in looks.values()
+        ):
+            def conv_key(act: Action) -> tuple:
+                look = looks[act.bench_index]
+                if look.can_ko:
+                    return (0, *score_key(act))
+                return (1, -(look.best_damage or 0), *score_key(act))
+
+            return min(acts, key=conv_key)
+
         def ko_key(act: Action) -> tuple:
-            mon = view.own.bench[act.bench_index]
-            ko = self._ko_prize_lookahead(view, mon=mon).can_ko
-            return (0 if ko else 1, *score_key(act))
+            look = looks[act.bench_index]
+            return (0 if look.can_ko else 1, *score_key(act))
 
         return min(acts, key=ko_key)
 
@@ -816,18 +836,24 @@ class HeuristicAgent:
         opp = scoring.opponent.active
         own_type = mon.current.card.energy_type
         best = 0
-        for atk in mon.current.card.attacks:
+        for index, atk in enumerate(mon.current.card.attacks):
             if _energy_role(types, atk.cost, add) != "enable":
                 continue
-            est = estimate_attack_damage(
-                scoring, atk.name, atk.damage, mon.current.card, self.card_effects,
-            )
-            dmg = (atk.damage or 0) if est is None else est.amount
-            if opp is not None and dmg:
-                if opp.current.card.weakness and own_type == opp.current.card.weakness:
-                    dmg *= 2
-                if opp.current.card.resistance and own_type == opp.current.card.resistance:
-                    dmg = max(0, dmg - RESISTANCE_AMOUNT)
+            dmg: int | None = None
+            if self.params.copy_conversion_gate:
+                copied = self._one_layer_copy(scoring, index, extra_types=(add,))
+                if copied is not None:
+                    dmg = copied[0]
+            if dmg is None:
+                est = estimate_attack_damage(
+                    scoring, atk.name, atk.damage, mon.current.card, self.card_effects,
+                )
+                dmg = (atk.damage or 0) if est is None else est.amount
+                if opp is not None and dmg:
+                    if opp.current.card.weakness and own_type == opp.current.card.weakness:
+                        dmg *= 2
+                    if opp.current.card.resistance and own_type == opp.current.card.resistance:
+                        dmg = max(0, dmg - RESISTANCE_AMOUNT)
             best = max(best, dmg)
         return best
 
@@ -852,6 +878,19 @@ class HeuristicAgent:
             if look.can_ko:
                 ko_targets.append((look.best_damage or 0, act))
         if not ko_targets:
+            if self.params.copy_conversion_gate:
+                active_dmg = self._ko_prize_lookahead(view).best_damage or 0
+                better: list[tuple[int, Action]] = []
+                for act in acts:
+                    look = self._ko_prize_lookahead(
+                        view, mon=view.own.bench[act.bench_index],
+                    )
+                    if look.via == "copy" and (look.best_damage or 0) > active_dmg:
+                        better.append((look.best_damage or 0, act))
+                if better:
+                    return min(
+                        better, key=lambda item: (-item[0], item[1].bench_index),
+                    )[1]
             return self._pick_retreat_powerless(view, acts)
         return min(ko_targets, key=lambda item: (-item[0], item[1].bench_index))[1]
 
@@ -964,13 +1003,25 @@ class HeuristicAgent:
         _rank, damage, ko, via, index = best
         return KoPrizeLookahead(damage, ko, via, index)
 
+    def _copy_cost_paid(
+        self, mon: InPlayPokemon, cost: tuple[str, ...],
+        extra_types: tuple[str | None, ...],
+    ) -> bool:
+        """付清判断：空 extra 走今天的 `_energy_satisfied`；非空并入属性列表。"""
+        if not extra_types:
+            return _energy_satisfied(mon.attached_energy, cost)
+        types = [e.card.energy_type for e in mon.attached_energy]
+        return _cost_satisfied([*types, *extra_types], cost)
+
     def _one_layer_copy(
-        self, view: VisibleGameState, index: int,
+        self, view: VisibleGameState, index: int, *,
+        extra_types: tuple[str | None, ...] = (),
     ) -> tuple[int, bool] | None:
         """这一招若是已付清的一层 own_bench_attack 复制，返回（伤害, 能否击杀）。
 
         不是这种招式、没文档、或未知 filter → None（调用方维持印面，不猜）。
         供体招式只走 `_copied_strike`，不再展开供体上的 copy_attack。
+        `extra_types` 只模拟多出来的属性（再贴一张），不写回视图。
         """
         if not self.params.ko_prize_lookahead_gate or self.card_effects is None:
             return None
@@ -981,7 +1032,7 @@ class HeuristicAgent:
         if not (0 <= index < len(attacks)):
             return None
         atk = attacks[index]
-        if not _energy_satisfied(active.attached_energy, atk.cost):
+        if not self._copy_cost_paid(active, atk.cost, extra_types):
             return None
         doc = doc_for(self.card_effects, sources[index])
         if doc is None:
@@ -1132,4 +1183,21 @@ class HeuristicAgent:
             ]
             if non_draw:
                 candidates = non_draw
+        if (
+            self.params.copy_conversion_gate
+            and self.params.ko_prize_lookahead_gate
+        ):
+            look = self._ko_prize_lookahead(view)
+
+            def rank(act: Action) -> tuple[int, int]:
+                damage = table[act.attack_index][0]
+                if (
+                    look.via == "copy"
+                    and look.attack_index == act.attack_index
+                    and look.best_damage is not None
+                ):
+                    damage = look.best_damage
+                return (damage, -act.attack_index)
+
+            return max(candidates, key=rank)
         return max(candidates, key=lambda a: (table[a.attack_index][0], -a.attack_index))

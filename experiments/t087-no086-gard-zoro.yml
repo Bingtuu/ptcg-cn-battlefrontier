@@ -1,0 +1,12 @@
+﻿# task 087 contrast: setup_before_chip ON, prize_race (086) OFF
+# Pattern mirrors experiments/t078-gard-zoro-off.yml (params gate flags).
+# Used for Step B acceptance when 087+086 is flat/worse vs A69.
+name: t087-no086-gard-zoro
+games: 100
+seed_start: 208000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic, params: {prize_race_gate: false, setup_before_chip_gate: true}}
+  b: {type: heuristic, params: {prize_race_gate: false, setup_before_chip_gate: true}}

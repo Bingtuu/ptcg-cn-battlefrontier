@@ -1,0 +1,12 @@
+# task 092: 沙奈朵 × N的索罗亚克 500 局（扩样本再定刀；零启发式变更）
+# 对齐正式矩阵该格种子 208000..208499；对照 100 局 t086 A69/B31（208000..208099）
+# bfsim run experiments/t092-gard-zoro-500.yml --workers 16 --results results/t092-gard-zoro-500.db
+name: t092-gard-zoro-500
+games: 500
+seed_start: 208000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = 086 TDD 单元绿（待 100 局 + Owner 合入）；087 未实现**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。Owner 2026-10-30：**086+087 整包按建议**；顺序 **086→087**；开关独立。086=`prize_race_gate`（撤退+换上，禁 081/死名）；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）。对照相对 post-085 **A69**。禁止复活 `prize_pressure_gate`/081。
+**当前焦点 = 086 TDD 绿 + 100 局已回写（相对 A69 **持平**；未合并 PR #16）；087 未实现**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。Owner 2026-10-30：**086+087 整包按建议**；顺序 **086→087**；开关独立。086=`prize_race_gate`（撤退+换上，禁 081/死名）；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）。086 一百局（种子 `208000..208099`，`results/t086-gard-zoro.db`，代码 `fc25648`）：A**69**/B31 失败 0；B prizes **16**；暗夜王牌 **293/80**；触及后 **35.0%** —— 与 post-085 同格 100 局数字一致，**持平**。禁止复活 `prize_pressure_gate`/081。不宣称 30.4%。
 
 **上一刀 task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由该刀关，也不由 085 的文档 PR 关。
 
@@ -47,12 +47,15 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-30 task 086：奖杯节奏 TDD（单元绿 / 100 局 pending）
+### 2026-10-30 task 086：奖杯节奏（TDD 绿 + 100 局持平；未合并）
 
 - **分支**：`cursor/task-086-prize-race-tdd`；字段 `prize_race_gate: bool = True`（不进 tune 10 维）
 - **行为**：落后且路径可见（`via=="copy"` & `best_damage>0` 或 `can_ko`）时，非斩杀撤退/换上窄消费更高复制前瞻；禁任意高印面（081 反例）
 - **TDD**：`tests/test_heuristic_prize_race.py` + 相关套件绿；ruff clean；无 `prize_pressure_gate`；未改 `_lethal_attack` / `pokemon_score` / `factor_prize_diff`
-- **未做**：100 局 bfsim、同格 500、18000、合并、087 实现。不宣称矩阵闭环。
+- **100 局**（Diupi-Yun，`.venv\Scripts\bfsim.exe`，8 workers，`results/t086-gard-zoro.db`，代码 `fc25648`）：失败 **0**；A**69**/B**31**；B prizes **16** / deck_out 3 / no_pokemon 12；暗夜王牌 **293/80**；触及后 B WR **35.0%**
+- **对照**：post-085 100 局 A69/B31 / prizes 16 / 293/80 / 35.0%；t080 A78/B22；t083 A72/B28
+- **方向读（Q7 vs A69）**：**持平**（A 未动；B prizes 未>16；触及后未改善）。不宣称 30.4%
+- **未做**：合并 PR #16、同格 500、18000、087 实现。不宣称矩阵闭环。
 
 ### 2026-10-30 task 086/087：奖杯节奏 + 非斩杀 setup 时序（文档已拍板，待合 PR #15 → 086 TDD）
 

@@ -1,0 +1,13 @@
+﻿# post-085 baseline: 沙奈朵 × N的索罗亚克 500 局（对齐正式矩阵该格种子）
+# 对照：v2-calibration-t080 实验 #17，种子 208000..208499，sim 80.0% / real 30.4%
+# main after PR #14 (copy_conversion_gate). 无 ablation。
+# bfsim run experiments/t085-gard-nzoro-500.yml --workers 16 --results results/t085-gard-nzoro-500.db
+name: t085-gard-nzoro-500
+games: 500
+seed_start: 208000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

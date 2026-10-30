@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 085 TDD unit green，100局 pending Diupi-Yun（王牌转换质量）**。规格 docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md；计划 docs/superpowers/plans/2026-10-29-task-085-ace-conversion-quality.md（Task 2–3 完成；Task 4 未跑）。主刀 B：`copy_conversion_gate=True` 不进 tune；非斩杀能量/撤退/换上/`_pick_attack` 读一层复制前瞻；`_lethal_attack` 维持 084 Q2=C。
+**当前焦点 = task 085 局级已回写，待 Owner 拍板是否合并 PR #14（王牌转换质量）**。规格 docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md；计划 docs/superpowers/plans/2026-10-29-task-085-ace-conversion-quality.md（Task 2–5 完成）。分支 `cursor/task-085-ace-conversion-tdd` @ `635c053` + STATUS/行诊断 YAML。主刀 B：`copy_conversion_gate=True` 不进 tune；非斩杀能量/撤退/换上/`_pick_attack` 读一层复制前瞻；`_lethal_attack` 维持 084 Q2=C。**未合并。**
 
 **上一刀 task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由该刀关，也不由 085 的文档 PR 关。
 
@@ -46,11 +46,33 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
-### 2026-10-30 task 085：王牌转换质量（TDD unit green；100局 pending）
+### 2026-10-30 task 085：王牌转换质量（实现 + Diupi-Yun 100 局 + 四格行诊断；未合并）
 
-- **TDD（Task 2–3，Diupi-Yun）**：`copy_conversion_gate`；`_one_layer_copy(extra_types)`；四个非斩杀消费者。相关套件 94 passed；ruff clean。tune 仍 10 维。`pokemon_score` / `_lethal_attack` 无 diff。
-- **偏差**：`test_promote_does_not_prefer_false_copy_ko_under_charm` 按 Q4 改写（护符仍挡 can_ko；转换开按前瞻伤害；关则回 pokemon_score）。
-- **未做**：100 局（Task 4）、行诊断（Task 5）、18000
+- **PR**：https://github.com/Bingtuu/ptcg-cn-battlefrontier/pull/14 （分支 `cursor/task-085-ace-conversion-tdd`，实现 HEAD `635c053`；本写回叠在其上）
+- **TDD**：相关套件 94 passed；ruff clean。tune 仍 10 维。无 `prize_pressure_gate` / `copy_lethal_policy` / `ABLATION_COPY_NOT_LETHAL` / 卡名分支。`pokemon_score` / `_lethal_attack` 无 diff。
+- **本机 100 局验收**（Diupi-Yun，`experiments/t078-gard-zoro.example.yml`，种子 `208000..208099`，代码 `635c053`，`results/t085-gard-zoro.db`，失败 0）：
+
+| | t080 | t083 | **t085** |
+|---|---|---|---|
+| A / B | 78 / 22 | 72 / 28 | **69 / 31** |
+| B prizes 胜 | 9 | 14 | **16** |
+| B deck_out / no_pokemon 胜 | 3 / 10 | 4 / 10 | 3 / 12 |
+| 暗夜王牌 次数 / 触及局 | 250 / 74 | 262 / 75 | **293 / 80** |
+| 触及后 B 胜率（打出该招的局） | 24.3% | 32.0% | **35.0%** |
+| 相对 t080 翻转 | — | A→B 13 / B→A 7 | A→B 15 / B→A 6 |
+| 相对 t083 翻转 | — | — | A→B 5 / B→A 2（同胜负 93） |
+
+- **方向读（相对 A72，Q7）**：A69 落入 60–70% 方向带；B prizes 16>14；触及后胜率 35% 高于本格整体 B sim 31%（相对 t080 的 24%「贴着」已离开）。**杠杆未证伪**（证伪条件：A≥72 且 B prizes≤14 且触及后仍贴整体）。不宣称 30.4%。
+- **Task 5 行诊断**（N索为 B，各 100 局，种子同，失败 0；不设过线、不作正式矩阵 Δ）：
+
+| A 侧 | A / B | B prizes | 暗夜王牌 次/局 | 触及后 B WR |
+|---|---|---|---|---|
+| 沙奈朵（Task 4） | 69 / 31 | 16 | 293 / 80 | 35.0% |
+| 多龙 `677868` | 88 / 12 | 3 | 144 / 51 | 17.6% |
+| 黑夜魔灵 `676344` | 70 / 30 | 10 | 350 / 74 | 31.1% |
+| 玛俐 `687339` | 48 / 52 | 25 | 360 / 77 | 63.6% |
+
+- **未做**：同格 500、18000、合并 PR #14。待 Owner 拍板合否。
 
 ### 2026-10-30 task 085：王牌转换质量（Q 已拍，docs 待合）
 

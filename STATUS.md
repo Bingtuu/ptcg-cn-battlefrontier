@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = 086 TDD 绿 + 100 局已回写（相对 A69 **持平**；未合并 PR #16）；087 未实现**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。Owner 2026-10-30：**086+087 整包按建议**；顺序 **086→087**；开关独立。086=`prize_race_gate`（撤退+换上，禁 081/死名）；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）。086 一百局（种子 `208000..208099`，`results/t086-gard-zoro.db`，代码 `fc25648`）：A**69**/B31 失败 0；B prizes **16**；暗夜王牌 **293/80**；触及后 **35.0%** —— 与 post-085 同格 100 局数字一致，**持平**。禁止复活 `prize_pressure_gate`/081。不宣称 30.4%。
+**当前焦点 = 086 已合入 main cd67311（PR #16）；100局相对 post-085 持平 A69；下一刀 087 TDD 绿 / 100 局待跑**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。Owner 2026-10-30：**086+087 整包按建议**；顺序 **086→087**；开关独立。086=`prize_race_gate`（撤退+换上，禁 081/死名）；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）。086 一百局（种子 `208000..208099`，`results/t086-gard-zoro.db`，代码 `fc25648`）：A**69**/B31 失败 0；B prizes **16**；暗夜王牌 **293/80**；触及后 **35.0%** —— 与 post-085 同格 100 局数字一致，**持平**。禁止复活 `prize_pressure_gate`/081。不宣称 30.4%。
 
 **上一刀 task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由该刀关，也不由 085 的文档 PR 关。
 
@@ -47,7 +47,16 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-30 task 086：奖杯节奏（TDD 绿 + 100 局持平；未合并）
+### 2026-10-30 task 087：非斩杀 setup 时序（TDD 绿；100 局待跑）
+
+- **前置**：086 已合入 main cd67311（PR #16）；相对 post-085 100局 **持平 A69**
+- **分支**：cursor/task-087-setup-before-chip-tdd；字段 setup_before_chip_gate: bool = True（不进 tune 10 维）
+- **行为**：路径可见（via=="copy" 且 best_damage>0）且非 can_ko 时，_setup_value(E+S+H) > chip 则先训练家；否则跳过零价值后挥砍。**永不 defer can_ko**（084 Q2=C）
+- **TDD**：	ests/test_heuristic_setup_before_chip.py + 相关套件绿；ruff clean；无 prize_pressure_gate；未改 _lethal_attack / pokemon_score / factor_prize_diff
+- **未做**：100 局、合并 PR、同格 500、18000、bfsim
+
+
+### 2026-10-30 task 086：奖杯节奏（TDD 绿 + 100 局持平；已合入 main cd67311 / PR #16）
 
 - **分支**：`cursor/task-086-prize-race-tdd`；字段 `prize_race_gate: bool = True`（不进 tune 10 维）
 - **行为**：落后且路径可见（`via=="copy"` & `best_damage>0` 或 `can_ko`）时，非斩杀撤退/换上窄消费更高复制前瞻；禁任意高印面（081 反例）

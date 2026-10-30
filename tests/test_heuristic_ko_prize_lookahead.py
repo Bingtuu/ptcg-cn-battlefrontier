@@ -155,14 +155,20 @@ def test_gate_off_lookahead_stays_on_print():
 def test_owner_filter_ignores_non_matching_ko():
     """N 供体只有 10 伤。非 N 的 400 伤不进复制池。
 
-    路人费用未付清，078 不会因为它的印面击杀而撤退；若复制池漏进它，
-    会走 attack。正确口径仍先打支援者。
+    若复制池漏进路人会 can_ko。正确口径：lookahead 不击杀。
+    task 087 下路径可见时跳过零价值支援者攻击；门关回到先支援者。
     """
     donor = _mon("供体", owner="N", hp=100, damage=10, cost=())
     decoy = _mon("路人", owner="别人", hp=100, damage=400, cost=("无", "无"))
     state = _base(donor=donor, decoy=decoy, opp_hp=100, hand=(inst(61, _supporter()),))
-    act = _observe(state)
-    assert act == Action(kind="play_trainer", iid=61)
+    agent, view = _agent_view(state)
+    look = agent._ko_prize_lookahead(view)
+    assert look.can_ko is False
+    assert look.best_damage == 10
+    assert look.via == "copy"
+    assert _observe(state) == Action(kind="attack", attack_index=0)
+    off = HeuristicParams(setup_before_chip_gate=False)
+    assert _observe(state, off) == Action(kind="play_trainer", iid=61)
 
 
 def test_no_doc_on_agent_does_not_guess():

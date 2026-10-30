@@ -122,6 +122,8 @@ class HeuristicParams:
     # 奖杯节奏（task 086）：路径可见后用奖差微调非斩杀撤退/换上。
     # 不进 tune。禁止 prize_pressure_gate。不改 _lethal_attack。
     prize_race_gate: bool = True
+    # task 087: nonlethal setup vs chip. Not in tune. Never defer can_ko.
+    setup_before_chip_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -195,6 +197,9 @@ _CYCLE_ABILITY_VALUE = 8.0
 _ATTACH_PROGRESS_VALUE = 18.0
 _ATTACH_ENABLE_VALUE = 30.0
 _ACTIVE_ATTACH_BONUS = 5.0
+_SETUP_ENABLE_KO_VALUE = 10000.0
+_SETUP_HEAL_SURVIVE_VALUE = 10000.0
+_SETUP_SEARCH_ENABLE_KO_VALUE = 10000.0
 _ENERGY_KEEP_SCORE = 1.0
 _TRAINER_KEEP_SCORE = 3.0
 
@@ -654,22 +659,35 @@ class HeuristicAgent:
             picked = self._pick_retreat(view, acts)
             if picked is not None:
                 return picked
+        items: list[Action] = []
         if self.params.play_items:
             items = [a for a in by_kind.get("play_trainer", [])
                      if hand[a.iid].card.trainer_subtype == "物品"]
-            if deck_low:  # D-032-6：含 draw 节点物品抑制（跳过该卡，继续排序）
+            if deck_low:
                 items = [a for a in items
                          if not card_has_draw(hand[a.iid].card, self.card_effects)]
-            if items:
-                return min(items, key=lambda a: a.iid)
+        supporters: list[Action] = []
         if self.params.play_supporters:
             supporters = [a for a in by_kind.get("play_trainer", [])
                           if hand[a.iid].card.trainer_subtype == "支援者"]
-            if deck_low:  # D-032-6：含 draw 节点支援者抑制
+            if deck_low:
                 supporters = [a for a in supporters
                               if not card_has_draw(hand[a.iid].card, self.card_effects)]
-            if supporters:
-                return min(supporters, key=lambda a: a.iid)
+        trainers = items + supporters
+        if trainers and self._setup_before_chip_active(view):
+            chip = self._chip_value(view)
+            scored = [(self._setup_value(view, a), a) for a in trainers]
+            best = max(
+                ((v, a) for v, a in scored if v > chip),
+                default=None,
+                key=lambda va: (va[0], -(va[1].iid or 0)),
+            )
+            if best is not None:
+                return best[1]
+        elif items:
+            return min(items, key=lambda a: a.iid)
+        elif supporters:
+            return min(supporters, key=lambda a: a.iid)
         if self.params.play_stadiums and (acts := by_kind.get("play_stadium")):
             return min(acts, key=lambda a: a.iid)
         if acts := by_kind.get("use_stadium"):
@@ -1198,6 +1216,202 @@ class HeuristicAgent:
     def _attack_damage_table(self, view: VisibleGameState) -> list[int]:
         """各招式对对手战斗场的有效伤害（_attack_table 的伤害投影）。"""
         return [dmg for dmg, _ in self._attack_table(view)]
+
+
+    def _setup_before_chip_active(self, view: VisibleGameState) -> bool:
+        """Gate on + copy path paid&visible + not can_ko (Q2/Q5/Q6)."""
+        if not self.params.setup_before_chip_gate:
+            return False
+        look = self._ko_prize_lookahead(view)
+        if look.can_ko:
+            return False
+        return look.via == "copy" and (look.best_damage or 0) > 0
+
+    def _chip_value(self, view: VisibleGameState) -> float:
+        """Effective damage of upcoming _pick_attack (085 includes copy)."""
+        look = self._ko_prize_lookahead(view)
+        if (
+            self.params.copy_conversion_gate
+            and self.params.ko_prize_lookahead_gate
+            and look.via == "copy"
+            and look.best_damage is not None
+        ):
+            return float(look.best_damage)
+        table = self._attack_table(view)
+        active = view.own.active
+        if active is None or not table:
+            return 0.0
+        best = 0
+        attacks, _sources = self._attack_sources(view)
+        for index, (dmg, _ok) in enumerate(table):
+            if index >= len(attacks):
+                continue
+            if not _energy_satisfied(active.attached_energy, attacks[index].cost):
+                continue
+            best = max(best, dmg)
+        return float(best)
+
+    def _trainer_on_play(self, card: CardDef) -> Effect | None:
+        if self.card_effects is None:
+            return None
+        doc = doc_for(self.card_effects, card)
+        if doc is None:
+            return None
+        return next((e for e in doc.effects if e.trigger == "on_play"), None)
+
+    def _setup_value(self, view: VisibleGameState, action: Action) -> float:
+        """E+S+H narrow score; unknown/irrelevant = 0."""
+        if action.iid is None:
+            return 0.0
+        hand = {c.iid: c for c in view.own.hand}
+        card = hand.get(action.iid)
+        if card is None:
+            return 0.0
+        effect = self._trainer_on_play(card.card)
+        if effect is None:
+            return 0.0
+        return max(
+            self._setup_e_value(view, effect),
+            self._setup_s_value(view, effect),
+            self._setup_h_value(view, effect),
+        )
+
+    def _setup_e_value(self, view: VisibleGameState, effect: Effect) -> float:
+        """E: attach energy enabling paid print/copy; can_ko scores highest."""
+        best = 0.0
+        active = view.own.active
+        for _phase, node in flatten_steps(effect):
+            if node.action != "attach_energy" or node.destination != "attach":
+                continue
+            if node.selector == "own_discard" and not any(
+                c.card.supertype == Supertype.ENERGY and c.card.is_basic_energy
+                for c in view.own.discard
+            ):
+                continue
+            add = _energy_symbol(node)
+            pool = node.args.get("target_pool", "own_pokemon_in_play")
+            if pool == "self":
+                mons = [active] if active is not None else []
+            elif pool == "own_bench":
+                mons = list(view.own.bench)
+            else:
+                mons = _in_play(view.own.active, view.own.bench)
+            filters = tuple(node.args.get("target_filters", ()))
+            for mon in mons:
+                if mon is None:
+                    continue
+                if filters:
+                    try:
+                        if not matches_in_play(mon, filters):
+                            continue
+                    except DslError:
+                        continue
+                if _mon_energy_role(mon, add) != 0:
+                    continue
+                scoring = self._view_as_active(view, mon)
+                enabled_ko = False
+                enabled_dmg = 0
+                for index, atk in enumerate(mon.current.card.attacks):
+                    types = [e.card.energy_type for e in mon.attached_energy]
+                    if _energy_role(types, atk.cost, add) != "enable":
+                        continue
+                    copied = self._one_layer_copy(scoring, index, extra_types=(add,))
+                    if copied is not None:
+                        dmg, ko = copied
+                    else:
+                        table = self._attack_table(scoring)
+                        dmg = table[index][0] if index < len(table) else (atk.damage or 0)
+                        rem = self._ko_remaining(view, view.opponent.active)
+                        ko = rem is not None and dmg >= rem
+                    enabled_dmg = max(enabled_dmg, dmg)
+                    if ko:
+                        enabled_ko = True
+                if enabled_ko:
+                    best = max(best, _SETUP_ENABLE_KO_VALUE)
+                elif enabled_dmg > 0:
+                    best = max(best, float(enabled_dmg))
+        return best
+
+    def _setup_s_value(self, view: VisibleGameState, effect: Effect) -> float:
+        """S: basic_energy search that enables next can_ko; pure draw = 0."""
+        if self._deck_low(view):
+            return 0.0
+        has_energy_search = False
+        for _phase, node in flatten_steps(effect):
+            if node.action == "search_deck" and "basic_energy" in tuple(node.filters or ()):
+                has_energy_search = True
+        if not has_energy_search:
+            return 0.0
+        for mon in _in_play(view.own.active, view.own.bench):
+            if _mon_energy_role(mon, None) != 0:
+                continue
+            scoring = self._view_as_active(view, mon)
+            for index, atk in enumerate(mon.current.card.attacks):
+                types = [e.card.energy_type for e in mon.attached_energy]
+                if _energy_role(types, atk.cost, None) != "enable":
+                    continue
+                copied = self._one_layer_copy(scoring, index, extra_types=(None,))
+                if copied is not None:
+                    _dmg, ko = copied
+                    if ko:
+                        return _SETUP_SEARCH_ENABLE_KO_VALUE
+                else:
+                    table = self._attack_table(scoring)
+                    dmg = table[index][0] if index < len(table) else (atk.damage or 0)
+                    rem = self._ko_remaining(view, view.opponent.active)
+                    if rem is not None and dmg >= rem:
+                        return _SETUP_SEARCH_ENABLE_KO_VALUE
+        return 0.0
+
+    def _setup_h_value(self, view: VisibleGameState, effect: Effect) -> float:
+        """H: heal so own active survives opponent paid KO."""
+        active = view.own.active
+        opp = view.opponent.active
+        if active is None or opp is None:
+            return 0.0
+        opp_dmg = self._opponent_paid_damage(view)
+        if opp_dmg <= 0:
+            return 0.0
+        remaining = self._ko_remaining(view, active)
+        if remaining is None or remaining > opp_dmg:
+            return 0.0
+        heal_amt = 0
+        for _phase, node in flatten_steps(effect):
+            if node.action != "heal":
+                continue
+            amount = node.args.get("amount")
+            if not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
+                continue
+            sel = node.selector
+            if sel in ("own_active", "all_pokemon_both", "own_pokemon_in_play", None):
+                heal_amt = max(heal_amt, amount)
+        if heal_amt <= 0:
+            return 0.0
+        actual = min(heal_amt, active.damage)
+        if remaining + actual > opp_dmg:
+            return _SETUP_HEAL_SURVIVE_VALUE
+        return 0.0
+
+    def _opponent_paid_damage(self, view: VisibleGameState) -> int:
+        """Max paid print damage from opponent active (no opp copy guess)."""
+        opp = view.opponent.active
+        if opp is None:
+            return 0
+        own = view.own.active
+        best = 0
+        for atk in opp.current.card.attacks:
+            if not _energy_satisfied(opp.attached_energy, atk.cost):
+                continue
+            dmg = atk.damage or 0
+            if own is not None and dmg:
+                opp_type = opp.current.card.energy_type
+                if own.current.card.weakness and opp_type == own.current.card.weakness:
+                    dmg *= 2
+                if own.current.card.resistance and opp_type == own.current.card.resistance:
+                    dmg = max(0, dmg - RESISTANCE_AMOUNT)
+            best = max(best, dmg)
+        return best
+
 
     def _lethal_attack(self, view: VisibleGameState, acts: list[Action]) -> Action | None:
         """斩杀检测：能直接昏厥对手战斗场的招式，取有效伤害最高者（tie 取下标小者）。

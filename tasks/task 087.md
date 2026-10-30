@@ -1,5 +1,7 @@
 # task 087 · 非斩杀 setup 时序
 
+> **进展（2026-10-30）**：TDD 绿（setup_before_chip_gate）；086 已合入 main cd67311（PR #16）；100 局待跑。不跑 bfsim、不合并。
+
 > 文档已拍板（2026-10-30 整包按本文建议）。不改 `heuristic.py`。不得破坏 084 Q2=C。
 
 - 状态：**已拍板**（2026-10-30 整包按本文建议）（docs PR：`cursor/task-086-087-docs`）

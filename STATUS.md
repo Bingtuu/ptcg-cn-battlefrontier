@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 093 Q3 PASS（2026-10-30 Asia/Shanghai）：首触转化×时序混合 / convert+timing hybrid。** 机制只 **R**（`convert_timing_hybrid_gate` 不进 tune）。**Q3 = PASS 49/236**（权威分母 236；R would-change ≥15）。证据 dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`；摘要 `results/t093-q3-frequency.json`。**下一闸 = TDD**：另开实现 `convert_timing_hybrid_gate`（先红测，再改 `_decide_main`）；**本步未开 TDD、未改 heuristic**。硬接受仍锁定：100 局种子 `208000..208099` **B≥34 且失败 0，否则回滚**（基线 A69/B31）；电电虫 **≥+3pp** 否决；18000 非完成；冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
+**当前焦点 = task 093 TDD 已落地（2026-10-30）：首触转化×时序混合 / convert+timing hybrid。** 机制只 **R**。`convert_timing_hybrid_gate: bool = True`，不进 tune。插在 `_decide_main` 的 `_pick_attack` 之前：落后且本步一层 `copy_attack`（`own_bench_attack`）有效伤害为 0、且不能斩杀时，`place_bench` 放上 `matches_in_play` 通过且 `_copied_strike>0` 的基础（高伤优先，平手 iid 小）。关闸回到今天的攻击。**Q3 = PASS 49/236**（权威分母 236；证据 dig `docs/digs/2026-10-30-task-093-q3-frequency.md`）。**100 局未跑**（种子 `208000..208099`，硬接受仍 **B≥34 且失败 0，否则回滚**，基线 A69/B31；电电虫 **≥+3pp** 否决；18000 非完成）。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
 
 
 
@@ -47,6 +47,13 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-30 task 093：TDD `convert_timing_hybrid_gate`（未跑 100 局）
+
+- **前置**：Q3 已在 main `57e86f4` 写回 **PASS 49/236**（分母 236）。本步先红测，再改 `_decide_main`。
+- **行为**：落后（`own.prizes_count > opponent.prizes_count`）且 `_pick_attack` 将打出已付清的一层 `own_bench_attack` 复制、有效伤害为 0、不能斩杀时，返回合格 `place_bench`。有效伤害与 Q3 脚本同口径：`_one_layer_copy` 有结果用该伤害，否则用印面表。多张基础取 `_copied_strike` 最高，平手 iid 小。关闸 = 今天的攻击。
+- **不动**：`_lethal_attack`、`_pick_choose`、`_pick_promote`、`_pick_retreat`、`_pick_ability`、支援者序。不写入 `prize_race_gate` 或其他已有闸。无卡名。无 `prize_pressure_gate`。
+- **未做**：100 局 `208000..208099`、电电虫否决、18000。硬接受仍 **B≥34 且失败 0，否则回滚**。不宣称 30.4%。
 
 ### 2026-10-30 task 093：Q3 频数门 PASS 49/236（未开 TDD）
 

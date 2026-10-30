@@ -1,8 +1,8 @@
 # task 093 · 首触转化×时序混合
 
-> **Q3 PASS**（2026-10-30 Asia/Shanghai：Q1–Q9 曾整包按本文建议；Q3 **49/236 PASS**）。下一闸 = TDD `convert_timing_hybrid_gate`（另开；本步未开）。088/089/090/091 均已按各自 Q3 收口。禁止重开那四道机制与字段。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死供体或王牌。**不宣称 30.4%。**
+> **Q3 PASS 49/236**。TDD 已落地：`convert_timing_hybrid_gate` 插在 `_decide_main` 的 `_pick_attack` 之前。**100 局未跑。** 088/089/090/091 均已按各自 Q3 收口。禁止重开那四道机制与字段。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死供体或王牌。**不宣称 30.4%。**
 
-- 状态：**Q3 PASS**（2026-10-30 Asia/Shanghai；**49/236**；TDD 未开，下一闸 = 另开实现 `convert_timing_hybrid_gate`）
+- 状态：**TDD 已落地**（2026-10-30；Q3 **49/236 PASS**；`convert_timing_hybrid_gate` 默认开、不进 tune；100 局未跑）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-093-convert-timing-hybrid-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-093-convert-timing-hybrid.md`（停在文档）
 - 依赖：092 dig `docs/digs/2026-10-30-task-092-expand-sample.md`（库 `results/t092-gard-zoro-500.db` @ `af0b04d+dirty`，不在本仓库）。088 **1/40**、089 **0/39**、090 **0/40**、091 **0/52**。
 - 对外中文名：首触转化×时序混合
@@ -42,9 +42,9 @@
 - [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
 - [x] Owner 勾选 Q1–Q9（整包按本文建议；硬门见规格 §5.1）
 - [x] Q3 计数（Diupi-Yun，`results/t092-gard-zoro-500.db`）：**49/236 PASS**（门槛 ≥15）；dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`
-- [ ] 计数过线后才允许单测与 heuristic（另开）
-- [ ] 100 局种子 `208000..208099`；B≥34 且失败 0，否则回滚
-- [ ] 无卡名；无 `prize_pressure_gate`；084 斩杀仍绿
+- [x] 单测与 heuristic：`convert_timing_hybrid_gate`，`_decide_main` 在 `_pick_attack` 之前放合格基础
+- [ ] 100 局种子 `208000..208099`；B≥34 且失败 0，否则回滚（本实现 PR 不跑）
+- [x] 无卡名；无 `prize_pressure_gate`；084 斩杀仍绿（复制斩杀仍先于支援者 / place_bench）
 
 ## 明确不做
 
@@ -66,8 +66,8 @@
 
 ### 状态
 
-拍板已写回。**Q3 PASS 49/236**。下一闸 = TDD（另开 `convert_timing_hybrid_gate`；先红测）。本步未写测试、未改 `heuristic.py`、未跑 100 局。硬接受仍 **B≥34 且失败 0，否则回滚**。不宣称 30.4%。
+拍板已写回。**Q3 PASS 49/236**。TDD 已落地（先红测，再改 `_decide_main`）。100 局未跑。硬接受仍 **B≥34 且失败 0，否则回滚**。不宣称 30.4%。
 
 ## 结果与遗留
 
-Q3 **49/236 PASS**（`docs/digs/2026-10-30-task-093-q3-frequency.md`）。TDD 未开。未改 `heuristic.py`。硬接受仍锁定 B≥34/失败 0，否则回滚。
+Q3 **49/236 PASS**（`docs/digs/2026-10-30-task-093-q3-frequency.md`）。TDD：`tests/test_heuristic_convert_timing_hybrid.py` + `convert_timing_hybrid_gate`（默认 True，不进 tune）。关闸、打平、领先、正伤害芯片、斩杀、撤退、物品、支援者维持今天。**100 局未跑**（Diupi）。硬接受仍锁定 B≥34/失败 0，否则回滚。不宣称 30.4%。

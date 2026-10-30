@@ -1,7 +1,7 @@
 # task 093 · 首触转化×时序混合
 
 - 日期：2026-10-30
-- 状态：**Q3 PASS 49/236**（2026-10-30 Asia/Shanghai；Q1–Q9 曾整包按本节「本文建议」）。下一闸 = TDD `convert_timing_hybrid_gate`（另开；本写回未改 `heuristic.py`）。硬接受仍 B≥34 且失败 0，否则回滚。不宣称 30.4%。证据 dig `docs/digs/2026-10-30-task-093-q3-frequency.md`。
+- 状态：**Q3 PASS 49/236**；TDD 已落地（`convert_timing_hybrid_gate`，`_decide_main` 在 `_pick_attack` 之前）。100 局未跑。硬接受仍 B≥34 且失败 0，否则回滚。不宣称 30.4%。证据 dig `docs/digs/2026-10-30-task-093-q3-frequency.md`。
 - 前置：092 同格 500 已验（A344/B156，失败 0）。088 Q3 **1/40**、089 **0/39**、090 **0/40**、091 **0/52** 维持收口。086 `prize_race_gate` 在 main。087 不合。081 搁置。
 - 权威：一期 PRD D10（通用启发式，不为单卡组写死）。078 Q4 / 083 Q9（不读血月减费）继续有效。
 - 证据：`docs/digs/2026-10-30-task-092-expand-sample.md`。库 `results/t092-gard-zoro-500.db`（Diupi-Yun，不入库），代码 `af0b04d+dirty`，种子 `208000..208499`。本会话未打开该库，数字只抄 dig。
@@ -165,7 +165,7 @@
 ### 5.4 Q3 写回（2026-10-30 Asia/Shanghai）
 
 - [x] **Q3 PASS 49/236**（权威分母 236；门槛 ≥15）。dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`；JSON `results/t093-q3-frequency.json`。
-- [ ] 下一闸 = **TDD** 实现 `convert_timing_hybrid_gate`（另开 PR：先红测，再改 `_decide_main`）。本写回步 **未改** `heuristic.py`、未写测试、未跑 100 局。
+- [x] **TDD** `convert_timing_hybrid_gate`（先红测，再在 `_decide_main` 的 `_pick_attack` 之前插入 R）。100 局未跑。Q3 写回步本身未改 `heuristic.py`。
 - 硬接受仍：**B≥34 且失败 0，否则回滚**；电电虫 ≥+3pp 否决；18000 非完成；**不宣称 30.4%。**
 
 ## 6. 还没钉死的点
@@ -184,4 +184,4 @@
 
 ## 8. 实现入口
 
-Q1–Q9 已按「本文建议」锁定。**Q3 PASS 49/236**。下一闸另开实现 PR：先红测，再在 `_decide_main` 的最后一档攻击之前加 R。本写回步不改 `heuristic.py`、不开 TDD。硬接受仍 B≥34/失败 0，否则回滚；不宣称 30.4%。
+Q1–Q9 已按「本文建议」锁定。**Q3 PASS 49/236**。TDD 已落地：先红测，再在 `_decide_main` 的最后一档攻击之前加 R（`convert_timing_hybrid_gate`，默认开，不进 tune）。100 局未跑。硬接受仍 B≥34/失败 0，否则回滚；不宣称 30.4%。

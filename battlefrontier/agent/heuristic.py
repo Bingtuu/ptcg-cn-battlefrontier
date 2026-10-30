@@ -42,6 +42,7 @@ from battlefrontier.dsl.schema import ActionNode, Effect
 from battlefrontier.engine.actions import Action
 from battlefrontier.engine.core import _energy_satisfied, resolve_tool_attacks
 from battlefrontier.engine.state import (
+    AttackDef,
     CardDef,
     CardInstance,
     InPlayPokemon,
@@ -122,6 +123,10 @@ class HeuristicParams:
     # 奖杯节奏（task 086）：路径可见后用奖差微调非斩杀撤退/换上。
     # 不进 tune。禁止 prize_pressure_gate。不改 _lethal_attack。
     prize_race_gate: bool = True
+    # 首触转化×时序混合（task 093）：落后且即将打出有效伤害为 0 的一层
+    # own_bench_attack 复制时，先 place_bench 放上过滤通过且复制伤害 >0 的基础。
+    # 不进 tune。禁止 prize_pressure_gate。不改 _lethal_attack。
+    convert_timing_hybrid_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -675,6 +680,11 @@ class HeuristicAgent:
         if acts := by_kind.get("use_stadium"):
             return acts[0]
         if acts := by_kind.get("attack"):
+            # task 093：只替换「已经走到 0 伤一层复制」的这一步。前面的分支
+            # （含斩杀、撤退、物品、支援者）都没返回，才看 place_bench。
+            placed = self._convert_timing_hybrid_place(view, acts, by_kind)
+            if placed is not None:
+                return placed
             return self._pick_attack(view, acts)
         fallback = by_kind.get("end_turn")
         return fallback[0] if fallback else min(
@@ -1213,6 +1223,104 @@ class HeuristicAgent:
             if act.attack_index == look.attack_index:
                 return act
         return None
+
+    def _own_bench_copy_node(
+        self, view: VisibleGameState, index: int,
+    ) -> tuple[AttackDef, ActionNode] | None:
+        """这一招若是一层 own_bench_attack 复制，返回 (招式, 节点)；否则 None。"""
+        if self.card_effects is None:
+            return None
+        active = view.own.active
+        if active is None:
+            return None
+        attacks, sources = self._attack_sources(view)
+        if not (0 <= index < len(attacks)):
+            return None
+        atk = attacks[index]
+        doc = doc_for(self.card_effects, sources[index])
+        if doc is None:
+            return None
+        effect = find_attack_effect(doc, atk.name)
+        if effect is None:
+            return None
+        node = next(
+            (
+                step for _phase, step in flatten_steps(effect)
+                if step.action == "copy_attack" and step.selector == "own_bench_attack"
+            ),
+            None,
+        )
+        if node is None:
+            return None
+        return atk, node
+
+    def _effective_copy_zero(self, view: VisibleGameState, attack_index: int) -> bool:
+        """这一招是已付清的一层复制，且有效伤害为 0、不能斩杀。
+
+        与 Q3 计数同口径：`_one_layer_copy` 有结果时用它的伤害；返回 None
+        （没供体 / 前瞻闸关 / 过滤读不懂）时用印面表。
+        """
+        pair = self._own_bench_copy_node(view, attack_index)
+        if pair is None:
+            return False
+        atk, _node = pair
+        active = view.own.active
+        if active is None or not _energy_satisfied(active.attached_energy, atk.cost):
+            return False
+        copied = self._one_layer_copy(view, attack_index)
+        if copied is not None:
+            damage, ko = copied
+        else:
+            damage, lethal_ok = self._attack_table(view)[attack_index]
+            remaining = self._ko_remaining(view, view.opponent.active)
+            ko = bool(lethal_ok and remaining is not None and damage >= remaining)
+        return (not ko) and damage == 0
+
+    def _convert_timing_hybrid_place(
+        self, view: VisibleGameState, attacks: list[Action],
+        by_kind: dict[str, list[Action]],
+    ) -> Action | None:
+        """落后且 _pick_attack 将打出 0 伤一层复制时，放上合格基础。关闸返回 None。"""
+        if not self.params.convert_timing_hybrid_gate:
+            return None
+        if view.own.prizes_count <= view.opponent.prizes_count:
+            return None
+        picked = self._pick_attack(view, attacks)
+        pair = self._own_bench_copy_node(view, picked.attack_index)
+        if pair is None or not self._effective_copy_zero(view, picked.attack_index):
+            return None
+        return self._best_hybrid_bench(view, by_kind.get("place_bench", []), pair[1])
+
+    def _best_hybrid_bench(
+        self, view: VisibleGameState, place_acts: list[Action], node: ActionNode,
+    ) -> Action | None:
+        """合法 place_bench 里，过滤通过且最高复制伤害 >0 的基础。高伤优先，平手 iid 小。"""
+        if not place_acts:
+            return None
+        hand = {c.iid: c for c in view.own.hand}
+        filters = tuple(node.filters)
+        candidates: list[tuple[int, int, Action]] = []
+        for act in place_acts:
+            card = hand.get(act.iid) if act.iid is not None else None
+            if card is None or card.card.stage != 0:
+                continue
+            temp = InPlayPokemon(stack=(card,))
+            try:
+                ok = matches_in_play(temp, filters)
+            except DslError:
+                continue
+            if not ok:
+                continue
+            strike = 0
+            for idx in range(len(card.card.attacks)):
+                dmg, _ko = self._copied_strike(view, temp, idx)
+                strike = max(strike, dmg)
+            if strike <= 0 or act.iid is None:
+                continue
+            candidates.append((strike, act.iid, act))
+        if not candidates:
+            return None
+        return min(candidates, key=lambda item: (-item[0], item[1]))[2]
 
     def _pick_attack(self, view: VisibleGameState, acts: list[Action]) -> Action:
         """无斩杀时取有效伤害最高的招式（tie 取下标小者）。

@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = 086 TDD 绿 + 100 局已回写（相对 A69 **持平**；未合并 PR #16）；087 未实现**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。Owner 2026-10-30：**086+087 整包按建议**；顺序 **086→087**；开关独立。086=`prize_race_gate`（撤退+换上，禁 081/死名）；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）。086 一百局（种子 `208000..208099`，`results/t086-gard-zoro.db`，代码 `fc25648`）：A**69**/B31 失败 0；B prizes **16**；暗夜王牌 **293/80**；触及后 **35.0%** —— 与 post-085 同格 100 局数字一致，**持平**。禁止复活 `prize_pressure_gate`/081。不宣称 30.4%。
+**当前焦点 = main 已合 086（`prize_race_gate` @ `cd67311` / PR #16）；087 TDD 曾在 closed PR #17（`setup_before_chip_gate`）上绿并跑过 100 局，但 Owner 拍板 **A：不合 #17**；086 保留不回退。087 一百局相对 A69 **持平**；关 086 对照与 Step A **零差 / 0 种子翻转**。阶段仍锁定：贴近真实策略/结果。下一刀残差 **待拍板**（不发明新 task 号、不实现）。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。086=`prize_race_gate`（撤退+换上，禁 081/死名）已在 main；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）**不合**。087 ON+086 ON（种子 `208000..208099`，`results/t087-gard-zoro.db`，代码 `9bdbe0c`）：A**68**/B32 失败 0；B prizes **15**；暗夜王牌 **281/80**；触及后 **36.2%** —— vs post-085/t086 A69 **持平**（A−1 噪声）。087 ON+086 OFF（YAML params only）：同数 / **0 种子翻转** → 本 100 种子上 086 无增量。禁止复活 `prize_pressure_gate`/081。不宣称 30.4%。
 
 **上一刀 task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由该刀关，也不由 085 的文档 PR 关。
 
@@ -46,8 +46,22 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
+### 2026-10-30 task 087：非斩杀 setup 时序（TDD 绿 + 100 局持平；Owner A 不合 #17；086 保留）
 
-### 2026-10-30 task 086：奖杯节奏（TDD 绿 + 100 局持平；未合并）
+- **前置**：086 已合入 main `cd67311`（PR #16）；相对 post-085 100 局 **持平 A69**
+- **分支 / PR**：`cursor/task-087-setup-before-chip-tdd` @ `99aed10`（实现代码 `9bdbe0c`）；PR #17 **closed / 未合并**（https://github.com/Bingtuu/ptcg-cn-battlefrontier/pull/17）
+- **字段**：`setup_before_chip_gate: bool = True`（不进 tune 10 维；**未进 main**）
+- **行为（分支上，未合）**：路径可见（`via=="copy"` 且 `best_damage>0`）且非 `can_ko` 时，`_setup_value`(E+S+H) > chip 则先训练家；否则跳过零价值后挥砍。**永不 defer can_ko**（084 Q2=C）
+- **TDD（分支）**：`tests/test_heuristic_setup_before_chip.py` + 相关套件绿；ruff clean；无 `prize_pressure_gate`；未改 `_lethal_attack` / `pokemon_score` / `factor_prize_diff`
+- **100 局 Step A**（Diupi-Yun，`.venv\Scripts\bfsim.exe`，8 workers，`results/t087-gard-zoro.db`，代码 `9bdbe0c`，087 ON + 086 ON）：失败 **0**；A**68**/B**32**；B prizes **15** / deck_out 4 / no_pokemon 13；暗夜王牌 **281/80**；触及后 B WR **36.2%**（29/80）；种子 `208000..208099`
+- **对照**：post-085/t086 A69/B31 / prizes 16 / 293/80 / 35.0%；相对 A69 种子翻转 5 局净 −1
+- **方向读（Q7 vs A69）**：**持平**（A 69→68 噪声；B prizes≤16；触及后仅 +1.2pp）。不宣称 30.4%
+- **Step B no086 对照**（持平后；YAML params only，**未改** `heuristic.py`）：`experiments/t087-no086-gard-zoro.yml` params `prize_race_gate: false` + `setup_before_chip_gate: true`；`results/t087-no086-gard-zoro.db`；A**68**/B32 / prizes 15 / 281/80 / 36.2%；与 Step A **0 种子翻转** → 本 100 种子上 086 无增量；相对 A69 的 −1 全为 087 噪声
+- **Owner 拍板 A（2026-10-30 chat）**：**不合** PR #17；**保留** main 上的 086（不回退 #16 / `prize_race_gate`）；下一刀残差 **待拍板**（不发明新 task 号、不实现）
+- **未做 / 禁止**：合并 #17、回退 086、改 main `heuristic.py`、同格 500、18000、开新刀 docs PR。不宣称矩阵闭环。
+
+
+### 2026-10-30 task 086：奖杯节奏（TDD 绿 + 100 局持平；已合入 main `cd67311` / PR #16）
 
 - **分支**：`cursor/task-086-prize-race-tdd`；字段 `prize_race_gate: bool = True`（不进 tune 10 维）
 - **行为**：落后且路径可见（`via=="copy"` & `best_damage>0` 或 `can_ko`）时，非斩杀撤退/换上窄消费更高复制前瞻；禁任意高印面（081 反例）
@@ -55,7 +69,8 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - **100 局**（Diupi-Yun，`.venv\Scripts\bfsim.exe`，8 workers，`results/t086-gard-zoro.db`，代码 `fc25648`）：失败 **0**；A**69**/B**31**；B prizes **16** / deck_out 3 / no_pokemon 12；暗夜王牌 **293/80**；触及后 B WR **35.0%**
 - **对照**：post-085 100 局 A69/B31 / prizes 16 / 293/80 / 35.0%；t080 A78/B22；t083 A72/B28
 - **方向读（Q7 vs A69）**：**持平**（A 未动；B prizes 未>16；触及后未改善）。不宣称 30.4%
-- **未做**：合并 PR #16、同格 500、18000、087 实现。不宣称矩阵闭环。
+- **合并**：Owner 拍板后 PR #16 → main `cd67311`（2026-10-30）。相对 post-085 仍 **持平 A69**。
+- **未做**：同格 500、18000。087 见下方（TDD/100 局曾在 PR #17，Owner A **不合**）。不宣称矩阵闭环。
 
 ### 2026-10-30 task 086/087：奖杯节奏 + 非斩杀 setup 时序（文档已拍板，待合 PR #15 → 086 TDD）
 

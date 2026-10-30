@@ -1,0 +1,10 @@
+﻿# task 085 行诊断。100 局，不替代正式矩阵 500。
+name: t085-nzoro-pult
+games: 100
+seed_start: 208000
+decks:
+  a: {source: db, deck_id: "mik_moe:677868"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

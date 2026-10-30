@@ -501,14 +501,27 @@ def test_no_tool_copy_ko_unchanged():
 
 
 def test_promote_does_not_prefer_false_copy_ko_under_charm():
-    """护符把复制击杀打成假阳性时，promote 回到 pokemon_score，不抬复制手。"""
+    """护符挡住复制 can_ko；085 转换开时非斩杀层仍按前瞻伤害抬复制手。
+
+    转换关：回到 083 的 pokemon_score（铺场分更高）。
+    """
     state = _charm_promote_state(tool=True)
     params = HeuristicParams()
     copier = state.players[0].bench[0]
     setup = state.players[0].bench[2]
     assert pokemon_score(setup, params) > pokemon_score(copier, params)
-    act = _observe(state, card_effects=CHARM_FX)
-    assert act == Action(kind="promote", bench_index=2)
+    agent, view = _agent_view(state, params, card_effects=CHARM_FX)
+    look = agent._ko_prize_lookahead(view, mon=view.own.bench[0])
+    assert look.can_ko is False
+    assert look.via == "copy"
+    assert (look.best_damage or 0) > 0
+    assert _observe(state, card_effects=CHARM_FX) == Action(
+        kind="promote", bench_index=0,
+    )
+    off = HeuristicParams(copy_conversion_gate=False)
+    assert _observe(state, off, card_effects=CHARM_FX) == Action(
+        kind="promote", bench_index=2,
+    )
 
 
 def test_promote_still_prefers_real_copy_ko_without_tool():

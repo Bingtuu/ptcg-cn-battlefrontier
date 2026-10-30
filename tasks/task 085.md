@@ -1,9 +1,9 @@
 # task 085 · 王牌转换质量
 
-> **待拍板。** 本文件只登记拆解。不改 `heuristic.py`，不写测试，不跑 `bfsim`。
+> 局级 100 局 + 四格行诊断已回写。待 Owner 拍板是否合并 PR #14。
 
-- 状态：**已拍板，待 TDD**
-- 关联：规格 `docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-085-ace-conversion-quality.md`（停在 Task 1）
+- 状态：**局级已回写，待合并拍板（PR #14）**
+- 关联：规格 `docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md`；计划 `docs/superpowers/plans/2026-10-29-task-085-ace-conversion-quality.md`（Task 2–3 完成；Task 4 未跑）
 - 依赖：083 已合入 main `4262a9f`（PR #12）。084 已收口（Q2=C，main `a3f1937`）。**081 搁置**（PR #10 不合并）
 - 对外中文名：王牌转换质量
 
@@ -32,20 +32,20 @@ Owner 已选残差方向 A（2026-10-29）：王牌招式被摸到之后要转�
 
 ## 验收标准（测试清单）
 
-Q 表未勾选。下面是「本文建议」被整包采纳之后才生效的清单。现在全部不做。
-
-- [ ] 不在勾选前修改 `heuristic.py`
-- [ ] 单测见计划 Task 2（新文件 `tests/test_heuristic_copy_conversion.py`）
-- [ ] 旧断言保持：`test_copy_ko_attacks_before_supporter`、`test_neither_ko_does_not_retreat_just_because_behind`
-- [ ] 一百局种子 `208000..208099`，失败 0，对照 t080 与 t083
-- [ ] 四格行诊断回写后才标收口；行不动不否决一百局的方向记录
-- [ ] 无 `prize_pressure_gate`，无卡名分支，不改 `pokemon_score`
+- [x] 不在勾选前修改 `heuristic.py`（docs 先行）
+- [x] 单测见计划 Task 2（新文件 `tests/test_heuristic_copy_conversion.py`）——Diupi-Yun TDD 绿
+- [x] 旧断言保持：`test_copy_ko_attacks_before_supporter`、`test_neither_ko_does_not_retreat_just_because_behind`
+- [x] 一百局种子 `208000..208099`，失败 0，对照 t080 与 t083（A69/B31，B prizes 16，暗夜王牌 293/80，触及后 35%）
+- [x] 四格行诊断已回写（多龙 A88/B12；黑夜 A70/B30；玛俐 A48/B52）；行不动不否决一百局方向
+- [x] 无 `prize_pressure_gate`，无卡名分支，不改 `pokemon_score`
 
 ## 实现要点
 
-docs PR 无代码变更。计划 Task 1 完成；Task 2 起由 TDD 刀执行。
-
-建议落点（未授权）：`copy_conversion_gate`。关则四个非斩杀消费者回到今天。`ko_prize_lookahead_gate=False` 时复制不可见，转换开关无事可做。
+- `HeuristicParams.copy_conversion_gate: bool = True`（不进 tune 10 维）
+- `_one_layer_copy(..., extra_types=())` + `_copy_cost_paid`；空元组仍走 `_energy_satisfied`
+- 四个消费者：`_newly_enabled_damage` / `_pick_retreat` / `_pick_promote` / `_pick_attack`
+- `ko_prize_lookahead_gate=False` 时复制不可见，转换开关无事可做
+- `_lethal_attack` / `pokemon_score` / `factor_prize_diff` 未改
 
 ## 与 084
 
@@ -57,6 +57,8 @@ docs PR 无代码变更。计划 Task 1 完成；Task 2 起由 TDD 刀执行。
 
 ## 结果与遗留
 
-- 文档落在 main `a3f1937` 之上。未改启发式。
-- 未做：TDD、字段、一百局、行诊断、18000、宣称到 30.4%。
-- 已知证据仍是 STATUS 里的那些：正式矩阵加权 \|Δ\| 19.0%；沙奈朵×N索 sim 80% / real 30.4% / Δ +49.6%；消融同格 500 收到 77.6% / \|Δ\| 47.2；100 局 t080 A78/B22（B prizes 9），083 A72/B28（B prizes 14）。
+- TDD（Task 2–3）在 Diupi-Yun 落地：相关套件 94 passed；ruff clean。
+- 偏差：`test_promote_does_not_prefer_false_copy_ko_under_charm` 按 Q4 保守层改写——护符仍挡住 `can_ko`；转换开时非斩杀层按前瞻伤害抬复制；转换关回到 pokemon_score。
+- **Task 4（2026-10-30 Diupi-Yun）**：`results/t085-gard-zoro.db`，代码 `635c053`。A**69**/B31，失败 0。对照 t080 A78/B22（B prizes 9）与 t083 A72/B28（B prizes 14）。B prizes **16**；暗夜王牌 **293/80**；触及后 B 胜率 **35.0%**（t080 24.3% / t083 32.0%）。相对 t083 翻转 A→B 5 / B→A 2。方向落入 60–70% 带，杠杆未证伪。
+- **Task 5**：`experiments/t085-nzoro-row/` 三份 + 沙奈朵格。多龙 88/12；黑夜 70/30；玛俐 48/52。不设过线。
+- 未做：同格 500、18000、宣称到 30.4%、**合并 PR #14**（待拍板）。

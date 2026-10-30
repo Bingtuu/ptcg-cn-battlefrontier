@@ -4,7 +4,9 @@
 0 = 关闭该因子），2 整数维走枚举网格。网格点不含默认值——默认值即坐标下降
 起点，不重复评估。布尔开关不进空间（M8a 后「开」均为已验证修复行为，
 固定全开，见设计文档 §2；task 077 的 ability_quality_gate、task 078 的
-board_quality_gate、task 079 的 energy_target_gate 同样固定默认开，不进这 10 维）。
+board_quality_gate、task 079 的 energy_target_gate、task 080 的
+attack_quality_gate、task 083 的 ko_prize_lookahead_gate、task 085 的
+copy_conversion_gate 同样固定默认开，不进这 10 维）。
 """
 
 from __future__ import annotations
@@ -73,7 +75,8 @@ def default_vector() -> dict[str, float | int]:
 def params_from_vector(vector: dict[str, float | int]) -> HeuristicParams:
     """参数向量 → HeuristicParams。键集合须恰为 10 搜索维（缺/多/未知显式报错，不猜）；
     未进空间的布尔开关取默认（全开，含 ability_quality_gate / board_quality_gate /
-    energy_target_gate）。"""
+    energy_target_gate / attack_quality_gate / ko_prize_lookahead_gate /
+    copy_conversion_gate）。"""
     names = {dim.name for dim in search_space()}
     missing = names - set(vector)
     unknown = set(vector) - names

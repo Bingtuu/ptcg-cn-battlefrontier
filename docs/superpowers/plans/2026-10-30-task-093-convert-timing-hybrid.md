@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> 本文件停在文档。Q3 过线之前禁止写测试、禁止改 `heuristic.py`。规格 `docs/superpowers/specs/2026-10-30-task-093-convert-timing-hybrid-design.md`。
+> Q3 已过线（**49/236 PASS**）。本文件仍不实现；实现另开 PR。规格 `docs/superpowers/specs/2026-10-30-task-093-convert-timing-hybrid-design.md`。
 >
 > **Task 1 = 本 PR 停止线。**
 
@@ -27,6 +27,7 @@
 
 - [x] Step 1: 规格、本计划、`tasks/task 093.md`、`STATUS.md` 焦点与工作记录
 - [x] Step 2: Owner 勾选 Q1–Q9（2026-10-30 离线自治，整包按本文建议；硬门见规格 §5.1）
-- [ ] Step 3: 仅当 Diupi 重放 R would-change ≥15/236：另开实现 PR（先红测，再改 `_decide_main`）。未过则收口，不写测试、不改 heuristic
+- [x] Step 3a: Diupi Q3 计数 **49/236 PASS**（dig `docs/digs/2026-10-30-task-093-q3-frequency.md`）
+- [ ] Step 3b: 另开实现 PR（先红测，再改 `_decide_main` / `convert_timing_hybrid_gate`）。本写回未开 TDD、未改 heuristic
 
 本文件没有「写测试 / 改 heuristic」的步骤。

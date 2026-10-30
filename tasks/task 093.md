@@ -1,8 +1,8 @@
 # task 093 · 首触转化×时序混合
 
-> **已拍板**（2026-10-30 Asia/Shanghai：Owner 离线自治，Q1–Q9 整包按本文建议）。下一闸是 Q3。Q3 未过：不写测试、不改 `heuristic.py`。088/089/090/091 均已按各自 Q3 收口。禁止重开那四道机制与字段。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死供体或王牌。
+> **Q3 PASS**（2026-10-30 Asia/Shanghai：Q1–Q9 曾整包按本文建议；Q3 **49/236 PASS**）。下一闸 = TDD `convert_timing_hybrid_gate`（另开；本步未开）。088/089/090/091 均已按各自 Q3 收口。禁止重开那四道机制与字段。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死供体或王牌。**不宣称 30.4%。**
 
-- 状态：**已拍板**（2026-10-30 Asia/Shanghai；docs-only；TDD 未开，阻塞于 Q3 ≥15/236）
+- 状态：**Q3 PASS**（2026-10-30 Asia/Shanghai；**49/236**；TDD 未开，下一闸 = 另开实现 `convert_timing_hybrid_gate`）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-093-convert-timing-hybrid-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-093-convert-timing-hybrid.md`（停在文档）
 - 依赖：092 dig `docs/digs/2026-10-30-task-092-expand-sample.md`（库 `results/t092-gard-zoro-500.db` @ `af0b04d+dirty`，不在本仓库）。088 **1/40**、089 **0/39**、090 **0/40**、091 **0/52**。
 - 对外中文名：首触转化×时序混合
@@ -41,7 +41,7 @@
 
 - [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
 - [x] Owner 勾选 Q1–Q9（整包按本文建议；硬门见规格 §5.1）
-- [ ] Q3 计数（Diupi-Yun，`results/t092-gard-zoro-500.db`）：236 局里 R would-change ≥15 才 TDD；低于则收口，不写测试、不改 heuristic
+- [x] Q3 计数（Diupi-Yun，`results/t092-gard-zoro-500.db`）：**49/236 PASS**（门槛 ≥15）；dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`
 - [ ] 计数过线后才允许单测与 heuristic（另开）
 - [ ] 100 局种子 `208000..208099`；B≥34 且失败 0，否则回滚
 - [ ] 无卡名；无 `prize_pressure_gate`；084 斩杀仍绿
@@ -66,8 +66,8 @@
 
 ### 状态
 
-拍板已写回。下一闸 = Q3。Q3 未跑（库不在本环境）。未过不写测试、不改 heuristic。TDD 未开。
+拍板已写回。**Q3 PASS 49/236**。下一闸 = TDD（另开 `convert_timing_hybrid_gate`；先红测）。本步未写测试、未改 `heuristic.py`、未跑 100 局。硬接受仍 **B≥34 且失败 0，否则回滚**。不宣称 30.4%。
 
 ## 结果与遗留
 
-拍板已写回。Q3 未跑。TDD 未开。未改 `heuristic.py`。
+Q3 **49/236 PASS**（`docs/digs/2026-10-30-task-093-q3-frequency.md`）。TDD 未开。未改 `heuristic.py`。硬接受仍锁定 B≥34/失败 0，否则回滚。

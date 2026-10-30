@@ -42,7 +42,7 @@
 
 - [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
 - [x] Owner 勾选 Q1–Q9（整包按本文建议；硬门见下）
-- [ ] Q3 计数（Diupi-Yun）：39 局中换上机会 ≥15 才继续；低于则收口；拍板后跑，写回后才允许 TDD
+- [x] Q3 计数（Diupi-Yun）：**0/39 FAIL**；见 `docs/digs/2026-10-30-task-089-q3-frequency.md`；**不进入 TDD / 按硬门收口**
 - [ ] 计数过线之后才允许单测与 `heuristic.py`（另开，不在本 PR）
 - [ ] 一百局种子 `208000..208099`，实验 `experiments/t078-gard-zoro.example.yml`，失败 0；过线见 Q5
 - [ ] 无 `prize_pressure_gate`；无卡名；`prize_race_gate` 的现有撤退/换上行为不改；084 斩杀短路回归仍绿
@@ -69,4 +69,4 @@
 
 ## 结果与遗留
 
-拍板已写回。Q3 计数见 `docs/digs/2026-10-30-task-089-q3-frequency.md`（若已生成）。TDD 未开。未改 `heuristic.py`。
+拍板已写回。Q3 计数 **0/39 FAIL**（`docs/digs/2026-10-30-task-089-q3-frequency.md`）。按硬门 **收口 089**：不写测试、不改 `heuristic.py`、不开 TDD。

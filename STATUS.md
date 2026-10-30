@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 089 已拍板（2026-10-30 Asia/Shanghai）：触及时点 / 早期奖杯止血；TDD 阻塞于 Q3。**Q1–Q9 整包按本文建议已写回（机制只 P；`early_prize_keep_gate`；不读奖差；不扩展 `prize_race_gate`；禁 081/`prize_pressure_gate`）。硬门：Q3 ≥15/39 才 TDD；100 局 B≥34 且失败 0 否则回滚；电电虫同种子再 +≥3pp 否决；18000 非完成。088 已收口（Q3 1/40 FAIL）。不改 `heuristic.py`、不写测试，直到 Q3 过线。证据库 `results/t086-gard-zoro.db`（`fc25648`，A69/B31）。不宣称 30.4%。
+**当前焦点 = task 089 已拍板且 Q3 **FAIL 0/39**（2026-10-30 Asia/Shanghai）→ **收口**；不开 TDD、不改 `heuristic.py`。**机会种子：（无）。按硬门重设计（不放宽 15/39）。禁 081/`prize_pressure_gate`。不宣称 30.4%。证据库 `results/t086-gard-zoro.db`（`fc25648`，A69/B31）。
 
 
 

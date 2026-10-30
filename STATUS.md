@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 093 已拍板（2026-10-30 Asia/Shanghai）：首触转化×时序混合 / convert+timing hybrid。** Owner 离线自治 Q1–Q9 整包按本文建议。机制只 **R**（`convert_timing_hybrid_gate` 不进 tune：落后且本步一层复制有效伤害为 0 时，`place_bench` 放上过滤通过且 `_copied_strike>0` 的基础供体）。**下一闸 = Q3**：Diupi 用 `results/t092-gard-zoro-500.db` 数 R would-change，触及负 **236** 局里 **≥15** 才写测试；**未过不写测试、不改 heuristic**。分母重算不是 236 则停。硬门已锁定：100 局种子 `208000..208099` **B≥34 且失败 0，否则回滚**（基线 A69/B31）；电电虫 **≥+3pp** 否决；18000 非完成；冻结 088–091。无卡名。禁止 `prize_pressure_gate`。不宣称 30.4%。证据 dig `docs/digs/2026-10-30-task-092-expand-sample.md`。
+**当前焦点 = task 093 Q3 PASS（2026-10-30 Asia/Shanghai）：首触转化×时序混合 / convert+timing hybrid。** 机制只 **R**（`convert_timing_hybrid_gate` 不进 tune）。**Q3 = PASS 49/236**（权威分母 236；R would-change ≥15）。证据 dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`；摘要 `results/t093-q3-frequency.json`。**下一闸 = TDD**：另开实现 `convert_timing_hybrid_gate`（先红测，再改 `_decide_main`）；**本步未开 TDD、未改 heuristic**。硬接受仍锁定：100 局种子 `208000..208099` **B≥34 且失败 0，否则回滚**（基线 A69/B31）；电电虫 **≥+3pp** 否决；18000 非完成；冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
 
 
 
@@ -48,11 +48,19 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
+### 2026-10-30 task 093：Q3 频数门 PASS 49/236（未开 TDD）
+
+- **Q3**：同种子引擎重放 `results/t092-gard-zoro-500.db`，分母 **236=权威**；机制 R would-change **49/236 PASS**（门槛 ≥15）。dig `docs/digs/2026-10-30-task-093-q3-frequency.md`；脚本 `experiments/t093_q3_frequency.py`；JSON `results/t093-q3-frequency.json`。
+- **诊断（非门禁）**：落后失败 67；挥击伤害 >0 100；无 place_bench 基础 13；过滤不过 7；`_copied_strike` 全 0 = 0。
+- **处置**：频数门过线 → **下一闸 = TDD** `convert_timing_hybrid_gate`（另开；先红测）。**本步未改 `heuristic.py`、未写测试、未跑 100 局。**
+- **硬接受仍锁定**：100 局 **B≥34 且失败 0，否则回滚**；电电虫 ≥+3pp 否决；18000 非完成；**不宣称 30.4%**。
+
 ### 2026-10-30 task 093：Owner 拍板写回（文档；下一闸 Q3）
 
+
 - **拍板**：Q1–Q9 整包按本文建议。Q1=093 · 首触转化×时序混合；Q2=只 R；Q3=≥15/236；Q4=`convert_timing_hybrid_gate` 不进 tune；Q5=B≥34 且失败 0，否则回滚；Q6=电电虫 ≥+3pp 否决，18000 非完成；Q7=全维持，冻结 088–091；Q8=要落后才启用；Q9=只文档。
-- **硬门**：原文在规格 §5.1。下一闸 Q3（Diupi，`results/t092-gard-zoro-500.db`，数 R would-change）。**未过不写测试、不改 heuristic。**
-- **未做**：Q3 计数、改 `heuristic.py`、写测试、100 局。
+- **硬门**：原文在规格 §5.1。当时下一闸 Q3；现已 PASS（见上条）。**未改 heuristic；TDD 另开。**
+- **其后**：Q3 已另条写回 **PASS 49/236**；TDD / heuristic / 100 局仍未做。
 
 ### 2026-10-30 task 093：首触转化×时序混合（文档，待拍板）
 

@@ -1,8 +1,8 @@
 # task 088 · 触及后转化 / 奖杯完成
 
-> **已拍板**（2026-10-30 Asia/Shanghai：Q1–Q9 整包按本文建议 + 硬门 1–4）。本文件与规格 **不改** `heuristic.py`，**不写**测试，**TDD 阻塞于 Q3**。禁止 `prize_pressure_gate` / 081 / 死名窄门。087 的 `setup_before_chip_gate` 维持不合。
+> **已收口**（2026-10-30 Asia/Shanghai：Q1–Q9 曾整包按本文建议；Q3 **1/40 FAIL**，硬门收口）。不改 `heuristic.py`，不写测试，不放宽阈值。禁止 `prize_pressure_gate` / 081 / 死名窄门。087 的 `setup_before_chip_gate` 维持不合。下一刀见 task 089。
 
-- 状态：**已拍板 / 文档待合**（2026-10-30 Asia/Shanghai；docs-only；TDD 阻塞于 Q3）。088 任务号已占用；`results/t088-posttouch-dig-summary.json` 只是 Job A 摘要名。
+- 状态：**已收口**（2026-10-30 Asia/Shanghai；Q3 **1/40 FAIL**；不写测试、不改 `heuristic.py`）。文档已在 main（PR #18 → `0085ce3`，收口措辞 `38db931`）。下一刀是 task 089，不重开本任务。
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-088-posttouch-conversion-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-088-posttouch-conversion.md`（停在文档；TDD 步骤故意不写）
 - 依赖：086 已在 main（`prize_race_gate`，100 局相对 085 **持平 A69**）；087 Owner A **不合** PR #17；085 `copy_conversion_gate`；084 Q2=C；083 共享前瞻。证据 dig `docs/digs/2026-10-30-posttouch-ace-still-lose.md`（库 `results/t086-gard-zoro.db` @ `fc25648`）
 - 对外中文名：触及后转化 / 奖杯完成
@@ -62,8 +62,8 @@ B 已经付清并正在使用复制/王牌（证据卡是暗夜王牌；代码�
 
 ### 状态
 
-- 文档 PR（#18）下一步合并 main。
-- **TDD 阻塞于 Q3**：本拍板不授权改 `heuristic.py`、不授权写测试，直到 Q3 计数过线并写回。
+- 文档 PR #18 已合并。Q3 **1/40 FAIL**，按硬门收口。
+- 不授权改 `heuristic.py`、不授权写测试。重设计见 task 089，不在本任务里放宽阈值。
 
 ## 结果与遗留
 

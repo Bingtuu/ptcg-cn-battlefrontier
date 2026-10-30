@@ -24,12 +24,12 @@
 - [x] Step 1: 规格、本计划、`tasks/task 092.md`、STATUS
 - [x] Step 2: Owner 勾选 Q1–Q9（整包按本文建议；autonote 离线自决）
 
-### Task 2 — 同格 500 + dig（本实验）
+### Task 2 — 同格 500 + dig（本实验；已完成）
 
-- [ ] Step 1: `bfsim run experiments/t092-gard-zoro-500.yml` → `results/t092-gard-zoro-500.db`（种子 208000..208499；失败须 0）
-- [ ] Step 2: 分层 dig（触及暗夜 / 未触及；胜率；奖杯结构；对照 100 局轴）
-- [ ] Step 3: 未触及对照 dig
-- [ ] Step 4: 写 `docs/digs/2026-10-30-task-092-expand-sample.md` + 下一刀菜单（推荐默认基于证据；无频数不发明启发式）
-- [ ] Step 5: STATUS 写回验证数字
+- [x] Step 1: `bfsim run experiments/t092-gard-zoro-500.yml` → `results/t092-gard-zoro-500.db`（A344/B156 失败 0）
+- [x] Step 2: 分层 dig（触及 381；触及后 B 145/236 WR 38.1%；对照 100 局轴）
+- [x] Step 3: 未触及对照 dig（A108/B11；A 发动机非整纯 touch）
+- [x] Step 4: `docs/digs/2026-10-30-task-092-expand-sample.md` + 下一刀菜单默认 **E**
+- [x] Step 5: STATUS 写回验证数字
 
 本文件没有「写测试 / 改 heuristic」的步骤。

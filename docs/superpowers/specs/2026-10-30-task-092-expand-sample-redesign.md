@@ -76,3 +76,11 @@
 ## 5. 实现入口
 
 拍板已锁定；本实验跑 500 + dig（`experiments/t092-gard-zoro-500.yml` → `results/t092-gard-zoro-500.db`）。零启发式。
+
+## 7. 实验结果（2026-10-30 Diupi-Yun）
+
+- 库 `results/t092-gard-zoro-500.db`；种子 `208000..208499`；**A344/B156（68.8%）失败 0**。
+- 触及 381；触及后 B 145/236（WR 38.1%）；未触及 A108/B11。
+- 主轴仍 (i)+(ii)；未触及对照削弱「A 发动机纯 touch 专属」。
+- 下一刀默认 **E**（新识别器+新 Q3；不重开 088–091）。dig `docs/digs/2026-10-30-task-092-expand-sample.md`。
+- **未改** `heuristic.py`。

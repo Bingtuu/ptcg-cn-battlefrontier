@@ -2,7 +2,7 @@
 
 > **已拍板**（2026-10-30 Asia/Shanghai：Q1–Q9 整包按本文建议）。autonote：Owner 离线授权按建议自决 2026-10-30。本文件与规格 **不改** `heuristic.py`，**不写**测试，**不发明**新启发式刀口。088/089/090/091 均已按各自 Q3 收口，记作**负面结果**。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死愿增猿/沙奈朵。
 
-- 状态：**已拍板 / 实验进行中**（2026-10-30 Asia/Shanghai；零启发式；500 局同格分层 + 未触及对照）
+- 状态：**已拍板 / 500 验毕**（2026-10-30 Asia/Shanghai；零启发式；A344/B156 失败 0；dig 已写）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-092-expand-sample-redesign.md`；计划 `docs/superpowers/plans/2026-10-30-task-092-expand-sample-redesign.md`
 - 依赖：091 收口（机制 L，Q3 **0/52**，`docs/digs/2026-10-30-task-091-q3-frequency.md`）；090 **0/40**；089 **0/39**；088 **1/40**；086 在 main（A69/B31）。证据 dig `docs/digs/2026-10-30-posttouch-ace-still-lose.md`（库 `results/t086-gard-zoro.db` @ `fc25648`）。main `84604e5`（PR #23）
 - 对外中文名：扩样本再定刀
@@ -38,9 +38,9 @@
 
 - [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
 - [x] Owner 勾选 Q1–Q9（整包按本文建议；autonote 离线自决）
-- [ ] 同格 500 局种子 `208000..208499` / 分层 dig（`results/t092-gard-zoro-500.db`）
-- [ ] 未触及对照 dig
-- [ ] 下一刀菜单写入 dig；**仍不**改 `heuristic.py`
+- [x] 同格 500 局种子 `208000..208499` / 分层 dig（`results/t092-gard-zoro-500.db`；A344/B156 失败 0）
+- [x] 未触及对照 dig
+- [x] 下一刀菜单写入 dig（默认 **E**）；**仍不**改 `heuristic.py`
 
 ## 明确不做
 
@@ -64,4 +64,4 @@ autonote：Owner 离线授权按建议自决 2026-10-30。验证过的进展写�
 
 ## 结果与遗留
 
-拍板已写回。500 实验进行中 / 待 dig 写回。未改 `heuristic.py`。
+拍板已写回。500 验毕：**A344/B156（68.8%）失败 0**；触及 381；触及后 B WR 38.1%；未触及对照完成。dig `docs/digs/2026-10-30-task-092-expand-sample.md`。下一刀默认 **E**（新识别器+新 Q3；不重开 088–091）。未改 `heuristic.py`。

@@ -5,7 +5,9 @@
 
 ## 当前
 
-**当前焦点 = task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由本刀关。
+**当前焦点 = task 085 已拍板，待 TDD（王牌转换质量；Q1–Q10 整包按本文建议，2026-10-30）**。规格 docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md；计划 docs/superpowers/plans/2026-10-29-task-085-ace-conversion-quality.md（Task 1 完成，实现从 Task 2 起）。主刀 B：非斩杀复制输出；斩杀短路维持 084 Q2=C；copy_conversion_gate=True。docs PR #13 含拍板写回；本刀仍不改 heuristic.py。
+
+**上一刀 task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由该刀关，也不由 085 的文档 PR 关。
 
 **task 083 已合入 main `4262a9f`（PR #12）**。Owner 拍板 A：正确性子集合入（共享 `_ko_prize_lookahead` + 有效 HP `_ko_remaining` + 印面 HP 残留的弃牌定量 / 附伤目标）。**copy→`_lethal_attack` 短路另开 084，不回滚 083。** 100 局（种子 `208000..208099`，失败 0，`results/t083-effhp-gard-zoro.db`，代码 `af48017`）相对 t080 为 A78→**A72** / B28，B prizes 9→14；修前 `edf392c` 与有效 HP 重验胜负 100/100 相同（翻转 13/7）。seed 208060 promote 已与 t080 同为火红，该局胜者仍是 A。印面 HP 残留再叠上之后，同 100 种子胜率与有效 HP 版相同。消融 `ABLATION_COPY_NOT_LETHAL=1`（只把复制击杀排除出短路，F1 仍看见 copy；未进 main）：A**75** / B25，相对 t080 的翻转收窄，B prizes 回到 9。同格 500：sim 80.0%→**77.6%**，相对 real 30.4% 的 |Δ| **49.6→47.2**（−2.4pp），不够单独关掉该格残差。
 
@@ -44,6 +46,20 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
+### 2026-10-30 task 085：王牌转换质量（Q 已拍，docs 待合）
+
+- **拍板（Q1–Q10 整包 = 规格「本文建议」）**：主刀 **B**；斩杀短路维持 084 Q2=C；四项消费者；换上保守层；copy_conversion_gate=True 不进 tune；100 局过线；中速四格必跑不过线；相对 A72 方向；同格 500 非完成条件；冻结全维持；docs PR 停在文档
+- **未做**：TDD、heuristic 改动、100 局、行诊断、18000
+
+
+
+### 2026-10-29 task 085：王牌转换质量（文档，待拍板）
+
+- **授权**：只写规格 / 计划 / `tasks/task 085.md` / STATUS。不改 `heuristic.py`，不跑 `bfsim`，不合并
+- **方向**：Owner 2026-10-29 选残差方向 A = 王牌转换质量。摸到复制路径之后要拿奖和胜局，不重做 083 的击杀可见性，不重开 081
+- **代码事实（main `a3f1937`）**：斩杀短路在物品/支援者之前，能量在短路之前。非斩杀 `_pick_attack` 与 `_newly_enabled_damage` 仍把印面 `damage=None` 的复制看成 0。索罗亚克ex 只有一条复制招式，改 `_pick_attack` 对这只身体是无操作
+- **本文建议（未勾选）**：主刀 B，`copy_conversion_gate` 默认开且不进 tune。能量启用分、无人斩杀时的撤退/换上、多招 `_pick_attack` 读一层复制伤害。`_lethal_attack` 维持 084 Q2=C
+- **未做**：TDD、字段、一百局、行诊断、18000。不宣称到 30.4%
 
 ### 2026-10-29 task 084：复制击杀短路（Q2=C 收口，行为不改）
 

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **未拍板。** 规格 `docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md` 第 5 节待 Owner 勾选。**本计划在 Task 1 停止。Task 2 起不执行**，除非 Q1–Q10 整包按「本文建议」（主刀 B，`copy_conversion_gate=True`）。任何一行改选，先改规格和本计划，再写测试。
+> **已拍板（2026-10-30 Owner：Q1–Q10 整包按「本文建议」）。** 规格 docs/superpowers/specs/2026-10-29-task-085-ace-conversion-quality-design.md 第 5 节已勾。**Task 1 完成。** Task 2 起按主刀 B / copy_conversion_gate=True 执行（另开 TDD 刀）。任何一行事后改选，先改规格和本计划，再写测试。
 
 **Goal:** 在不改复制击杀短路的前提下，让非斩杀的能量启用分、撤退、换上和多招 `_pick_attack` 使用一层复制前瞻的伤害，使已付清或再贴一张就付清的复制路径不再被印面 0 伤当成磨血。
 
@@ -37,7 +37,7 @@
 | `tests/test_tune_space.py` | 新字段进 `bool_fields`，维数仍 10 |
 | `battlefrontier/tune/space.py` | 模块说明里补上这个开关不进 10 维 |
 | `tests/test_heuristic_ko_prize_lookahead.py` | 不改断言。复制斩杀先于支援者、印面更高也不撤，都要保持绿 |
-| `tasks/task 085.md` / `STATUS.md` | Task 1 只写「待拍板」 |
+| `tasks/task 085.md` / `STATUS.md` | Task 1 已写「已拍板，待 TDD」 |
 
 不改 `tests/test_features.py` 的期望。不改 `tests/test_heuristic_attack_quality.py` 的 chooser 断言。不新建第二套击杀前瞻。
 

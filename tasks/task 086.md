@@ -1,8 +1,8 @@
 # task 086 · 奖杯节奏（共享前瞻）
 
-> 文档待拍板。不改 `heuristic.py`。禁止 `prize_pressure_gate` / PR #10。
+> 文档已拍板（2026-10-30 整包按本文建议）。不改 `heuristic.py`。禁止 `prize_pressure_gate` / PR #10。
 
-- 状态：**待拍板**（docs PR：`cursor/task-086-087-docs`）
+- 状态：**已拍板**（2026-10-30 整包按本文建议）（docs PR：`cursor/task-086-087-docs`）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-086-prize-race-shared-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-086-prize-race-shared-lookahead.md`；一页纸 `docs/superpowers/specs/2026-10-30-post-085-baseline-and-next-knives.md`
 - 依赖：085 已合入 `5a29664`；post-085 500 基线 A68.8% / Δ+38.4pp；083/084(Q2=C)；**081 搁置**
 - 对外中文名：奖杯节奏（共享前瞻）

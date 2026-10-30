@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = 085 已合入；post-085 同格 500 基线已回写；086+087 文档待拍板**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500（`t085-gard-nzoro-500`，种子 208000..208499）：**A 68.8% / B 31.2%**，失败 0；Δ**+38.4pp**（real 30.4%；t080 +49.6）。暗夜王牌触及后 B WR **38.1%**（381 局）。**086（奖杯节奏·共享前瞻）+087（非斩杀 setup 时序）规格/计划/task/一页纸已落盘，Q 表空拍板列待 Owner 勾选**；分支 `cursor/task-086-087-docs`。Owner：B/C 都尝试；可顺序 TDD、开关独立。本阶段不改 `heuristic.py`、不合入实现。禁止复活 `prize_pressure_gate`/081。
+**当前焦点 = 086/087 已拍板（整包按本文建议）；docs PR #15 拍板写回后合入，接着 086 TDD**。阶段锁定：贴近真实策略/结果。085 → main `5a29664`/`11ef281`（PR #14）。同格 500 基线：**A 68.8% / Δ+38.4pp**；暗夜王牌触及后 B WR **38.1%**。Owner 2026-10-30：**086+087 整包按建议**；顺序 **086→087**；开关独立。086=`prize_race_gate`（撤退+换上，禁 081/死名）；087=`setup_before_chip_gate`（E+S+H，永不 defer can_ko）。对照相对 post-085 **A69**。禁止复活 `prize_pressure_gate`/081。
 
 **上一刀 task 084 已收口（Q2=C：维持复制击杀短路；不加字段、不改 heuristic.py、不重跑 100 局；残差另计）**。规格 `docs/superpowers/specs/2026-10-29-task-084-copy-lethal-short-circuit-design.md`；计划停在 Task 1。同格 500 的 |Δ| **47.2** 不由该刀关，也不由 085 的文档 PR 关。
 
@@ -47,14 +47,13 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 ## 工作记录
 
 
-### 2026-10-30 task 086/087：奖杯节奏 + 非斩杀 setup 时序（文档，待拍板）
+### 2026-10-30 task 086/087：奖杯节奏 + 非斩杀 setup 时序（文档已拍板，待合 PR #15 → 086 TDD）
 
-- **授权**：chat；B/C 都尝试。只写规格/计划/`tasks/task 086.md`/`tasks/task 087.md`/一页纸/STATUS。不改 `heuristic.py`，不合并实现。
-- **一页纸**：`docs/superpowers/specs/2026-10-30-post-085-baseline-and-next-knives.md`（基线 A + 两刀关系）
-- **086**：奖杯节奏（共享前瞻）。消费 `_ko_prize_lookahead`；开关建议 `prize_race_gate`；**禁止** `prize_pressure_gate`/081 自残/卡名。规格+计划+task 已写，Q1–Q11 拍板列空。
-- **087**：非斩杀 setup 时序。窄 `_setup_value`（E/S/H）；`can_ko` 不 defer（084 Q2=C）；开关建议 `setup_before_chip_gate`。规格+计划+task 已写，Q1–Q10 拍板列空。
-- **顺序**：可 086→087 或反向；独立开关。对照局级默认相对 post-085 **A69**。
-- **未做**：Owner 勾选、TDD、heuristic 改动、100 局、同格 500 重跑、18000。
+- **Owner 拍板（2026-10-30 chat）**：**整包按本文建议**；TDD 顺序 **086→087**；开关独立。
+- **086 Q1–Q11**：主行为 B（撤退+换上）；前提 copy 可见或 can_ko；落后=prizes_count；`prize_race_gate=True` 不进 tune；禁死名/081/自残/卡名；对照相对 A69。
+- **087 Q1–Q10**：永不 defer can_ko；主行为 B（setup>`chip`）；`_setup_value`=E+S+H；`setup_before_chip_gate=True`；路径已付清可见；对照相对 A69。
+- **一页纸**：`docs/superpowers/specs/2026-10-30-post-085-baseline-and-next-knives.md`
+- **未做（本写回）**：合并 PR #15、086/087 TDD、heuristic 改动、100 局、同格 500、18000。
 
 ### 2026-10-30 post-085 基线（沙奈朵×N索 500）
 

@@ -1,8 +1,8 @@
 # task 087 · 非斩杀 setup 时序
 
-> 文档待拍板。不改 `heuristic.py`。不得破坏 084 Q2=C。
+> 文档已拍板（2026-10-30 整包按本文建议）。不改 `heuristic.py`。不得破坏 084 Q2=C。
 
-- 状态：**待拍板**（docs PR：`cursor/task-086-087-docs`）
+- 状态：**已拍板**（2026-10-30 整包按本文建议）（docs PR：`cursor/task-086-087-docs`）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-087-nonlethal-setup-timing-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-087-nonlethal-setup-timing.md`；一页纸 `docs/superpowers/specs/2026-10-30-post-085-baseline-and-next-knives.md`
 - 依赖：085 已合入；084 Q2=C；083/085 路径可见；081 搁置
 - 对外中文名：非斩杀 setup 时序

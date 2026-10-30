@@ -1,50 +1,42 @@
 # task 091 · 约束 A 侧发动机
 
-> **待拍板**（2026-10-30：方向已定 = dig 选项 C / 离线自治失败路径推荐 B「约束 A 侧发动机」；Q1–Q9 待整包勾选）。本文件与规格 **不改** `heuristic.py`，**不写**测试。088/089/090 均已按各自 Q3 收口，三道 15 局门槛不放宽，三份 TDD 不重开。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死愿增猿/沙奈朵。
+> **已收口**（2026-10-30 Asia/Shanghai：Q1–Q9 曾整包按本文建议；Q3 **0/52 FAIL**）。autonote：Owner 离线授权按建议自决 2026-10-30。不改 `heuristic.py`，不写测试，不放宽 15/52，不发明新启发式。088/089/090 维持收口。禁止 `prize_pressure_gate` / 081 / 死名。下一刀文档是 task 092（**扩样本再定刀**），不在本任务里开 TDD。
 
-- 状态：**待拍板**（2026-10-30 Asia/Shanghai；docs-only；TDD 未开）
-- 关联：规格 `docs/superpowers/specs/2026-10-30-task-091-a-engine-constrain-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-091-a-engine-constrain.md`（停在文档）
-- 依赖：090 收口（机制 S，Q3 **0/40**，`docs/digs/2026-10-30-task-090-q3-frequency.md`）；089 收口（0/39）；088 收口（1/40）；086 在 main（A69/B31）。证据 dig `docs/digs/2026-10-30-posttouch-ace-still-lose.md`（库 `results/t086-gard-zoro.db` @ `fc25648`）
+- 状态：**已收口**（2026-10-30 Asia/Shanghai；Q3 **0/52 FAIL**；不写测试、不改 `heuristic.py`）。下一刀文档是 task 092，不重开本任务。
+- 关联：规格 `docs/superpowers/specs/2026-10-30-task-091-a-engine-constrain-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-091-a-engine-constrain.md`；Q3 dig `docs/digs/2026-10-30-task-091-q3-frequency.md`
+- 依赖：090 收口（Q3 **0/40**）；089 **0/39**；088 **1/40**；086 在 main（A69/B31）。证据库 `results/t086-gard-zoro.db` @ `fc25648`。拍板提交本地 `f5c9e03`。
 - 对外中文名：约束 A 侧发动机
-- 阶段：有效性优先。090/089/088 三条「B 侧转化/换位/少送奖」刀口都无频数。本刀转向 dig 次轴：触及后 A 侧攻击/特性频率翻倍把 B 拖死——用**通用**启发式约束，不为单卡组写死。
 
-## 目标
+## 拍板表（曾锁定）
 
-在启发式两边通用的前提下，压低「已经奖杯领先、且本回合没有斩杀」时的高频率特性循环/非必要 setup，让触及后窗口少被对侧发动机碾压。不重开 088/089/090，不滑回 081。
+| ID | 本文建议（曾拍板） |
+|---|---|
+| Q1 | **091 · 约束 A 侧发动机** |
+| Q2 | **只 L**（`leader_cycle_throttle_gate`：领先且无斩杀时节流 `_is_cycle_discard_draw`） |
+| Q3 | **≥15/52** 才 TDD；分母 = dig 触及负 |
+| Q4 | **`leader_cycle_throttle_gate: bool = True`**，不进 tune |
+| Q5 | **B≥34 且失败 0**；持平回滚 |
+| Q6 | 电电虫 +≥3pp 否决；18000 非完成 |
+| Q7 | 冻结全维持（088–090 不重开） |
+| Q8 | 落后不当启用（gate 看领先） |
+| Q9 | docs done |
 
-## 假设（绑 dig 数字）
+## Owner 拍板与硬门
 
-同种子 100 局 A69/B31。触及 80；触及后 B 28/52（WR 35%）。触及负局里首触后 A 侧 `attack` **5.92**/局、`use_ability` **5.31**/局；触及胜仅 **2.11 / 2.21**。触及负 KO 偏 B（B 被击倒 121 vs A 52）。088/089/090 的 Q3 分别为 1/40、0/39、0/40 —— B 侧转化/换上/换位刀口无频数。
+曾整包按本文建议。硬门 1 = Q3 ≥15/52，否则收口。
 
-还没数过的是：在这 52 局触及负（或 40 局首触未转化）里，有多少次决策是「己方奖杯领先、无 can_ko、却仍打出交易类/循环类特性或非斩杀 setup」，且若收紧则 would-change。
+### 离线自治
 
-## 拍板表
-
-| ID | 问题 | 本文建议 |
-|---|---|---|
-| Q1 | 编号与对外名？ | **091 · 约束 A 侧发动机** |
-| Q2 | 主机制？ | **L**：当 `_lethal_attack` 为无，且己方奖杯剩余 **少于** 对手（已领先），收紧交易类特性（`_is_cycle_discard_draw`）——`ability_cycle_*` 阈值更严或本回合已用过一次循环特性则不再发。不改斩杀短路。不改 `_pick_choose`。备选 M（非斩杀时攻击优先于特性）/ N（只扩样本不改启发式）不进默认包 |
-| Q3 | TDD 前频数门？ | **要**。在 dig 触及负 **52** 局里，≥15 局存在「领先且无斩杀却仍发出循环特性」的 would-change 才写测试。不放宽 088/089/090 的 15 |
-| Q4 | 新字段？ | **`leader_cycle_throttle_gate: bool = True`**，不进 tune。禁止 `prize_pressure_gate`，禁止写入 `prize_race_gate` / `ability_quality_gate` 消融语义 |
-| Q5 | 不持平？ | **B≥34 且失败 0**；持平（\|ΔA\|≤2 且触及后 WR 抬升 <3pp 且 B prizes≤16）回滚 |
-| Q6 | 行级？ | 电电虫同种子 +≥3pp 否决；18000 非完成。本刀动的是「领先侧」，更要盯过冲 |
-| Q7 | 冻结？ | **全维持**（081/084/086 不扩展/088–090 不重开/卡名例外空） |
-| Q8 | 落后当启用？ | **不当**。本刀看的是**领先**才节流；落后侧行为不变 |
-| Q9 | 本 PR 停哪？ | **只文档** |
+Owner 授权：硬门失败则回滚并试其他方向。本刀 Q3 失败 → 收口 091 → 下一刀文档 **扩样本再定刀** = task 092（dig 选项 C：同格 500 分层 + 未触及对照；088–091 作负面结果）。
 
 ## 验收清单
 
-- [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
-- [ ] Owner 勾选 Q1–Q9（整包按本文建议；硬门见规格）
-- [ ] Q3 计数（Diupi-Yun）：52 局里 ≥15 才 TDD；低于则收口
-- [ ] 计数过线后才允许单测与 heuristic（另开）
-- [ ] 100 局种子 `208000..208099`；过线见 Q5
-- [ ] 无卡名；无 `prize_pressure_gate`；084 斩杀仍绿
-
-## 明确不做
-
-081 复活、卡名分支（愿增猿/沙奈朵 `if name ==`）、重开 088/089/090、放宽任一 15 局门槛、用 H/S/Y/K/E/G 给旧刀补过、推迟 `can_ko`、改 `pokemon_score` / `factor_prize_diff`、宣称 30.4%、本 PR 改启发式或写测试。
+- [x] 规格 + 计划 + 本 task + STATUS
+- [x] Owner 勾选 Q1–Q9（autonote 离线自决）
+- [x] Q3 计数（Diupi-Yun，同种子重放）：**0/52 FAIL**；见 dig；**不进入 TDD / 按硬门收口**
+- [ ] （关闭）单测与 heuristic
+- [ ] （关闭）100 局
 
 ## 结果与遗留
 
-Q 表已写成「本文建议」，尚未勾选。Q3 未跑。TDD 未开。未改 `heuristic.py`。
+拍板已写回。Q3 **0/52 FAIL**（`docs/digs/2026-10-30-task-091-q3-frequency.md`；脚本 `experiments/t091_q3_frequency.py`）。诊断：A 侧触及负里高频特性是愿增猿/`move_damage_counters` 与沙奈朵ex/`attach_energy`，**不是** `_is_cycle_discard_draw`，故 L 识别器分子为 0。按硬门 **收口 091**：不写测试、不改 `heuristic.py`、不开 TDD、不放宽门槛、不发明启发式。重设计见 task 092。

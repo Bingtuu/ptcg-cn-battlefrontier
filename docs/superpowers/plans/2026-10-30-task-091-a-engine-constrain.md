@@ -1,6 +1,6 @@
 # 091 约束 A 侧发动机 Implementation Plan
 
-> **For agentic workers:** 本文件停在文档。Owner 禁止在 Q3 过线之前写测试或改 `heuristic.py`。Q 表勾选且计数 ≥15/52 之后，另开实现计划。
+> **For agentic workers:** 本文件停在文档。Q1–Q9 已拍板。仍禁止在 Q3 过线之前写测试或改 `heuristic.py`。计数 ≥15/52 之后，另开实现计划。autonote：Owner 离线授权按建议自决 2026-10-30。
 >
 > 规格 `docs/superpowers/specs/2026-10-30-task-091-a-engine-constrain-design.md`。
 >
@@ -23,7 +23,7 @@
 ### Task 1 — 文档落盘，然后停
 
 - [x] Step 1: 规格、本计划、`tasks/task 091.md`、STATUS
-- [ ] Step 2: Owner 勾选 Q1–Q9
+- [x] Step 2: Owner 勾选 Q1–Q9（2026-10-30 整包按本文建议 + 硬门；autonote：Owner 离线授权按建议自决 2026-10-30）
 - [ ] Step 3: 仅当拍板含 Q3=计数且 ≥15/52：另开实现 PR
 
 本文件没有「写测试 / 改 heuristic」的步骤。

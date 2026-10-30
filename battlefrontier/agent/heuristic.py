@@ -119,6 +119,9 @@ class HeuristicParams:
     # 非斩杀路径是否采用一层复制的前瞻伤害（task 085）。
     # 不改变 _lethal_attack。不进 tune。关 = 能量/撤退/换上/_pick_attack 回到印面。
     copy_conversion_gate: bool = True
+    # 奖杯节奏（task 086）：路径可见后用奖差微调非斩杀撤退/换上。
+    # 不进 tune。禁止 prize_pressure_gate。不改 _lethal_attack。
+    prize_race_gate: bool = True
 
 
 def _card_of(poke: InPlayPokemon | CardInstance):
@@ -431,6 +434,25 @@ class HeuristicAgent:
                 return (1, -(look.best_damage or 0), *score_key(act))
 
             return min(acts, key=conv_key)
+
+        # task 086：落后且路径可见时，仅对复制候选加奖差层（不抬无复制高印面）。
+        if (
+            self.params.prize_race_gate
+            and self._prize_race_behind(view)
+            and any(
+                look.via == "copy" and (look.best_damage or 0) > 0
+                for look in looks.values()
+            )
+        ):
+            def race_key(act: Action) -> tuple:
+                look = looks[act.bench_index]
+                if look.can_ko:
+                    return (0, *score_key(act))
+                if look.via == "copy" and (look.best_damage or 0) > 0:
+                    return (1, -(look.best_damage or 0), *score_key(act))
+                return (2, *score_key(act))
+
+            return min(acts, key=race_key)
 
         def ko_key(act: Action) -> tuple:
             look = looks[act.bench_index]
@@ -891,8 +913,34 @@ class HeuristicAgent:
                     return min(
                         better, key=lambda item: (-item[0], item[1].bench_index),
                     )[1]
+            # task 086：落后 + 复制路径可见 → 仅撤到更高前瞻复制身体（非任意高印面）。
+            if self.params.prize_race_gate and self._prize_race_behind(view):
+                active_look = self._ko_prize_lookahead(view)
+                active_dmg = active_look.best_damage or 0
+                path_visible = (
+                    (active_look.via == "copy" and active_dmg > 0)
+                    or active_look.can_ko
+                )
+                better_race: list[tuple[int, Action]] = []
+                for act in acts:
+                    look = self._ko_prize_lookahead(
+                        view, mon=view.own.bench[act.bench_index],
+                    )
+                    if look.via == "copy" and (look.best_damage or 0) > 0:
+                        path_visible = True
+                    if look.via == "copy" and (look.best_damage or 0) > active_dmg:
+                        better_race.append((look.best_damage or 0, act))
+                if path_visible and better_race:
+                    return min(
+                        better_race,
+                        key=lambda item: (-item[0], item[1].bench_index),
+                    )[1]
             return self._pick_retreat_powerless(view, acts)
         return min(ko_targets, key=lambda item: (-item[0], item[1].bench_index))[1]
+
+    def _prize_race_behind(self, view: VisibleGameState) -> bool:
+        """落后 = 己方剩余奖赏多于对手（Q4）。"""
+        return view.own.prizes_count > view.opponent.prizes_count
 
     def _view_as_active(self, view: VisibleGameState, mon: InPlayPokemon) -> VisibleGameState:
         """打分副本：把 mon 当成战斗场。不写回引擎状态。"""

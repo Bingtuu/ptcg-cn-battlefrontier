@@ -2,7 +2,7 @@
 
 > 文档已拍板（2026-10-30 整包按本文建议）。不改 `heuristic.py`。禁止 `prize_pressure_gate` / PR #10。
 
-- 状态：**已拍板**（2026-10-30 整包按本文建议）（docs PR：`cursor/task-086-087-docs`）
+- 状态：**TDD 单元绿**（2026-10-30；分支 `cursor/task-086-prize-race-tdd`）；100 局 pending Diupi-Yun；不宣称矩阵闭环
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-086-prize-race-shared-lookahead-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-086-prize-race-shared-lookahead.md`；一页纸 `docs/superpowers/specs/2026-10-30-post-085-baseline-and-next-knives.md`
 - 依赖：085 已合入 `5a29664`；post-085 500 基线 A68.8% / Δ+38.4pp；083/084(Q2=C)；**081 搁置**
 - 对外中文名：奖杯节奏（共享前瞻）
@@ -31,12 +31,12 @@
 ## 验收清单
 
 - [x] 规格 + 计划 + 本 task + STATUS + 一页纸
-- [ ] Owner 勾选 Q 表
-- [ ] 单测 `tests/test_heuristic_prize_race.py`（拍板后）
-- [ ] 无 `prize_pressure_gate`；无卡名；084 回归绿
-- [ ] 一百局对照 A69（拍板后，Diupi-Yun）
-- [ ] 不改本 docs PR 的 `heuristic.py`
+- [x] Owner 勾选 Q 表（整包按本文建议）
+- [x] 单测 `tests/test_heuristic_prize_race.py`（TDD 绿）
+- [x] 无 `prize_pressure_gate`；无卡名；083/084/085 回归绿
+- [ ] 一百局对照 A69（pending Diupi-Yun；本 PR 不跑 bfsim）
+- [x] heuristic 窄改（`prize_race_gate` + 撤退/换上）；未改 `_lethal_attack` / `pokemon_score`
 
 ## 明确不做
 
-081 复活、自残换人、卡名分支、推迟 `can_ko`、改 `pokemon_score`、宣称 30.4%、本 PR 实现/合并。
+081 复活、自残换人、卡名分支、推迟 `can_ko`、改 `pokemon_score`、宣称 30.4%、本刀不合并；100 局待跑；不实现 087。

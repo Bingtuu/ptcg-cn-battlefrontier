@@ -1,8 +1,8 @@
 # task 093 · 首触转化×时序混合
 
-> **待拍板**（2026-10-30：方向已由 Owner 离线自治锁定 = 092 dig 选项 **E** / convert+timing hybrid；Q1–Q9 待整包勾选）。本文件与规格 **不改** `heuristic.py`，**不写**测试。088/089/090/091 均已按各自 Q3 收口。禁止重开那四道机制与字段。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死供体或王牌。
+> **已拍板**（2026-10-30 Asia/Shanghai：Owner 离线自治，Q1–Q9 整包按本文建议）。下一闸是 Q3。Q3 未过：不写测试、不改 `heuristic.py`。088/089/090/091 均已按各自 Q3 收口。禁止重开那四道机制与字段。禁止 `prize_pressure_gate` / 081 / 死名。禁止用卡名分支写死供体或王牌。
 
-- 状态：**待拍板**（2026-10-30 Asia/Shanghai；docs-only；TDD 未开）
+- 状态：**已拍板**（2026-10-30 Asia/Shanghai；docs-only；TDD 未开，阻塞于 Q3 ≥15/236）
 - 关联：规格 `docs/superpowers/specs/2026-10-30-task-093-convert-timing-hybrid-design.md`；计划 `docs/superpowers/plans/2026-10-30-task-093-convert-timing-hybrid.md`（停在文档）
 - 依赖：092 dig `docs/digs/2026-10-30-task-092-expand-sample.md`（库 `results/t092-gard-zoro-500.db` @ `af0b04d+dirty`，不在本仓库）。088 **1/40**、089 **0/39**、090 **0/40**、091 **0/52**。
 - 对外中文名：首触转化×时序混合
@@ -21,25 +21,27 @@
 
 088–091 的 Q3 说明旧识别器没有频数。行动阶段 `_decide_main` 今天不消费 `place_bench`。还没数过的是：236 局触及负里，第一下复制之前有多少局「落后 + 0 伤复制挥击 + 手里有合格基础」。
 
-## 拍板表
+## 拍板表（已勾选 = 本文建议）
 
-| ID | 问题 | 本文建议 |
-|---|---|---|
-| Q1 | 编号与对外名？ | **093 · 首触转化×时序混合**（convert+timing hybrid） |
-| Q2 | 主机制？ | **只 R**：落后且有效伤害为 0 的一层 `copy_attack` 即将打出时，`place_bench` 放上 `matches_in_play` 过滤通过且 `_copied_strike>0` 的基础。不改 `_pick_choose` / `_pick_promote` / 支援者序 / `_pick_ability`。备选 T（不看落后）/ U（提早到特性前）不进默认包 |
-| Q3 | TDD 前频数门？ | **要**。092 触及负 **236** 局里，≥15 局存在 R 的 would-change 才写测试。分母重算不是 236 则停。不放宽 088/089/090/091 的 15。不把结局下界 109 当成通过 |
-| Q4 | 新字段？ | **`convert_timing_hybrid_gate: bool = True`**，不进 tune。禁止 `prize_pressure_gate`。禁止写入 `prize_race_gate` / `early_prize_keep_gate` / `copy_ko_switch_gate` / `leader_cycle_throttle_gate` / `setup_before_chip_gate` |
-| Q5 | 不持平？ | **100 局 B≥34 且失败 0，否则回滚**。种子 `208000..208099`。基线 A69/B31。B≤33 即失败 |
-| Q6 | 行级？ | 电电虫同种子 +≥3pp 否决；18000 非完成 |
-| Q7 | 冻结？ | **全维持**（081/084/086 不扩展；088–091 不重开；卡名例外空） |
-| Q8 | 落后才启用？ | **要**。打平与领先不放这张基础 |
-| Q9 | 本 PR 停哪？ | **只文档** |
+| ID | 问题 | 本文建议 | 拍板 |
+|---|---|---|---|
+| Q1 | 编号与对外名？ | **093 · 首触转化×时序混合**（convert+timing hybrid） | **093 · 首触转化×时序混合** |
+| Q2 | 主机制？ | **只 R**：落后且有效伤害为 0 的一层 `copy_attack` 即将打出时，`place_bench` 放上 `matches_in_play` 过滤通过且 `_copied_strike>0` 的基础。不改 `_pick_choose` / `_pick_promote` / 支援者序 / `_pick_ability`。备选 T（不看落后）/ U（提早到特性前）不进默认包 | **只 R** |
+| Q3 | TDD 前频数门？ | **要**。092 触及负 **236** 局里，≥15 局存在 R 的 would-change 才写测试。分母重算不是 236 则停。不放宽 088/089/090/091 的 15。不把结局下界 109 当成通过 | **≥15/236** |
+| Q4 | 新字段？ | **`convert_timing_hybrid_gate: bool = True`**，不进 tune。禁止 `prize_pressure_gate`。禁止写入 `prize_race_gate` / `early_prize_keep_gate` / `copy_ko_switch_gate` / `leader_cycle_throttle_gate` / `setup_before_chip_gate` | **`convert_timing_hybrid_gate`，不进 tune** |
+| Q5 | 不持平？ | **100 局 B≥34 且失败 0，否则回滚**。种子 `208000..208099`。基线 A69/B31。B≤33 即失败 | **B≥34 且失败 0，否则回滚** |
+| Q6 | 行级？ | 电电虫同种子 ≥+3pp 否决；18000 非完成 | **电电虫 ≥+3pp 否决；18000 非完成** |
+| Q7 | 冻结？ | **全维持**（081/084/086 不扩展；088–091 不重开；卡名例外空） | **全维持，冻结 088–091** |
+| Q8 | 落后才启用？ | **要**。打平与领先不放这张基础 | **要，落后才启用** |
+| Q9 | 本 PR 停哪？ | **只文档** | **只文档** |
+
+> **拍板写回**：上表九行全部 = 「本文建议」。硬门原文见规格 §5.1。
 
 ## 验收清单
 
 - [x] 规格 + 计划（文档停止线）+ 本 task + STATUS
-- [ ] Owner 勾选 Q1–Q9（整包按本文建议；硬门见规格 §5.1）
-- [ ] Q3 计数（Diupi-Yun）：236 局里 ≥15 才 TDD；低于则收口
+- [x] Owner 勾选 Q1–Q9（整包按本文建议；硬门见规格 §5.1）
+- [ ] Q3 计数（Diupi-Yun，`results/t092-gard-zoro-500.db`）：236 局里 R would-change ≥15 才 TDD；低于则收口，不写测试、不改 heuristic
 - [ ] 计数过线后才允许单测与 heuristic（另开）
 - [ ] 100 局种子 `208000..208099`；B≥34 且失败 0，否则回滚
 - [ ] 无卡名；无 `prize_pressure_gate`；084 斩杀仍绿
@@ -48,6 +50,24 @@
 
 081 复活、卡名分支、重开 088/089/090/091、放宽任一旧 15 局门槛、用 T/U 给 R 补过、把 C/P/S/L 的谓词换个字段名再计、推迟 `can_ko`、改 `pokemon_score` / `factor_prize_diff`、宣称 30.4%、本 PR 改启发式或写测试。
 
+## Owner 拍板（2026-10-30 Asia/Shanghai）
+
+**整包按「本文建议」**：Q1=093 · 首触转化×时序混合；Q2=只 R；Q3=≥15/236；Q4=`convert_timing_hybrid_gate` 不进 tune；Q5=B≥34 且失败 0，否则回滚；Q6=电电虫 ≥+3pp 否决，18000 非完成；Q7=全维持，冻结 088–091；Q8=要落后才启用；Q9=只文档。
+
+### 硬门
+
+原文在规格 §5.1。摘要：
+
+1. **Q3**：Diupi 用 `results/t092-gard-zoro-500.db` 数 R would-change，**≥15/236** 才 TDD。低于则收口，不写测试、不改 `heuristic.py`。分母重算不是 236 则停。
+2. **100 局**：种子 `208000..208099`，**B≥34 且失败 0，否则回滚**。基线 A69/B31。
+3. **电电虫**：同种子已过冲的那一侧再 **≥+3pp** → 否决并回滚。
+4. **18000** 非完成条件。
+5. **冻结** 088–091 的机制、字段与 15 局门槛。
+
+### 状态
+
+拍板已写回。下一闸 = Q3。Q3 未跑（库不在本环境）。未过不写测试、不改 heuristic。TDD 未开。
+
 ## 结果与遗留
 
-Q 表已写成「本文建议」，尚未勾选。方向锁定为 dig 选项 E。Q3 未跑（库不在本环境）。TDD 未开。未改 `heuristic.py`。
+拍板已写回。Q3 未跑。TDD 未开。未改 `heuristic.py`。

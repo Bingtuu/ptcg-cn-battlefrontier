@@ -5,7 +5,7 @@
 
 ## 当前
 
-**当前焦点 = task 093 文档待拍板（2026-10-30 Asia/Shanghai）：首触转化×时序混合 / convert+timing hybrid（092 dig 选项 E）。** Owner 离线自治已把下一刀锁定为 E：新识别器，独立 Q3，不重开 088–091。本文建议机制只 **R**（`convert_timing_hybrid_gate`：落后且本步一层复制有效伤害为 0 时，`place_bench` 放上过滤通过且 `_copied_strike>0` 的基础供体）。Q3 分母 = 500 局触及负 **236**；would-change ≥15 才写测试（绝对数 15，不把 15/40 抬成约 89，也不把结局交集下界 ≥109 当成通过）。硬过线建议：100 局种子 `208000..208099` **B≥34 且失败 0，否则回滚**（基线 A69/B31）；电电虫 +≥3pp 否决；18000 非完成。冻结 088–091 的机制、字段与 15 局门槛。无卡名。禁止 `prize_pressure_gate`。不改 `heuristic.py`、不写测试。证据 dig `docs/digs/2026-10-30-task-092-expand-sample.md`（库 `results/t092-gard-zoro-500.db`，不在本仓库）。不宣称 30.4%。
+**当前焦点 = task 093 已拍板（2026-10-30 Asia/Shanghai）：首触转化×时序混合 / convert+timing hybrid。** Owner 离线自治 Q1–Q9 整包按本文建议。机制只 **R**（`convert_timing_hybrid_gate` 不进 tune：落后且本步一层复制有效伤害为 0 时，`place_bench` 放上过滤通过且 `_copied_strike>0` 的基础供体）。**下一闸 = Q3**：Diupi 用 `results/t092-gard-zoro-500.db` 数 R would-change，触及负 **236** 局里 **≥15** 才写测试；**未过不写测试、不改 heuristic**。分母重算不是 236 则停。硬门已锁定：100 局种子 `208000..208099` **B≥34 且失败 0，否则回滚**（基线 A69/B31）；电电虫 **≥+3pp** 否决；18000 非完成；冻结 088–091。无卡名。禁止 `prize_pressure_gate`。不宣称 30.4%。证据 dig `docs/digs/2026-10-30-task-092-expand-sample.md`。
 
 
 
@@ -47,6 +47,12 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-30 task 093：Owner 拍板写回（文档；下一闸 Q3）
+
+- **拍板**：Q1–Q9 整包按本文建议。Q1=093 · 首触转化×时序混合；Q2=只 R；Q3=≥15/236；Q4=`convert_timing_hybrid_gate` 不进 tune；Q5=B≥34 且失败 0，否则回滚；Q6=电电虫 ≥+3pp 否决，18000 非完成；Q7=全维持，冻结 088–091；Q8=要落后才启用；Q9=只文档。
+- **硬门**：原文在规格 §5.1。下一闸 Q3（Diupi，`results/t092-gard-zoro-500.db`，数 R would-change）。**未过不写测试、不改 heuristic。**
+- **未做**：Q3 计数、改 `heuristic.py`、写测试、100 局。
 
 ### 2026-10-30 task 093：首触转化×时序混合（文档，待拍板）
 

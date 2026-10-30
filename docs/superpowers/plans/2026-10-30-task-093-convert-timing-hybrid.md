@@ -26,7 +26,7 @@
 ### Task 1 — 文档落盘，然后停
 
 - [x] Step 1: 规格、本计划、`tasks/task 093.md`、`STATUS.md` 焦点与工作记录
-- [ ] Step 2: Owner 勾选 Q1–Q9
-- [ ] Step 3: 仅当拍板含 Q3=计数且重放 ≥15/236：另开实现 PR（先红测，再改 `_decide_main`）
+- [x] Step 2: Owner 勾选 Q1–Q9（2026-10-30 离线自治，整包按本文建议；硬门见规格 §5.1）
+- [ ] Step 3: 仅当 Diupi 重放 R would-change ≥15/236：另开实现 PR（先红测，再改 `_decide_main`）。未过则收口，不写测试、不改 heuristic
 
 本文件没有「写测试 / 改 heuristic」的步骤。

@@ -5,7 +5,20 @@
 
 ## 当前
 
-**当前焦点 = task 093 电电虫 +8pp 过冲 dig 已完成（2026-10-30 Asia/Shanghai）；下一刀仍待 Owner 拍板。** 复述确认 tip ON A**56**/B44 vs OFF A**48**/B52 → ΔN索 **+8.0pp**。翻转 10=帮N索9−害1；OFF 下 A 落后 place=0；R 签名局 13/100（供体莱希拉姆/索罗亚）；电电虫无暗夜王牌、B place 不变 → R 单边加速 N索追奖。dig `docs/digs/2026-10-30-task-093-joltik-overshoot.md`。**推荐：放弃 R**（收窄/换门为备选）。**PR #27 仍关不合**；heuristic main 无 R；**未实现新刀**。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 PASS 49/236。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。**
+**当前焦点 = task 093 已收口：Owner 拍板 A · 放弃 R（2026-10-31 Asia/Shanghai）。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。**PR #27 维持关闭、不合、不重开。** heuristic main **无 R**（本写回未改 `heuristic.py`）。电电虫 dig 结论见 `docs/digs/2026-10-30-task-093-joltik-overshoot.md`（ON A56/B44 vs OFF A48/B52，ΔN索 **+8.0pp**）。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 曾 PASS 49/236，不构成合入理由。
+
+**下一焦点**：残差下一刀待 Owner 另定（另开 task；**不重开** 088–091；**不重开 R、不做收窄 R**）。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。** 未实现新刀。不扩到 stadium / end_turn / JEV / LLM。
+
+### 残差下一刀菜单（092 轴仍开；放弃 R 之后；待 Owner 另定）
+
+R 是 092 菜单 E 的落后补 `place_bench` 实现，已放弃。下列仍开，本步**不实现**任何刀：
+
+- **A（建议）**：非 `place_bench` 的触及后转化刀（例如：已有合格供体时优先挥击/换目标，或首触未转化窗口的 attack/ability 时序；**禁止**再做 R 式落后补 `place_bench`）。须新识别器 + 独立 Q3；不重开 088–091。
+- **B**：触及时点 / 早期奖杯止血（非 P / `early_prize_keep` 旧门；新识别器；划清 086）。
+- **C**：跨格对照扩样本（092 菜单 D：矩阵 / 行级体检后再定刀），validity-first。
+- **D**：暂停窄门堆叠，先做 post-086 矩阵健康复查（加权 |Δ| / N索行）再定刀。
+
+默认建议 **A**。
 
 
 
@@ -47,6 +60,14 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-10-31 task 093：Owner A 放弃 R（收口）
+
+- **拍板**：Owner 选 **A · 放弃 R**（2026-10-31 Asia/Shanghai）。机制 R / `convert_timing_hybrid_gate` 本线永久放弃。不做收窄 R 实验。
+- **#27**：维持关闭、不合、不重开。
+- **heuristic**：main 无 R；本步未改 `heuristic.py`。
+- **093**：收口。电电虫 dig `docs/digs/2026-10-30-task-093-joltik-overshoot.md`。
+- **下一刀**：另开 task，待 Owner 从残差菜单另定（建议 A：非 `place_bench` 触及后转化）。不重开 088–091。不宣称 30.4%。
 
 ### 2026-10-30 task 093：电电虫 +8pp 过冲 dig（完成；未实现新刀）
 

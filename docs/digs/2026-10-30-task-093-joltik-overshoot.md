@@ -99,3 +99,13 @@
 
 - 本 dig：`docs/digs/2026-10-30-task-093-joltik-overshoot.md`
 - 既有否决 dig：`docs/digs/2026-10-30-task-093-100-hard-accept.md`
+
+## 6. Owner 拍板（2026-10-31 Asia/Shanghai）
+
+**A · 放弃 R。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。
+
+- **PR #27** 维持关闭：不合、不重开、不重开合入。
+- **不做**收窄 R 实验（不砍 ACE 后窗、不改奖差、不限次）。
+- heuristic 保持 main **无 R**；本写回未改 `heuristic.py`。
+- task 093 **收口**。残差下一刀待 Owner 另定，另开新 task（不重开 088–091；不重开 R）。菜单见 `STATUS.md`「当前」。
+- 不宣称 30.4%。

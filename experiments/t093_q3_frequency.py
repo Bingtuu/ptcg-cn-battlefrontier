@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 task 093 Q3 frequency gate (read-only) — mechanism R.
 
@@ -181,7 +180,7 @@ class ProbeHeuristic:
         if pair is None:
             return False, info
         info["is_copy"] = True
-        atk, node = pair
+        atk, _node = pair
         active = view.own.active
         if active is None or not _energy_satisfied(active.attached_energy, atk.cost):
             return False, info
@@ -244,8 +243,7 @@ class ProbeHeuristic:
             best = 0
             for idx in range(len(card.card.attacks)):
                 dmg, _ko = self.inner._copied_strike(view, temp, idx)
-                if dmg > best:
-                    best = dmg
+                best = max(best, dmg)
             strike_pos.append(
                 {
                     "iid": a.iid,
@@ -324,10 +322,10 @@ class ProbeHeuristic:
 
 def main():
     from battlefrontier.runner.experiment import (
+        build_agents,
+        load_db_path,
         load_experiment,
         prepare_experiment,
-        load_db_path,
-        build_agents,
     )
     from battlefrontier.runner.play import play_game
 
@@ -468,8 +466,8 @@ def main():
             text=True,
         ).strip()
         out["tip_sha_local_main"] = tip
-    except Exception:
-        pass
+    except (OSError, subprocess.CalledProcessError):
+        tip = None
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(

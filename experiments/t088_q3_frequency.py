@@ -1,4 +1,3 @@
-﻿# -*- coding: utf-8 -*-
 """
 task 088 Q3 frequency gate (read-only) — strict first-touch window.
 
@@ -18,9 +17,14 @@ Would-change: 上述 choose 上 C 键最优 ≠ 实际 chosen。
 Pass: 机会局 ≥15/40。
 """
 from __future__ import annotations
-import collections, json, sqlite3, sys
+
+import collections
+import json
+import sqlite3
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 DB = Path("results/t086-gard-zoro.db")
@@ -52,8 +56,8 @@ for name, h, rb, attacks in conn_cards.execute(
                     digits = "".join(ch for ch in d if ch.isdigit())
                     if digits:
                         mx = max(mx, int(digits))
-        except Exception:
-            pass
+        except (TypeError, ValueError):
+            arr = []
     ATKMAX[name] = max(mx, ATKMAX.get(name, 0))
 
 
@@ -110,7 +114,6 @@ class Board:
     prizes_left: dict = field(default_factory=lambda: {0: 6, 1: 6})
 
     def bench(self, player: int):
-        act = self.active.get(player)
         return [m for m in self.mons.values() if m.zone == "bench" and owner(m.iid) == player]
 
     def all_in_play(self, player: int):
@@ -276,9 +279,14 @@ def main():
             if e.get("kind") == "attack" and e.get("player") == 0:
                 break
             # turn bump past first
-            if e.get("turn") is not None and evs[first_i][1].get("turn") is not None:
-                if e.get("turn") > evs[first_i][1].get("turn") and e.get("player") == 0 and e.get("kind") == "attack":
-                    break
+            if (
+                e.get("turn") is not None
+                and evs[first_i][1].get("turn") is not None
+                and e.get("turn") > evs[first_i][1].get("turn")
+                and e.get("player") == 0
+                and e.get("kind") == "attack"
+            ):
+                break
         if converted:
             continue
 
@@ -313,7 +321,7 @@ def main():
 
         # board to start
         board = Board()
-        for i in range(0, start):
+        for i in range(start):
             apply_event(board, evs[i][1])
 
         # First pass: find paid_dmg from first ace chain
@@ -333,7 +341,7 @@ def main():
 
         # walk window with board
         board = Board()
-        for i in range(0, start):
+        for i in range(start):
             apply_event(board, evs[i][1])
 
         for i in range(start, end + 1):
@@ -491,7 +499,7 @@ def main():
     md.append(f"| opp_A / opp_B | {summary['n_opp_A']} / {summary['n_opp_B']} |")
     md.append(f"| 窗口内有 switch choose 的局 | {summary['n_with_switch_choose']} |")
     md.append(f"| 首触链上有 bench-dmg choose 的局 | {summary['n_with_bench_choose']} |")
-    md.append(f"| 阈值 | ≥15/40 |")
+    md.append("| 阈值 | ≥15/40 |")
     md.append(f"| **判定** | {'**PASS**' if passed else '**FAIL / 收口**'} |")
     md.append("\n首触 paid_dmg 分布：`" + json.dumps(summary["paid_dmg_hist"]) + "`\n")
     md.append("\n机会种子：" + (", ".join(map(str, summary["opp_seeds"])) or "（无）") + "\n")

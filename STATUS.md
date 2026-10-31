@@ -9,6 +9,8 @@
 
 **下一焦点**：残差下一刀待 Owner 另定（另开 task；**不重开** 088–091；**不重开 R、不做收窄 R**）。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。** 未实现新刀。不扩到 stadium / end_turn / JEV / LLM。
 
+**M13 校准与验证地基（2026-10-31 完成）**：task 094–096 已完成——`results/m13-baseline/` full(409场)/development(286)/validation(123) 三份双轨包 + manifest，raw/SDK **72/72 全等**、72格 `sim_failed=0`、100/100 串行=并行=post-086 events_hash。full 加权/未加权 |Δ| **18.065%/18.065%**；development **19.195%/18.279%**；validation **16.270%/17.986%**。独立审查 2 Important + 3 Minor 已 TDD 修复；最终全量 pytest **1674 passed**、全仓 Ruff 0.16.4 **零告警**。lint loop 保留新版默认规则，125 个未跟踪本地脚本按 SHA-256 清单移入 `results/m13-scratch/`，6 个已跟踪历史实验脚本 37 项告警已清理；未新增排除或告警抑制。未改 Agent、DSL、引擎规则或对局行为，不提前展开 M14–M16。
+
 ### 残差下一刀菜单（092 轴仍开；放弃 R 之后；待 Owner 另定）
 
 R 是 092 菜单 E 的落后补 `place_bench` 实现，已放弃。下列仍开，本步**不实现**任何刀：

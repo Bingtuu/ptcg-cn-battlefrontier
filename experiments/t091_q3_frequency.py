@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 task 091 Q3 frequency gate (read-only) — mechanism L.
 
@@ -105,31 +104,30 @@ class ProbeHeuristic:
             self.probe.leading_cycle_but_lethal += 1
 
         # L would-change: leading + no lethal + actually fired cycle ability
-        if leading and no_lethal and is_cycle:
-            if not self.probe.opportunity:
-                self.probe.opportunity = True
+        if leading and no_lethal and is_cycle and not self.probe.opportunity:
+            self.probe.opportunity = True
+            holder_name = None
+            try:
+                from battlefrontier.agent.heuristic import _mon_by_iid
+                holder = _mon_by_iid(view, action.iid)
+                holder_name = holder.current.card.name if holder else None
+            except AttributeError:
                 holder_name = None
-                try:
-                    from battlefrontier.agent.heuristic import _mon_by_iid
-                    holder = _mon_by_iid(view, action.iid)
-                    holder_name = holder.current.card.name if holder else None
-                except Exception:
-                    holder_name = None
-                self.probe.examples.append({
-                    "own_prizes": view.own.prizes_count,
-                    "opp_prizes": view.opponent.prizes_count,
-                    "ability_iid": action.iid,
-                    "holder": holder_name,
-                    "played_kind": action.kind,
-                })
+            self.probe.examples.append({
+                "own_prizes": view.own.prizes_count,
+                "opp_prizes": view.opponent.prizes_count,
+                "ability_iid": action.iid,
+                "holder": holder_name,
+                "played_kind": action.kind,
+            })
 
 
 def main():
     from battlefrontier.runner.experiment import (
+        build_agents,
+        load_db_path,
         load_experiment,
         prepare_experiment,
-        load_db_path,
-        build_agents,
     )
     from battlefrontier.runner.play import play_game
 

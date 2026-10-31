@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 task 089 Q3 frequency gate (read-only) — mechanism P.
 
@@ -21,7 +20,11 @@ Pass: 机会局 ≥15/39（若重算分母≠39：停，写回两边种子，不
 不改 heuristic.py。可选 --replay 用同种子引擎重放验证（更慢，需 decks/DSL）。
 """
 from __future__ import annotations
-import argparse, collections, json, sqlite3, sys
+
+import argparse
+import json
+import sqlite3
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,7 +51,7 @@ def _parse_type_field(raw):
     else:
         try:
             obj = json.loads(raw)
-        except Exception:
+        except (TypeError, ValueError):
             return str(raw) if raw else None
     if isinstance(obj, list):
         return obj[0] if obj else None
@@ -114,8 +117,8 @@ def load_cards():
                         cost_list, cost_n = [], 0
                     parsed.append({"name": a.get("name") or "?", "damage": dmg, "cost_n": cost_n, "cost": cost_list})
                     mx = max(mx, dmg)
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                arr = []
         ATKMAX[name] = max(mx, ATKMAX.get(name, 0))
         ATTACKS[name] = parsed
     conn.close()
@@ -587,7 +590,7 @@ def main():
     md.append(f"| 机会局 would-change | **{num_opp}/{denom}** |")
     md.append(f"| 局势局 situation（含已选幸存者） | **{num_sit}/{denom}** |")
     md.append(f"| 首触前有过换上的局 | {num_promote_games} |")
-    md.append(f"| 阈值 | ≥15/39 |")
+    md.append("| 阈值 | ≥15/39 |")
     md.append(f"| **判定** | {'**PASS**' if passed else '**FAIL / 收口**'} |")
     md.append("\n机会种子：" + (", ".join(map(str, out["opp_seeds"])) or "（无）") + "\n")
     md.append("\n### would-change 例\n")

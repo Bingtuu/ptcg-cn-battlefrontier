@@ -1,0 +1,18 @@
+version: 1
+method: time-70-30
+development_fraction: 0.7
+tournament_count: 409
+development_count: 286
+validation_count: 123
+development_last: "limitless:687aa6f4164bc0b13840661e"
+validation_first: "limitless:687ec868164bc0b138408fc9"
+validation_limitation: "真实全量聚合此前已查看；此划分仅从 M13 起冻结为前瞻验证，并非绝对未见 holdout。"
+real:
+  date_from: "2025-04-11"
+  date_to: "2025-08-31"
+  basis: intl_aligned
+  division: master
+baseline:
+  experiment: experiments/v2-calibration.example.yml
+  results: results/v2-calibration-post086.db
+final_seed_start: 600000

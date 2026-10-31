@@ -66,6 +66,7 @@ def pairing_contrast(
     basis: str,
     division: str = "master",
     sample_limit: int = 20,
+    tournament_ids: tuple[str, ...] | None = None,
 ) -> PairingContrast:
     """聚合有向格，并按稳定顺序保留前 sample_limit 行原始对阵。"""
     names = tuple(dict.fromkeys(archetypes))
@@ -73,6 +74,14 @@ def pairing_contrast(
         raise ValueError("archetypes 为空（不猜）")
     if sample_limit < 0:
         raise ValueError("sample_limit 不能为负")
+    id_filter = ""
+    id_params: tuple[str, ...] = ()
+    if tournament_ids is not None:
+        if not tournament_ids:
+            raise ValueError("tournament_ids 为空（不猜）")
+        id_marks = ",".join("?" * len(tournament_ids))
+        id_filter = f"AND pp.tournament_id IN ({id_marks})"
+        id_params = tournament_ids
     marks = ",".join("?" * len(names))
     sql = f"""
         SELECT pp.tournament_id, pp.phase, pp.round, pp.table_no,
@@ -82,12 +91,13 @@ def pairing_contrast(
         WHERE t.date BETWEEN ? AND ?
           AND t.basis = ?
           AND (t.division = ? OR t.division IS NULL)
+          {id_filter}
           AND pp.archetype_name_1 IN ({marks})
           AND pp.archetype_name_2 IN ({marks})
           AND pp.archetype_name_1 <> pp.archetype_name_2
         ORDER BY pp.tournament_id, pp.phase, pp.round, pp.table_no
     """
-    params = (date_from, date_to, basis, division, *names, *names)
+    params = (date_from, date_to, basis, division, *id_params, *names, *names)
     conn = _connect_ro(db_path)
     try:
         try:

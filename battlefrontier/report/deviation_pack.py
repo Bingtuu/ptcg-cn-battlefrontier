@@ -71,13 +71,18 @@ def _cell_row(cell: CalibrationCell) -> dict[str, object]:
 
 
 def deviation_payload(rep: CalibrationReport) -> dict[str, object]:
-    return {
+    payload = {
         "group_name": rep.group_name,
         "weighted_mean_abs_delta": rep.weighted_mean_abs_delta,
         "ci_coverage": rep.ci_coverage,
         "meta": rep.meta,
         "cells": [_cell_row(c) for c in rep.cells],
     }
+    if rep.meta.get("validation_split"):
+        from battlefrontier.report.validation import calibration_summary
+
+        payload["summary"] = calibration_summary(rep)
+    return payload
 
 
 def write_deviation_pack(directory: str | Path, rep: CalibrationReport) -> dict[str, Path]:

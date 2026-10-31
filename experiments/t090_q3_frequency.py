@@ -1,4 +1,3 @@
-﻿# -*- coding: utf-8 -*-
 """
 task 090 Q3 frequency gate (read-only) — mechanism S.
 
@@ -80,7 +79,6 @@ def _remaining(agent, view, mon) -> int | None:
 
 def _would_reach_supporters(agent, view, by_kind: dict) -> list:
     """复刻 _decide_main 优先级，返回走到支援者档时的支援者 action 列表；否则 []."""
-    from battlefrontier.agent.heuristic import pokemon_score
     from battlefrontier.agent.dsl_estimate import card_has_draw
 
     hand = {c.iid: c for c in view.own.hand}
@@ -176,12 +174,11 @@ class ProbeHeuristic:
             try:
                 active = view.own.active
                 if active is not None and action.attack_index is not None:
-                    attacks = active.current.card.attacks
                     # may include tool attacks; use inner helper if available
                     atks, _ = self.inner._attack_sources(view)
                     if 0 <= action.attack_index < len(atks):
                         atk_name = atks[action.attack_index].name
-            except Exception:
+            except (AttributeError, AssertionError, IndexError, TypeError):
                 atk_name = None
             if atk_name == ACE:
                 is_ace = True
@@ -194,7 +191,6 @@ class ProbeHeuristic:
         return action
 
     def _maybe_count(self, view, by_kind, action, *, before: bool):
-        from battlefrontier.agent.heuristic import pokemon_score
 
         supporters = _would_reach_supporters(self.inner, view, by_kind)
         if not supporters:
@@ -233,18 +229,24 @@ class ProbeHeuristic:
             and winner_rem <= dmg
         )
 
-        if cond_look and koable and winner is not None and not score_is_ko:
-            if before and not self.probe.score_miss:
-                self.probe.score_miss = True
-                self.probe.score_miss_examples.append({
-                    "dmg": dmg,
-                    "winner": winner.current.card.name if winner else None,
-                    "winner_rem": winner_rem,
-                    "koable": [
-                        (m.current.card.name, _remaining(self.inner, view, m))
-                        for m in koable
-                    ],
-                })
+        if (
+            cond_look
+            and koable
+            and winner is not None
+            and not score_is_ko
+            and before
+            and not self.probe.score_miss
+        ):
+            self.probe.score_miss = True
+            self.probe.score_miss_examples.append({
+                "dmg": dmg,
+                "winner": winner.current.card.name if winner else None,
+                "winner_rem": winner_rem,
+                "koable": [
+                    (m.current.card.name, _remaining(self.inner, view, m))
+                    for m in koable
+                ],
+            })
 
         # S pick: among switch cards (min iid), first whose score-winner is KO-able
         s_pick = None
@@ -353,10 +355,10 @@ def recompute_denom(db_path: Path, touch_loss: list[int]) -> list[int]:
 
 def main():
     from battlefrontier.runner.experiment import (
+        build_agents,
+        load_db_path,
         load_experiment,
         prepare_experiment,
-        load_db_path,
-        build_agents,
     )
     from battlefrontier.runner.play import play_game
 

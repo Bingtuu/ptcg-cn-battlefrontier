@@ -18,7 +18,7 @@ dependencies = [
 # ptcgdb SDK（数据层）以本地可编辑路径安装，路径机器相关不入库，见 README「数据依赖」
 dev = [
     "pytest>=8",
-    "ruff>=0.6",
+    "ruff==0.16.4",
     # task 056（D3-3 核销）：M12 蒸馏训练侧（dev-only，训练非复算面 D3-4；
     # engine/agent runtime 路径零 torch import）
     "torch>=2",

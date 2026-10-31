@@ -152,6 +152,122 @@ def _cmd_sensitivity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_calibration_split(args: argparse.Namespace, defn, pool) -> int:
+    """M13：显式赛事切分；真实侧只读 raw 对阵，复用同一校准报告。"""
+    from dataclasses import replace
+
+    import yaml
+
+    from battlefrontier.data.pairings import pairing_contrast
+    from battlefrontier.data.validation import tournament_time_split
+    from battlefrontier.report.calibration import (
+        REAL_MIN_N,
+        calibration_report,
+        format_calibration,
+    )
+    from battlefrontier.report.deviation_pack import write_deviation_pack
+    from battlefrontier.report.validation import write_validation_manifest
+
+    protocol_path = Path(args.validation_protocol or "config/m13-validation-v1.yml")
+    real_db_path = args.db or load_db_path()
+    try:
+        protocol = yaml.safe_load(protocol_path.read_text(encoding="utf-8"))
+        if protocol.get("method") != args.tournament_split:
+            raise ValueError("协议 method 与 --tournament-split 不一致")
+        if float(protocol["development_fraction"]) != 0.7:
+            raise ValueError("time-70-30 协议 development_fraction 必须为 0.7")
+        real = protocol["real"]
+        split = tournament_time_split(
+            real_db_path,
+            date_from=real["date_from"], date_to=real["date_to"],
+            basis=real["basis"], division=real.get("division", "master"),
+            development_fraction=float(protocol["development_fraction"]),
+        )
+        for key in (
+            "tournament_count", "development_count", "validation_count",
+            "development_last", "validation_first",
+        ):
+            if split.meta[key] != protocol[key]:
+                raise ValueError(
+                    f"协议{key}={protocol[key]!r} 与实际 {split.meta[key]!r} 不一致"
+                )
+        contrasts = {
+            "full": pairing_contrast(
+                real_db_path, [d.en_archetype for d in pool.decks],
+                date_from=real["date_from"], date_to=real["date_to"],
+                basis=real["basis"], division=real.get("division", "master"),
+                sample_limit=0,
+            ),
+            "development": pairing_contrast(
+                real_db_path, [d.en_archetype for d in pool.decks],
+                date_from=real["date_from"], date_to=real["date_to"],
+                basis=real["basis"], division=real.get("division", "master"),
+                sample_limit=0, tournament_ids=split.development_ids,
+            ),
+            "validation": pairing_contrast(
+                real_db_path, [d.en_archetype for d in pool.decks],
+                date_from=real["date_from"], date_to=real["date_to"],
+                basis=real["basis"], division=real.get("division", "master"),
+                sample_limit=0, tournament_ids=split.validation_ids,
+            ),
+        }
+        reports = {}
+        db = ResultsDB(args.results)
+        try:
+            for name, contrast in contrasts.items():
+                real_meta = {
+                    "date_from": real["date_from"], "date_to": real["date_to"],
+                    "basis": real["basis"], "division": real.get("division", "master"),
+                    "min_n": REAL_MIN_N, "n_tournaments": (
+                        split.meta["tournament_count"] if name == "full"
+                        else split.meta[f"{name}_count"]
+                    ),
+                    "n_games_used": sum(c.n for c in contrast.cells) // 2,
+                    "scope": "pool_raw_pairings",
+                }
+                rep = calibration_report(db, defn, pool, list(contrast.cells), real_meta)
+                reports[name] = replace(rep, meta={
+                    **rep.meta,
+                    "validation_split": args.tournament_split,
+                    "validation_limitation": protocol.get(
+                        "validation_limitation",
+                        "真实全量聚合此前已查看；此划分仅从 M13 起冻结为前瞻验证，"
+                        "并非绝对未见 holdout。",
+                    ),
+                })
+        finally:
+            db.close()
+    except (KeyError, TypeError, ValueError, OSError) as e:
+        print(f"错误：赛事切分协议或数据无效：{e}")
+        return 1
+
+    out_dir = Path(args.out) if args.out else Path("results") / f"{defn.name}-validation"
+    paths = []
+    report_paths = {}
+    for name, rep in reports.items():
+        written = write_deviation_pack(out_dir / name, rep)
+        report_paths[name] = written
+        paths.extend(written.values())
+    manifest = write_validation_manifest(
+        out_dir,
+        protocol={
+            **protocol,
+            "actual_split": split.meta,
+            "report_code_version": _code_version(),
+        },
+        reports=reports,
+        artifacts={
+            "experiment": args.experiment,
+            "results": args.results,
+            "real_db": real_db_path,
+        },
+        report_paths=report_paths,
+    )
+    print(format_calibration(reports["full"]))
+    print("偏差包：" + " ".join(str(p) for p in [*paths, manifest]))
+    return 0
+
+
 def _cmd_calibration(args: argparse.Namespace) -> int:
     """M6 偏差表（task 030 WP3）：matrix 实验定义 → 结果库子实验 vs 真实赛事 matchup。"""
     from ptcgdb.sdk import open_db
@@ -173,6 +289,8 @@ def _cmd_calibration(args: argparse.Namespace) -> int:
         print("错误：calibration 需要 matrix 模式实验定义")
         return 1
     pool = load_target_pool(defn.matrix.pool)
+    if args.tournament_split:
+        return _cmd_calibration_split(args, defn, pool)
     sdk = open_db(args.db or load_db_path())
     try:
         real = sdk.stats_matchup(date_from=REAL_DATE_FROM, date_to=REAL_DATE_TO,
@@ -722,6 +840,14 @@ def main(argv: list[str] | None = None) -> int:
     cal_p.add_argument(
         "--out", default=None,
         help="偏差包目录（默认 results/<实验名>-deviation）：同时写 md/html/csv/json",
+    )
+    cal_p.add_argument(
+        "--tournament-split", choices=("time-70-30",), default=None,
+        help="M13：显式按赛事时间切分 full/development/validation 报告",
+    )
+    cal_p.add_argument(
+        "--validation-protocol", default=None,
+        help="切分协议 YAML（默认 config/m13-validation-v1.yml）",
     )
     pr_p = sub.add_parser(
         "pairings",

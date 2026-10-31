@@ -198,4 +198,22 @@ def format_calibration(rep: CalibrationReport) -> str:
             f" / 低置信格 {low_conf}/{len(valid)}（real n<{REAL_LOW_CONF_N}）"
             f" / 最大偏差：{worst.archetype} vs {worst.opponent}"
             f" Δ {_signed_pct(worst.delta)}")
+    if m.get("validation_split"):
+        from battlefrontier.report.validation import calibration_summary
+
+        if limitation := m.get("validation_limitation"):
+            lines.append(f"限制：{limitation}")
+        summary = calibration_summary(rep)
+        if summary["unweighted_mean_abs_delta"] is not None:
+            lines.append(
+                f"扩展汇总：未加权平均 |Δ| {_pct(summary['unweighted_mean_abs_delta'])}"
+                f" / |Δ|≥25% 格 {summary['high_residual_cells']}/{len(valid)}"
+            )
+            for row in summary["rows"]:
+                worst = row["max_cell"]
+                lines.append(
+                    f"行级 {row['archetype']}：加权 |Δ| {_pct(row['weighted_mean_abs_delta'])}"
+                    f" / 未加权 |Δ| {_pct(row['unweighted_mean_abs_delta'])}"
+                    f" / 最大 {worst['opponent']} {_signed_pct(worst['delta'])}"
+                )
     return "\n".join(lines)

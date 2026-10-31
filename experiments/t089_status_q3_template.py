@@ -1,8 +1,11 @@
-# -*- coding: utf-8 -*-
 """Apply Q3 result into STATUS.md + task 089.md after gate run. Fill PASS/FAIL from JSON."""
 from __future__ import annotations
-import json, re, sys
+
+import json
+import re
+import sys
 from pathlib import Path
+
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(r"C:\Vibe Project\Pokebattle")
 j = json.loads((ROOT / "results" / "t089-q3-frequency.json").read_text(encoding="utf-8"))
@@ -51,7 +54,7 @@ s2, n = re.subn(
     focus + "\n\n",
     s,
     count=1,
-    flags=re.S,
+    flags=re.DOTALL,
 )
 print("focus n", n)
 if f"Q3 频数门 {verdict}" not in s2:

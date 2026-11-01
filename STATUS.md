@@ -5,11 +5,13 @@
 
 ## 当前
 
-**当前焦点 = task 097 / M14 结构归因 no-go 已收口并合入 main（2026-11-01）。** 600 局 2×50 MCTS 全部完成且失败 0：多龙×电电虫连续两批显著向真实值改善（+57.0pts CI [+46.1,+67.9]；+59.0pts CI [+47.8,+70.2]），但多龙×N索第二批 +10.0pts 的 CI 下界为 −0.6pts，未满足“两个独立高残差配对连续两批 CI 下界 >0”。结论 **no-go**：不设计 M15 Agent 候选、不改 Agent/DSL/引擎规则；no-go 证据、CRN 统计工具与实验定义随本分支合入 `main`。证据与成本见 `docs/digs/2026-11-01-m14-structure-feasibility.md`；task 097 已同步。
+**当前焦点 = task 098 / M14 后低成本决策差异归因 loop 已找到候选模式（分支 `task/m14-decision-mining`）。** 不新增 MCTS、不改 Agent/DSL/引擎规则，复用 M14 600 局与 111,084 个双侧 `mcts_consider` 决策点；自动方案发现 **多龙×N索 A 侧早期 `use_ability`（全部为多龙奇）** 满足预注册指标：首批 34 点 / 31 局、二批 34 点 / 29 局，MCTS 发生率 31%/29% vs 启发式 77%/61%，合并改善 +21.7pts，CI `[+6.2,+37.2]`，对照无显著反向。结论：**存在可进入启发式规则验证的候选模式**；方向是给早期多龙奇特性加选择性门槛，而不是更多使用。
+
+**上一焦点 = task 097 / M14 结构归因 no-go 已收口并合入 main（2026-11-01）。** 600 局 2×50 MCTS 全部完成且失败 0：多龙×电电虫连续两批显著向真实值改善（+57.0pts CI [+46.1,+67.9]；+59.0pts CI [+47.8,+70.2]），但多龙×N索第二批 +10.0pts 的 CI 下界为 −0.6pts，未满足“两个独立高残差配对连续两批 CI 下界 >0”。结论 **no-go**：不设计 M15 Agent 候选、不改 Agent/DSL/引擎规则；no-go 证据、CRN 统计工具与实验定义随本分支合入 `main`。证据与成本见 `docs/digs/2026-11-01-m14-structure-feasibility.md`；task 097 已同步。
 
 **上一焦点 = task 093 已收口：Owner 拍板 A · 放弃 R（2026-10-31 Asia/Shanghai）。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。**PR #27 维持关闭、不合、不重开。** heuristic main **无 R**（本写回未改 `heuristic.py`）。电电虫 dig 结论见 `docs/digs/2026-10-30-task-093-joltik-overshoot.md`（ON A56/B44 vs OFF A48/B52，ΔN索 **+8.0pp**）。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 曾 PASS 49/236，不构成合入理由。
 
-**下一焦点**：不再追加 MCTS 预算；先开 task 098，基于已落库的 600 局与约 11 万个 `mcts_consider` 决策点做低成本决策差异挖掘。优先解释多龙×电电虫强效应与多龙×N索近失格，只有出现跨两个独立批次稳定、可启发式表达的决策模式时，才讨论新的候选规则与低成本启发式 CRN 验证。M15 Agent 修改仍冻结；不重开 088–091；不重开 R、不做收窄 R；不宣称 30.4%；不扩到 stadium / end_turn / JEV / LLM。
+**下一焦点**：另开 task，将 task 098 候选转成最小启发式规则（早期多龙奇特性选择性门槛），用新种子启发式 CRN 验证；不新增 MCTS，不重开 088–091，不重开 R，不宣称 30.4%，不扩到 stadium / end_turn / JEV / LLM。
 
 **M13 校准与验证地基（2026-10-31 完成）**：task 094–096 已完成——`results/m13-baseline/` full(409场)/development(286)/validation(123) 三份双轨包 + manifest，raw/SDK **72/72 全等**、72格 `sim_failed=0`、100/100 串行=并行=post-086 events_hash。full 加权/未加权 |Δ| **18.065%/18.065%**；development **19.195%/18.279%**；validation **16.270%/17.986%**。独立审查 2 Important + 3 Minor 已 TDD 修复；最终全量 pytest **1674 passed**、全仓 Ruff 0.16.4 **零告警**。lint loop 保留新版默认规则，125 个未跟踪本地脚本按 SHA-256 清单移入 `results/m13-scratch/`，6 个已跟踪历史实验脚本 37 项告警已清理；未新增排除或告警抑制。未改 Agent、DSL、引擎规则或对局行为；M14 已随后按预登记完成 no-go 归因试点。
 
@@ -64,6 +66,14 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-11-02 task 098：M14 后低成本决策差异归因 loop（候选 pass）
+
+- **范围**：零新增 MCTS；只读 M14 600 局与同种子启发式对照，解析双侧 `mcts_consider` 共 111,084 点；不改 Agent/DSL/引擎规则。
+- **实现**：`battlefrontier/report/m14_decision.py` + `tests/test_m14_decision.py`（11 passed）；全量 pytest **1696 passed**、Ruff 零告警。复现命令见 `tasks/task 098.md`，JSON 落 `results/t098-decision-mining.json`。
+- **候选**：多龙×N索 A 侧早期 `use_ability`（68 个决策点全部为 `use_ability：多龙奇`）。首批 34 点 / 31 局，二批 34 点 / 29 局；MCTS 发生率 31%/29% vs 启发式 77%/61%；合并 +21.7pts，CI `[+6.2,+37.2]`；对照与反向格无显著反向。
+- **结论**：存在可进入启发式规则验证的候选模式——给早期多龙奇特性加选择性门槛，而不是更多使用。回退方案 B 因方案 A 已过线而未触发。
+- **下一步**：另开 task 做最小启发式规则与新种子 CRN 验证；不追加 MCTS。
 
 ### 2026-11-01 task 097 / M14：结构归因与稳定提升可行性（no-go 收口）
 

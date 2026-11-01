@@ -9,8 +9,10 @@ from battlefrontier.report.m14_decision import (
     BatchData,
     DecisionRecord,
     PatternSpec,
+    analyze_pair,
     discover_patterns,
     evaluate_pattern,
+    evaluation_to_dict,
     load_action_records,
     load_decision_records,
     turn_bucket,
@@ -100,6 +102,7 @@ def test_discover_patterns_is_sorted_and_deterministic():
         DecisionRecord(4, 0, 6, "main", "attack", "attack：多龙巴鲁托ex"),
         DecisionRecord(5, 0, 2, "main", "choose", "choose：秘密箱"),
         DecisionRecord(6, 0, 2, "main", "end_turn", "end_turn"),
+        DecisionRecord(7, 0, 6, "main", "attach_energy", "attach_energy：基本超能量→多龙奇"),
     )
     first = discover_patterns(records, max_candidates=32)
     second = discover_patterns(records, max_candidates=32)
@@ -109,6 +112,16 @@ def test_discover_patterns_is_sorted_and_deterministic():
     assert PatternSpec(name="retreat@early", kind="retreat", bucket="early") in first
     assert all(spec.contains != spec.kind for spec in first)
     assert all(spec.kind not in {"choose", "end_turn"} for spec in first)
+    assert all(spec.kind != "attach_energy" or spec.contains is None for spec in first)
+
+
+def test_discover_patterns_deduplicates_equivalent_specs():
+    records = (
+        DecisionRecord(1, 0, 2, "main", "retreat", "retreat：多龙巴鲁托ex"),
+        DecisionRecord(2, 0, 3, "main", "retreat", "retreat：多龙巴鲁托ex"),
+    )
+    specs = discover_patterns(records, max_candidates=16)
+    assert specs == (PatternSpec(name="retreat@early", kind="retreat", bucket="early"),)
 
 
 def test_side_filtering_counts_all_decisions_but_discovers_a_side_only(tmp_path):
@@ -177,3 +190,27 @@ def test_evaluate_pattern_rejects_low_coverage():
     assert result.batch_stats[0].points == 4
     assert result.batch_stats[0].games == 1
     assert not result.passes
+
+
+def test_analyze_pair_returns_passing_candidates_first():
+    b1 = _batch("b1")
+    b2 = _batch("b2", seeds=tuple(range(9, 17)))
+    evaluations = analyze_pair("synthetic", b1, b2, max_candidates=32)
+    assert evaluations
+    assert evaluations[0].passes
+    assert all(evaluation.passes for evaluation in evaluations[:1])
+
+
+def test_evaluation_to_dict_contains_required_metrics():
+    result = evaluate_pattern(
+        PatternSpec(name="retreat@early", kind="retreat", bucket="early"),
+        (_batch("b1"), _batch("b2", seeds=tuple(range(9, 17)))),
+    )
+    payload = evaluation_to_dict(result)
+    assert payload["spec"] == "retreat@early"
+    assert payload["passes"] is True
+    assert payload["combined_effect"] == 1.0
+    assert payload["combined_ci"] == [1.0, 1.0]
+    assert len(payload["batches"]) == 2
+    assert payload["batches"][0]["points"] == 20
+    assert payload["batches"][0]["games"] == 5

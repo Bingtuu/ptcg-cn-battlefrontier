@@ -5,7 +5,9 @@
 
 ## 当前
 
-**当前焦点 = task 093 已收口：Owner 拍板 A · 放弃 R（2026-10-31 Asia/Shanghai）。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。**PR #27 维持关闭、不合、不重开。** heuristic main **无 R**（本写回未改 `heuristic.py`）。电电虫 dig 结论见 `docs/digs/2026-10-30-task-093-joltik-overshoot.md`（ON A56/B44 vs OFF A48/B52，ΔN索 **+8.0pp**）。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 曾 PASS 49/236，不构成合入理由。
+**当前焦点 = task 097 / M14 结构归因 no-go 收口（2026-11-01）。** 600 局 2×50 MCTS 全部完成且失败 0：多龙×电电虫连续两批显著向真实值改善（+57.0pts CI [+46.1,+67.9]；+59.0pts CI [+47.8,+70.2]），但多龙×N索第二批 +10.0pts 的 CI 下界为 −0.6pts，未满足“两个独立高残差配对连续两批 CI 下界 >0”。结论 **no-go**：不设计 M15 Agent 候选、不改 Agent/DSL/引擎规则、不合并 `main`。证据与成本见 `docs/digs/2026-11-01-m14-structure-feasibility.md`；task 097 已同步。
+
+**上一焦点 = task 093 已收口：Owner 拍板 A · 放弃 R（2026-10-31 Asia/Shanghai）。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。**PR #27 维持关闭、不合、不重开。** heuristic main **无 R**（本写回未改 `heuristic.py`）。电电虫 dig 结论见 `docs/digs/2026-10-30-task-093-joltik-overshoot.md`（ON A56/B44 vs OFF A48/B52，ΔN索 **+8.0pp**）。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 曾 PASS 49/236，不构成合入理由。
 
 **下一焦点**：残差下一刀待 Owner 另定（另开 task；**不重开** 088–091；**不重开 R、不做收窄 R**）。冻结 088–091。无卡名。禁止 `prize_pressure_gate`。**不宣称 30.4%。** 未实现新刀。不扩到 stadium / end_turn / JEV / LLM。
 
@@ -62,6 +64,15 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 - ✅ M12 MCTS 行为蒸馏（**部分达成收口**，2026-10-21 用户拍板 D3-7）——task 056–062 ✅：锚 1 ✅（v1 相对天花板 88.8% ≥ 0.85；task 062 特征 v2 补全失败面测量 use_ability 0.009%→20.9%）；锚 3 ✅（v2 全 matrix 18000 局 7.4min，教师口径 ~9h → 73×）；锚 2 过第一门槛（v2 加权 |Δ| 12.5% ≤ 启发式 13.2%，未及 M10 9.7%）；**学生定位分钟级粗筛**（保序两版实证不成立）；残留盲区进 backlog（特性使用质量 / play_stadium / end_turn / copy_attack 多级嵌套）
 
 ## 工作记录
+
+### 2026-11-01 task 097 / M14：结构归因与稳定提升可行性（no-go 收口）
+
+- **实验**：首批四对 2×50 MCTS 各 100 局（300000..303099）；二批至多两对各 100 局（304000/305000）；总计 600 局，失败 0、平局 0。首批墙钟约 21h56m，二批约 5h14m27s，总约 27h12m。
+- **统计**：新增同种子 CRN 报告统计并修正 `winner=0=A` 口径；`tests/test_paired.py` 11 passed，定向 Ruff 通过。
+- **首批**：沙奈朵×N索 −6.0pts CI [−19.0,+7.0]；多龙×N索 +8.0pts CI [−3.4,+19.4]；多龙×电电虫 +57.0pts CI [+46.1,+67.9]；喷火龙×玛俐对照 +2.0pts CI [−12.5,+16.5]。
+- **二批**：多龙×N索 +10.0pts CI **[−0.6,+20.6]**；多龙×电电虫 +59.0pts CI [+47.8,+70.2]。
+- **判定**：仅一个独立高残差配对连续两批 CI 下界 >0；多龙×N索第二批未过线 0.6pts。**no-go**，不进入 M15 策略修改，不合 `main`。
+- **证据**：`docs/digs/2026-11-01-m14-structure-feasibility.md`；结果库与实验定义留本机/分支。
 
 ### 2026-10-31 task 093：Owner A 放弃 R（收口）
 

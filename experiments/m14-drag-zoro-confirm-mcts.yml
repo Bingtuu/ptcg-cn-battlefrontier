@@ -1,0 +1,9 @@
+name: m14-drag-zoro-confirm-mcts-304k
+games: 100
+seed_start: 304000
+decks:
+  a: {source: db, deck_id: "mik_moe:677868"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50}}
+  b: {type: mcts, params: {worlds: 2, iterations: 50}}

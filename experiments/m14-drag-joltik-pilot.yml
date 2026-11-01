@@ -1,0 +1,9 @@
+name: m14-drag-joltik-pilot-302k
+games: 100
+seed_start: 302000
+decks:
+  a: {source: db, deck_id: "mik_moe:677868"}
+  b: {source: db, deck_id: "mik_moe:677291"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50}}
+  b: {type: mcts, params: {worlds: 2, iterations: 50}}

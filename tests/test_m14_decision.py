@@ -88,6 +88,8 @@ def test_load_action_records_reads_executed_actions(tmp_path):
     assert len(records) == 1
     assert records[0].kind == "retreat"
     assert records[0].turn == 2
+    assert records[0].action.startswith("retreat：")
+    assert "多龙巴鲁托ex" in records[0].action
 
 
 def test_discover_patterns_is_sorted_and_deterministic():
@@ -96,6 +98,8 @@ def test_discover_patterns_is_sorted_and_deterministic():
         DecisionRecord(2, 0, 3, "main", "retreat", "retreat：多龙巴鲁托ex"),
         DecisionRecord(3, 0, 4, "main", "attack", "attack：喷射头击"),
         DecisionRecord(4, 0, 6, "main", "attack", "attack：多龙巴鲁托ex"),
+        DecisionRecord(5, 0, 2, "main", "choose", "choose：秘密箱"),
+        DecisionRecord(6, 0, 2, "main", "end_turn", "end_turn"),
     )
     first = discover_patterns(records, max_candidates=32)
     second = discover_patterns(records, max_candidates=32)
@@ -103,6 +107,20 @@ def test_discover_patterns_is_sorted_and_deterministic():
     assert first == tuple(sorted(first, key=lambda p: p.name))
     assert PatternSpec(name="attack@mid", kind="attack", bucket="mid") in first
     assert PatternSpec(name="retreat@early", kind="retreat", bucket="early") in first
+    assert all(spec.contains != spec.kind for spec in first)
+    assert all(spec.kind not in {"choose", "end_turn"} for spec in first)
+
+
+def test_side_filtering_counts_all_decisions_but_discovers_a_side_only(tmp_path):
+    path = _db(tmp_path / "sides.db", {
+        301: [_event("mcts_consider", 0, 2, chosen="retreat：多龙巴鲁托ex"),
+              _event("mcts_consider", 1, 3, chosen="attack：喷射头击")],
+    })
+    all_records = load_decision_records(path, side=None)
+    assert len(all_records) == 2
+    specs = discover_patterns(all_records, max_candidates=16)
+    assert PatternSpec(name="retreat@early", kind="retreat", bucket="early") in specs
+    assert all(spec.kind != "attack" for spec in specs)
 
 
 def _batch(label: str, *, seeds: tuple[int, ...] = tuple(range(1, 9)),

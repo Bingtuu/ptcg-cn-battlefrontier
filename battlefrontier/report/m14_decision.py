@@ -23,6 +23,7 @@ ACTION_KINDS = frozenset({
     "play_stadium", "use_stadium", "attach_energy", "attach_tool",
     "play_trainer", "evolve", "place_bench", "end_turn", "place_active",
 })
+DISCOVERY_KINDS = ACTION_KINDS - {"choose", "end_turn"}
 
 MIN_POINTS_PER_BATCH = 20
 MIN_GAMES_PER_BATCH = 5
@@ -54,8 +55,11 @@ class PatternSpec:
     kind: str | None = None
     bucket: str | None = None
     contains: str | None = None
+    side: int = 0
 
     def matches(self, record: DecisionRecord | ActionRecord) -> bool:
+        if record.side != self.side:
+            return False
         if self.kind is not None and record.kind != self.kind:
             return False
         if self.bucket is not None and turn_bucket(record.turn, record.phase) != self.bucket:
@@ -145,7 +149,7 @@ def _chosen_kind(detail: dict) -> str:
 
 
 def load_decision_records(path: str, *, experiment_id: int = 1,
-                          side: int = 0) -> tuple[DecisionRecord, ...]:
+                          side: int | None = 0) -> tuple[DecisionRecord, ...]:
     con = _connect(path)
     try:
         records: list[DecisionRecord] = []
@@ -155,11 +159,14 @@ def load_decision_records(path: str, *, experiment_id: int = 1,
                 (game["id"],),
             ):
                 event = json.loads(row["event_json"])
-                if event.get("kind") != "mcts_consider" or event.get("player") != side:
+                if event.get("kind") != "mcts_consider":
+                    continue
+                if side is not None and event.get("player") != side:
                     continue
                 records.append(DecisionRecord(
-                    seed=int(game["seed"]), side=side, turn=int(event["turn"]),
-                    phase=str(event["phase"]), kind=_chosen_kind(event["detail"]),
+                    seed=int(game["seed"]), side=int(event["player"]),
+                    turn=int(event["turn"]), phase=str(event["phase"]),
+                    kind=_chosen_kind(event["detail"]),
                     action=str(event["detail"].get("chosen", "")),
                 ))
         return tuple(records)
@@ -168,7 +175,7 @@ def load_decision_records(path: str, *, experiment_id: int = 1,
 
 
 def load_action_records(path: str, *, experiment_id: int = 1,
-                        side: int = 0) -> tuple[ActionRecord, ...]:
+                        side: int | None = 0) -> tuple[ActionRecord, ...]:
     con = _connect(path)
     try:
         records: list[ActionRecord] = []
@@ -178,13 +185,15 @@ def load_action_records(path: str, *, experiment_id: int = 1,
                 (game["id"],),
             ):
                 event = json.loads(row["event_json"])
-                if event.get("kind") not in ACTION_KINDS or event.get("player") != side:
+                if event.get("kind") not in ACTION_KINDS:
+                    continue
+                if side is not None and event.get("player") != side:
                     continue
                 records.append(ActionRecord(
-                    seed=int(game["seed"]), side=side, turn=int(event["turn"]),
-                    phase=str(event["phase"]), kind=str(event["kind"]),
-                    action=json.dumps(event.get("detail", {}), ensure_ascii=False,
-                                      sort_keys=True),
+                    seed=int(game["seed"]), side=int(event["player"]),
+                    turn=int(event["turn"]), phase=str(event["phase"]),
+                    kind=str(event["kind"]),
+                    action=f"{event['kind']}：{json.dumps(event.get('detail', {}), ensure_ascii=False, sort_keys=True)}",
                 ))
         return tuple(records)
     finally:
@@ -197,23 +206,27 @@ def _tokens(action: str) -> tuple[str, ...]:
 
 def discover_patterns(decisions: Iterable[DecisionRecord], *,
                       max_candidates: int = 128,
-                      tokens_per_group: int = 8) -> tuple[PatternSpec, ...]:
-    decisions = tuple(decisions)
+                      tokens_per_group: int = 8,
+                      side: int = 0) -> tuple[PatternSpec, ...]:
+    decisions = tuple(record for record in decisions if record.side == side)
     specs: set[PatternSpec] = set()
     tokens_by_group: dict[tuple[str, str], Counter[str]] = {}
     for record in decisions:
+        if record.kind not in DISCOVERY_KINDS:
+            continue
         bucket = turn_bucket(record.turn, record.phase)
         group = (record.kind, bucket)
         specs.add(PatternSpec(name=f"{record.kind}@{bucket}", kind=record.kind,
-                              bucket=bucket))
+                              bucket=bucket, side=side))
         counts = tokens_by_group.setdefault(group, Counter())
         for token in _tokens(record.action):
-            counts[token] += 1
+            if token != record.kind:
+                counts[token] += 1
     for kind, bucket in sorted(tokens_by_group):
         counts = tokens_by_group[(kind, bucket)]
         for token, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:tokens_per_group]:
             specs.add(PatternSpec(name=f"{kind}@{bucket}[{token}]", kind=kind,
-                                  bucket=bucket, contains=token))
+                                  bucket=bucket, contains=token, side=side))
     return tuple(sorted(specs, key=lambda spec: spec.name)[:max_candidates])
 
 

@@ -72,6 +72,7 @@ task 098 的候选描述为「早期 use_ability 选择性门槛」，机制调�
 
 - task 098 的 +21.7pts 候选模式整体降权：低预算 MCTS 单点决策 near-tie 率过高，决策差异挖掘应优先使用 margin 过滤（如 chosen_visits − max(other) ≥ 10）筛掉噪声点后再评估模式，此为 task 098 工具的改进项而非新验证。
 - 若仍要追该配对，剩余方向是 G2（主线触发抑制）——但其证据同样来自这批 near-tie 决策，预期价值低，不建议在未加 margin 过滤重估前立项。
+- **（2026-11-02 补）上述两遗留均已定量收口**：margin 过滤重分析（`.kimi-code/t099_margin_rescue.py`）显示 MCTS 库内「用/不用特性」与 A 侧结局无关（z1/z2 逐点相同，j1/j2 反向），G2 每局早用率 j1 批次零差距——两条都死透。092 轴菜单 A/E would-change 频数预检（`.kimi-code/t099_wouldchange_precheck.py`，replay 500/500 hash 一致）紧口径 FAIL：可支付直斩漏拿仅 8–11 局、复制斩信号被胜局同频污染、老大拉备战 10 局未过 ≥15 门。详见 `docs/digs/2026-11-02-task099-wouldchange-precheck.md`。**结论：092 轴窄门范式关闭，残差为结构性时点/位置问题，短期无低成本决策点级解。**
 - 校验成本：标定只读解析既有库，零 MCTS、零新对局（约 5 秒墙钟）。
 
 ## 验收记录（测试清单）

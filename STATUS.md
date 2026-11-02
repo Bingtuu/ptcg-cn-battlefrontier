@@ -5,13 +5,15 @@
 
 ## 当前
 
-**当前焦点 = task 098 / M14 后低成本决策差异归因 loop 已找到候选模式（分支 `task/m14-decision-mining`）。** 不新增 MCTS、不改 Agent/DSL/引擎规则，复用 M14 600 局与 111,084 个双侧 `mcts_consider` 决策点；自动方案发现 **多龙×N索 A 侧早期 `use_ability`（全部为多龙奇）** 满足预注册指标：首批 34 点 / 31 局、二批 34 点 / 29 局，MCTS 发生率 31%/29% vs 启发式 77%/61%，合并改善 +21.7pts，CI `[+6.2,+37.2]`，对照无显著反向。结论：**存在可进入启发式规则验证的候选模式**；方向是给早期多龙奇特性加选择性门槛，而不是更多使用。
+**当前焦点 = task 099 / task 098 候选的规则化验证 → 证伪收口（预注册校准 FAIL，2026-11-02，分支 `task/m15-heuristic-gate`，未合 main）。** 机制调研发现 task 098 候选更精确的价值落点在**选择步拿/不拿**（挂起根冻结披露顶 2 张，完全可观测），预注册 G1 gate（R1 双废 pass / R2 关键件保护 / R3 薄牌库白拿，效果结构检测无卡名硬编码），标定协议 = z1 拟合 → z2 内嵌验证（一致率 ≥70% 且每规则命中 ≥20）。**结果 FAIL**：z1 网格最优一致率 51.7%、z2 48.7%，低于「总是拿最优」基线 51.1%——3 条规则在（卡评分 × deck_count）特征上零可泛化信号；更深证据是 **MCTS 决策本身噪声主导**：选择步 pass 率全回合桶恒定（44–53%），选择步 margin 中位 2/100、多龙奇触发点 margin 中位 1 且 **34% 触发点 chosen 非访问领先者**。结论：**task 098 的 +21.7pts 条件效应是「条件相关 + 搜索噪声」混合，不是可复制的因果结构；G1 gate 不实现，零 Agent/DSL/引擎行为变更**。证据：`.kimi-code/t099_calibrate_gate.py` + `results/t099-calibration.json` + `tasks/task 099.md`。遗留：task 098 挖掘工具应加 margin 过滤（chosen_visits − max(other) ≥ 10）后再评估模式；G2 触发抑制证据同源 near-tie 决策，不建议立项。
+
+**上一焦点 = task 098 / M14 后低成本决策差异归因 loop 已找到候选模式（已合入 main 44cffdb）。** 不新增 MCTS、不改 Agent/DSL/引擎规则，复用 M14 600 局与 111,084 个双侧 `mcts_consider` 决策点；自动方案发现 **多龙×N索 A 侧早期 `use_ability`（全部为多龙奇）** 满足预注册指标：首批 34 点 / 31 局、二批 34 点 / 29 局，MCTS 发生率 31%/29% vs 启发式 77%/61%，合并改善 +21.7pts，CI `[+6.2,+37.2]`，对照无显著反向。结论曾记为「存在可进入启发式规则验证的候选模式」——**经 task 099 标定证伪，该候选已降权（见当前焦点）**。
 
 **上一焦点 = task 097 / M14 结构归因 no-go 已收口并合入 main（2026-11-01）。** 600 局 2×50 MCTS 全部完成且失败 0：多龙×电电虫连续两批显著向真实值改善（+57.0pts CI [+46.1,+67.9]；+59.0pts CI [+47.8,+70.2]），但多龙×N索第二批 +10.0pts 的 CI 下界为 −0.6pts，未满足“两个独立高残差配对连续两批 CI 下界 >0”。结论 **no-go**：不设计 M15 Agent 候选、不改 Agent/DSL/引擎规则；no-go 证据、CRN 统计工具与实验定义随本分支合入 `main`。证据与成本见 `docs/digs/2026-11-01-m14-structure-feasibility.md`；task 097 已同步。
 
 **上一焦点 = task 093 已收口：Owner 拍板 A · 放弃 R（2026-10-31 Asia/Shanghai）。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。**PR #27 维持关闭、不合、不重开。** heuristic main **无 R**（本写回未改 `heuristic.py`）。电电虫 dig 结论见 `docs/digs/2026-10-30-task-093-joltik-overshoot.md`（ON A56/B44 vs OFF A48/B52，ΔN索 **+8.0pp**）。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 曾 PASS 49/236，不构成合入理由。
 
-**下一焦点**：另开 task，将 task 098 候选转成最小启发式规则（早期多龙奇特性选择性门槛），用新种子启发式 CRN 验证；不新增 MCTS，不重开 088–091，不重开 R，不宣称 30.4%，不扩到 stadium / end_turn / JEV / LLM。
+**下一焦点**：待定。task 098 候选已被 task 099 标定证伪（见当前焦点）；可选方向：① task 098 工具加 margin 过滤后重估既有模式（零 MCTS、只读）；② 092 轴残差菜单（见下，默认 A）；③ 其他。未获批前不动。不新增 MCTS，不重开 088–091，不重开 R，不宣称 30.4%，不扩到 stadium / end_turn / JEV / LLM。
 
 **M13 校准与验证地基（2026-10-31 完成）**：task 094–096 已完成——`results/m13-baseline/` full(409场)/development(286)/validation(123) 三份双轨包 + manifest，raw/SDK **72/72 全等**、72格 `sim_failed=0`、100/100 串行=并行=post-086 events_hash。full 加权/未加权 |Δ| **18.065%/18.065%**；development **19.195%/18.279%**；validation **16.270%/17.986%**。独立审查 2 Important + 3 Minor 已 TDD 修复；最终全量 pytest **1674 passed**、全仓 Ruff 0.16.4 **零告警**。lint loop 保留新版默认规则，125 个未跟踪本地脚本按 SHA-256 清单移入 `results/m13-scratch/`，6 个已跟踪历史实验脚本 37 项告警已清理；未新增排除或告警抑制。未改 Agent、DSL、引擎规则或对局行为；M14 已随后按预登记完成 no-go 归因试点。
 

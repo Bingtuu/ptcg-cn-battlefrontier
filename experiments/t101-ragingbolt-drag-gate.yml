@@ -1,0 +1,9 @@
+name: t101-ragingbolt-drag-gate-800k
+games: 1000
+seed_start: 800000
+decks:
+  a: {source: db, deck_id: "mik_moe:676249"}
+  b: {source: db, deck_id: "mik_moe:677868"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

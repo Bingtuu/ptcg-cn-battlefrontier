@@ -1,0 +1,9 @@
+name: t101-control-drag-zoro-base-800k
+games: 500
+seed_start: 800000
+decks:
+  a: {source: db, deck_id: "mik_moe:677868"}
+  b: {source: db, deck_id: "mik_moe:690359"}
+agents:
+  a: {type: heuristic, params: {boss_conversion_gate: false}}
+  b: {type: heuristic, params: {boss_conversion_gate: false}}

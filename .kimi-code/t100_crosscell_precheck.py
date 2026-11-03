@@ -31,8 +31,9 @@ from battlefrontier.runner.play import DEFAULT_MAX_TURNS, OBSERVATION_KINDS
 
 DB_FILE = ROOT / "results/v2-calibration-post086.db"
 BOSS = "老大的指令"
-ME = 0          # 输家侧 = 玩家 0（deck a = 猛雷鼓 / 火伊布）
-OPP = 1         # 多龙侧
+# 视角：sys.argv[1] = "0"（输家侧，默认）或 "1"（对手侧，B 侧稀释读数）
+ME = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+OPP = 1 - ME
 PAIRS = [
     ("ragingbolt-drag", "mik_moe:676249", "mik_moe:677868"),
     ("flareon-drag", "mik_moe:689871", "mik_moe:677868"),

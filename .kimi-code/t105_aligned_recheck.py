@@ -13,6 +13,7 @@ import json
 import math
 import random
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -20,7 +21,28 @@ DB = "file:C:/Vibe Project/Pokearena/data/ptcg-cn.db?mode=ro"
 PACK = ROOT / "results/m13-baseline/full/deviation.json"
 UPSTREAM_MANIFEST = Path("C:/Vibe Project/Pokearena/dist/manifest.json")
 OUT = ROOT / "results/t105-aligned-recheck.json"
+HISTORY = ROOT / "results/t105-sentinel-history.jsonl"
 BOOT = 10_000
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def emit(state: dict) -> None:
+    """写当前状态 JSON + append-only 历史行（周检增量对比基座）。"""
+    text = json.dumps(state, ensure_ascii=False, indent=1)
+    OUT.write_text(text, encoding="utf-8")
+    line = {"checked_at": state.get("checked_at"), "state": state.get("state"),
+            "pool_games": state["census"]["pool_games"],
+            "pairs_n_ge_20": state["census"]["pairs_n_ge_20"],
+            "upstream_version": state["upstream"].get("version"),
+            "upstream_data_version": state["upstream"].get("data_version")}
+    if state.get("state") == "RUN":
+        line["ruling"] = state["verdict"]["ruling"]
+    with HISTORY.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    print(text)
 
 POOL = ["Dragapult Dusknoir", "Grimmsnarl Froslass", "Gardevoir", "Raging Bolt Ogerpon",
         "N's Zoroark", "Dragapult", "Flareon Noctowl", "Charizard Pidgeot", "Joltik Box"]
@@ -95,7 +117,7 @@ def main() -> None:
         manifest = {"version": m.get("version"), "data_version": m.get("data_version"),
                     "built_at": m.get("built_at")}
 
-    state = {"task": 105, "window_from": WINDOW_LO, "upstream": manifest,
+    state = {"task": 105, "checked_at": _now(), "window_from": WINDOW_LO, "upstream": manifest,
              "census": {"pool_games": total,
                         "pairs_with_games": sum(1 for p in pairs if p["n"] > 0),
                         "pairs_n_ge_20": len(qualified),
@@ -104,8 +126,7 @@ def main() -> None:
     if len(qualified) < 10:
         state["state"] = "WAIT"
         state["note"] = f"功效不足：{len(qualified)} 格 n>=20（需 >=26 且总对局 >=1000）"
-        OUT.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
-        print(json.dumps(state, ensure_ascii=False, indent=1))
+        emit(state)
         return
 
     # 有效有向格：n>=20 且非退化（0/1 只在 n<20 时剔除，此处 n>=20 故保留端点）
@@ -155,8 +176,7 @@ def main() -> None:
             "dropped_small_cells": dropped,
             "per_cell": flat,
         }
-    OUT.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps(state, ensure_ascii=False, indent=1))
+    emit(state)
 
 
 if __name__ == "__main__":

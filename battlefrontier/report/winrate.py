@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from battlefrontier.report import SIM_INTERPRETATION_NOTE
 from battlefrontier.runner.results_db import ResultsDB
 
 Z_95 = 1.959964  # 正态 97.5 分位
@@ -127,6 +128,7 @@ def format_report(r: WinrateReport) -> str:
          f"CI {_pct(r.as_first.ci_a[0])}..{_pct(r.as_first.ci_a[1])}）"),
         (f"后攻时 A 胜率 {_pct(r.as_second.wr_a)}（{r.as_second.wins_a}/{r.as_second.decided}，"
          f"CI {_pct(r.as_second.ci_a[0])}..{_pct(r.as_second.ci_a[1])}）"),
+        SIM_INTERPRETATION_NOTE,
     ]
     warning = status_warning(r.name, r.status)
     if warning is not None:

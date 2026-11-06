@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from battlefrontier.data.pool import TargetPool
+from battlefrontier.report import CALIBRATION_EXTRA_NOTE, SIM_INTERPRETATION_NOTE
 from battlefrontier.report.winrate import wilson_ci
 from battlefrontier.runner.experiment import ExperimentDef
 from battlefrontier.runner.results_db import ResultsDB
@@ -170,6 +171,7 @@ def format_calibration(rep: CalibrationReport) -> str:
          f" / 口径哈希 rules={rget('name_group_rules_hash')}"
          f" tiers={rget('tournament_tiers_hash')}"),
         "口径：分母 = 决定局（平局剔除单列）；失败局单列不进分母；Δ = sim − real",
+        f"{SIM_INTERPRETATION_NOTE}；{CALIBRATION_EXTRA_NOTE}",
     ]
     for w in m.get("warnings", []):  # 非完成态子实验告警（task 038，D-038-4）
         lines.append(f"⚠ 告警：{w}")

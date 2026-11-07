@@ -11,8 +11,9 @@ take_prize → …。状态结算时点一律不变（task 026 WP2 / D-WP2-1 / t
 只动事件发射顺序；窗口外（无 DSL 招式 / 混乱自伤 / 训练家·特性·场馆效果）零变化。
 """
 
-from helpers import engine_at, inst
+from helpers import basic, energy, engine_at, in_play, inst
 from test_attack import battle, energies, mon
+from test_primitives_wp6 import CACTUS_DOC, attack_engine, cactus
 
 from battlefrontier.dsl import parse_card_doc
 from battlefrontier.engine.actions import Action
@@ -129,9 +130,6 @@ def test_plain_attack_ko_order_unchanged() -> None:
 
 
 # ── 排水内层帧回归（task 108 开发期 replay 抽查实证漏洞）────────────────────
-
-from helpers import basic, energy, in_play  # noqa: E402  (放尾部避免与顶部 helpers 导入冲突观感)
-from test_primitives_wp6 import CACTUS_DOC, attack_engine, cactus  # noqa: E402
 
 COUNTER_DOC = parse_card_doc("""
 card:

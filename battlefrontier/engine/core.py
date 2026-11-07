@@ -107,6 +107,10 @@ def resolve_tool_attacks(
 # 新规则盒在此登记；无规则盒 / 未知规则盒恒 1；V-UNION 一期不实现）
 PRIZE_BY_RULE_BOX = {"ex": 2, "V": 2, "VSTAR": 2, "VMAX": 3}
 
+# 招式效果窗口内滞后冲刷的事件 kind（task 108）：昏厥结算包（昏厥/拿奖/奖赏加成/
+# 终局）在 attack completion 链收尾统一入流——事件序符合因果，状态结算时点不变
+_DEFERRED_EVENT_KINDS = frozenset({"knockout", "take_prize", "prize_bonus", "game_over"})
+
 
 def _energy_satisfied(attached: tuple[CardInstance, ...], cost: tuple[str, ...]) -> bool:
     """招式能量需求（rules-manual §6）：指定属性逐个匹配，无色（"无"）需求任意属性可抵。"""
@@ -218,6 +222,13 @@ class GameEngine:
         # legal_actions 状态恒等缓存（task 037 WP4，见 legal_actions 注释）；
         # 克隆不继承（构造即 None——克隆态是新状态对象，旧缓存恒 miss）
         self._legal_cache: tuple[GameState, int, list] | None = None
+        # 招式效果窗口的昏厥事件缓冲（task 108）：attack completion 链执行期间
+        # knockout / take_prize / prize_bonus / game_over 先入缓冲、链收尾统一
+        # 冲刷——事件序符合因果（招式文本效果先于昏厥/拿奖），状态结算时点不变。
+        # 深度计数（触发效果的 completion="attack" 内层帧会嵌套）；克隆不继承
+        # （同 _in_effect 口径：决策点克隆恒处默认值，随构造重置）
+        self._ko_event_buffer: list[tuple[str, int | None, dict[str, object]]] = []
+        self._attack_defer_depth = 0
 
     def _effect_doc(self, card: CardDef) -> CardEffectDoc | None:
         """effect_doc 的缓存版（task 037 WP2）：热路径逐次 dict 查找 + isinstance 摊销。"""
@@ -253,6 +264,12 @@ class GameEngine:
     # ── 事件 ─────────────────────────────────────────────
 
     def _emit(self, kind: str, player: int | None = None, **detail: object) -> None:
+        # 招式效果窗口的昏厥事件滞后（task 108）：缓冲期内昏厥结算包事件先入缓冲，
+        # 链收尾统一冲刷（见 _flush_ko_events）——只动事件发射序，状态 settlement
+        # 时点不变（check_knockouts / _knockout_one 逻辑零改动）
+        if self._attack_defer_depth > 0 and kind in _DEFERRED_EVENT_KINDS:
+            self._ko_event_buffer.append((kind, player, detail))
+            return
         self.events.append(
             GameEvent(
                 seq=len(self.events),
@@ -263,6 +280,27 @@ class GameEngine:
                 detail=detail,
             )
         )
+
+    def _flush_ko_events(self) -> None:
+        """冲刷招式效果窗口缓冲的昏厥结算事件（task 108）。
+
+        冲刷点 = attack completion 链最外层帧退出（try/finally 保证挂起-恢复、
+        交棒、终局等一切出口都到达）；seq 在冲刷时按当前流尾连续编号。
+        """
+        if not self._ko_event_buffer:
+            return
+        buffered, self._ko_event_buffer = self._ko_event_buffer, []
+        for kind, player, detail in buffered:
+            self.events.append(
+                GameEvent(
+                    seq=len(self.events),
+                    turn=self.state.turn,
+                    phase=self.state.phase,
+                    player=player,
+                    kind=kind,
+                    detail=detail,
+                )
+            )
 
     # ── 开局（规则书「游戏的准备」）─────────────────────────
 
@@ -275,6 +313,8 @@ class GameEngine:
         选择权留待 Agent 层）；奖赏卡 6 张。
         """
         self.events = []
+        self._ko_event_buffer = []  # task 108：新对局清空残留缓冲（异常中断卫生）
+        self._attack_defer_depth = 0
         for cards in (deck_a, deck_b):
             basics = [c for c in cards if c.supertype == Supertype.POKEMON and c.stage == 0]
             if not basics:
@@ -2612,6 +2652,58 @@ class GameEngine:
         copy_stack: tuple[CopyFrame, ...] = (),
         copy_chain: tuple[tuple[int, str], ...] = (),
     ) -> None:
+        """task 108 包装层：招式效果窗口的昏厥事件缓冲进出。
+
+        completion="attack" 的帧进入时深度 +1、退出时 -1（try/finally 覆盖一切
+        出口）。冲刷有两个关口，合起来覆盖全部完成形态：
+        - impl 完成段深度 1 门控冲刷（effect_end 后、排水前）——本帧窗口的昏厥
+          块在触发器排水之前入流；
+        - 此处深度 0 且未挂起（pending_choice 为空）冲刷——覆盖「完成段已过后
+          的排水内层帧」（反伤等 completion="attack" 触发帧深度 2 完成时不冲刷，
+          由最外层退到 0 在这里补冲；replay 抽查种子 300003 实证过缺此关口丢块）。
+        挂起（pending_choice 非空）不冲刷，缓冲跨挂起保持，恢复后由完成段统一
+        入流。嵌套顺序 = 结算发生顺序。缓冲保持在引擎实例上（非 state），克隆
+        不继承（同 _in_effect 口径），choose 恢复经本包装层重新进入。
+        """
+        if completion == "attack":
+            self._attack_defer_depth += 1
+        try:
+            self._run_or_suspend_impl(
+                player, card, effect_index, start, choice, carry, completion,
+                inner=inner, outer_cursor=outer_cursor, outer_choice=outer_choice,
+                inner_done=inner_done, flip=flip, cost_discarded=cost_discarded,
+                discarded_count=discarded_count, attacker_iid=attacker_iid,
+                flip_heads_count=flip_heads_count,
+                prev_optional_done=prev_optional_done, outer_carry=outer_carry,
+                copy_stack=copy_stack, copy_chain=copy_chain,
+            )
+        finally:
+            if completion == "attack":
+                self._attack_defer_depth -= 1
+                # 深度 0 且未挂起 = 整条 attack 链真正完成：补冲排水内层帧（深度 2
+                # 完成段不冲）留下的缓冲；挂起（pending_choice 非空）保持缓冲（task 108）
+                if (
+                    self._attack_defer_depth == 0
+                    and self.state.pending_choice is None
+                ):
+                    self._flush_ko_events()
+
+    def _run_or_suspend_impl(
+        self, player: int, card: CardInstance, effect_index: int,
+        start: int, choice: tuple[int, ...] | None = None,
+        carry: tuple[int, ...] = (), completion: str = "trainer",
+        *, inner: tuple[str, str, str] | None = None, outer_cursor: int = -1,
+        outer_choice: tuple[int, ...] = (), inner_done: bool = False,
+        flip: bool | None = None,
+        cost_discarded: tuple[int, ...] = (),
+        discarded_count: int = 0,
+        attacker_iid: int | None = None,
+        flip_heads_count: int | None = None,
+        prev_optional_done: bool | None = None,
+        outer_carry: tuple[int, ...] = (),
+        copy_stack: tuple[CopyFrame, ...] = (),
+        copy_chain: tuple[tuple[int, str], ...] = (),
+    ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
         嵌套帧（task 020 / task 076）：inner 非空时按 inner 定位内层效果续跑
@@ -2746,6 +2838,11 @@ class GameEngine:
             return
         # 效果完成：训练家卡本体进弃牌区（规则书·训练家卡）；特性不弃置；
         # 攻击结算完毕推进对手回合（rules-manual §6：攻击后回合结束）。
+        # task 108：招式效果窗口的昏厥事件冲刷点——effect_end 之后、排水/换上/
+        # 回合推进之前，由最外层 attack 帧（深度 1）统一冲刷（内层触发帧缓冲
+        # 保留到外层冲刷，顺序 = 结算发生顺序）；挂起路径不走本段、不冲刷。
+        if completion == "attack" and self._attack_defer_depth == 1:
+            self._flush_ko_events()
         if completion == "trainer":
             p = self.state.players[player]
             self._set_player(player, p.model_copy(update={"discard": p.discard + (card,)}))

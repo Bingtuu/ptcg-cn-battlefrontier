@@ -30,6 +30,13 @@ attack → effect_start → knockout → take_prize → effect_primitive ×n →
 4. TDD 红先行：新测试断言新序（`effect_primitive` 先于 `knockout`）；存量断言旧序的测试按「语义评估」更新并逐条注明。
 5. 不回改历史结果包（m13 哈希为历史 artifact）；replay render 无需改（读序即新序）。
 
+## 开发期实证修正（2026-11-07）
+
+- **排水内层帧漏洞**：初版只在 impl 完成段（effect_end 后、排水前）设一个冲刷点；replay 抽查（gard-zoro 种子 300003）实证**排水内层帧**（仙人掌式反伤等以 `completion="attack"` 发动的触发帧，深度 2）产生的昏厥事件两块全丢——外层完成段冲刷点在其之前已过，内层完成段深度 2 不冲。存量 1703 测试全绿但无覆盖（该路径靠 replay 抽查才暴露）。
+- **修复**：双关口——(a) impl 完成段深度 1 冲刷（排水前，本帧窗口昏厥块）；(b) 包装层 finally 深度 0 且未挂起（`pending_choice is None`）冲刷（补冲排水内层帧）。挂起两关口都不冲，缓冲跨挂起保持。
+- **回归测试**：`test_drain_inner_frame_ko_events_not_lost`（沙铃仙人掌反伤双昏厥）；变异检查（去掉关口 b）测试如期 FAIL。
+- **replay 抽查 PASS**（`.kimi-code/t108_replay_check.py`，gard-zoro 种子 300000..300019）：事件多重集 20/20、终局 20/20、重排生效 20/20、串行 events_hash 20/20。
+
 ## 验收
 
 - 红测先行（至少：窗口内昏厥新序测试、窗口外不变测试、挂起-恢复冲刷测试、game_over 保底顺序测试）。

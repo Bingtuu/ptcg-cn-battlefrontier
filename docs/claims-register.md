@@ -33,7 +33,7 @@
 2. 引用 `results/m13-baseline/` 真实侧数字时，注明「**上游 db v20261025.1 后有数据修订，旧包 real 值最多漂移 6.6pts**」（task 103 D3）。
 3. MCTS 深档结论必须带「**归因参照**」限定；禁止把 MCTS 格值当作预测值外推。
 4. 单格深挖服务（委托式）可以用，交付时必须附 M14 过冲先例说明。
-5. 唯一能让「格级外部效度」复活的条件：上游 pairings 延伸到 GHIJ 时代 → 赛制对齐窗重验（backlog A1）。在那之前，本表二的禁句永久有效。
+5. 「格级外部效度」复活条件与对齐窗状态（task 107，2026-11-07 更新）：**(a) 复活条件**——上游 pairings 供给恢复覆盖 GHIJ 赛事（当前为**结构性断档**：2026 年起 GHI 赛事 0 pairings，唯一供给 = SEASAC 类特别赛事、9 池密度约 6%、预注册触发门槛约需 60 场同规模赛事）→ t105 RUN 协议自动执行，R1 则解禁、R2 则二.1/二.2 注明「对齐窗已验证」；**(b) 在那之前，本表二的禁句永久有效**；**(c) 如实状态标注**——对齐窗本身 = 「不可验证（供给约束）」，**非**「已验证零信号」；零信号的最强可用证据 = task 103 低混因子图（牌表重合 88–92% 的 12 格 Pearson −0.010）。
 
 ## 四、证据索引
 
@@ -41,4 +41,5 @@
 - task 098–101 `tasks/task 098.md`–`tasks/task 101.md`（候选→证伪→CRN FAIL 回滚链）
 - task 102 `tasks/task 102.md` + `results/t102-calibration.json`（校准层预注册 FAIL）
 - task 103 `tasks/task 103.md` + `results/t103-regulation-audit.json`（赛制混因审计 + db 修订发现）
+- task 107 `tasks/done/task 107.md`（对齐窗供给约束终局：R3 不可验证声明 + 可达上限量化）
 - M13 地基 `results/m13-baseline/manifest.json`（dev/val 划分与限制声明）

@@ -5,7 +5,9 @@
 
 ## 当前
 
-**当前焦点 = task 106 报告层诚实化已交付（2026-11-06，随本分支合 main）：claims register 守则钉进产品输出。** `format_report` 末行与 `format_calibration` 口径行后追加限定语（`SIM_INTERPRETATION_NOTE`：sim 数字为自对局模拟结果、不构成真实胜率预测；校准表另带 `CALIBRATION_EXTRA_NOTE`：真实窗与卡快照可能不同代、|Δ| 非精度指标）；deviation 包 md/html 内嵌原文自动继承。红测先行 3 测，局部 42 passed + ruff 零告警。详见 `tasks/task 106.md`。
+**当前焦点 = task 107 对齐窗判决供给约束终局已交付（2026-11-07，文档闭环合 main）：R3「不可验证（供给约束）」声明。** 上游确认 GHIJ 赛事 pairings **供给侧拿不到**（非采集未跑）：2026-01 起 GHI 环境 390 场元数据赛事 pairings 覆盖 0 场，全库 2026 年 pairings 仅 4 场 SEASAC（1,063 行）。本仓只读复算可达上限：t105 口径池内 30 局/6 格/max n=13，乐观口径（partial 全接受）63 局/10 格——9 池密度约 6%，预注册触发门槛（≥1,000 局且 ≥26 格 n≥20）需约 60 场同规模特别赛事，可预见供给下不可达决策级功效。处置：claims register 守则 5 改写三态（复活条件/禁句维持/对齐窗状态注明「不可验证」——区别于 R2「已验证零信号」，零信号最强证据维持 task 103 低混因子图 −0.010）；t105 触发条件原样保留 + 双 sentinel 值守维持，供给恢复即自动复活；task 105/106 归档。下一 goal loop 候选评估结论：已钉死方向清单内无可行新立项，不新增方向（Owner 约束维持）。详见 `tasks/task 107.md`。
+
+**上一焦点 = task 106 报告层诚实化已交付（2026-11-06，随本分支合 main）：claims register 守则钉进产品输出。** `format_report` 末行与 `format_calibration` 口径行后追加限定语（`SIM_INTERPRETATION_NOTE`：sim 数字为自对局模拟结果、不构成真实胜率预测；校准表另带 `CALIBRATION_EXTRA_NOTE`：真实窗与卡快照可能不同代、|Δ| 非精度指标）；deviation 包 md/html 内嵌原文自动继承。红测先行 3 测，局部 42 passed + ruff 零告警。详见 `tasks/task 106.md`。
 
 **上一焦点 = task 105 对齐窗重验预注册 + 自动管道已合 main `b177d9f`（2026-11-06，WAIT 态待命）。** 「数据达标后做什么」在见数据前冻结：RUN 门槛 = 池内 ≥1,000 局且 ≥26 格 n≥20；RUN 态 = 加权 Pearson + 无向格对 bootstrap 10k，CI 下界 >0 → R1 效度复活 / 否则 R2 永久钉死；10–25 格只报点估计（R3）。`.kimi-code/t105_aligned_recheck.py` 单入口三态，数据一到即出判决。当前普查：池内 30 局、最大无向格 n=13、0 格达标。详见 `tasks/task 105.md`。
 
@@ -29,7 +31,7 @@
 
 **上一焦点 = task 093 已收口：Owner 拍板 A · 放弃 R（2026-10-31 Asia/Shanghai）。** 机制 R / `convert_timing_hybrid_gate` 本线永久放弃。**PR #27 维持关闭、不合、不重开。** heuristic main **无 R**（本写回未改 `heuristic.py`）。电电虫 dig 结论见 `docs/digs/2026-10-30-task-093-joltik-overshoot.md`（ON A56/B44 vs OFF A48/B52，ΔN索 **+8.0pp**）。硬门沙奈朵 B41 PASS 证据仍见 `docs/digs/2026-10-30-task-093-100-hard-accept.md`。Q3 曾 PASS 49/236，不构成合入理由。
 
-**下一焦点**：无（当前证据边界内全部路径已闭环；宣称边界见 `docs/claims-register.md`）。窄刀（088–101）实证关闭；报告层单调校准（task 102）与赛制混因复活（task 103）双双钉死——格级外部效度未建立是跨池 + 跨窗 + 低混因子图稳健的结构事实。Backlog A1 第一批已落地（2026-11 上旬：+1,063 行 GHIJ pairings，质量核实通过）；A2 已修复并验证——双轨版本在 `dist/manifest.json`（`version: v20261106.2`，data_version 整数轨 2 与数据变更同步，db 内 meta 表为旧轨遗留不再作准），但对齐窗功效不足（池内仅 30 局 / 最大格 n=7，相关检验不可跑）；**对齐窗重验触发条件 = 池内对局 ≥1,000 且 ≥26 格 n≥20**（路径：169 场 GHIJ 全量抓 pairings + 344 partial 映射补全）。届时回仓动作 = m13 对齐窗新包 + t102/t103 套路重验。不新增 MCTS，不重开 088–091，不重开 R，不宣称 30.4%，不扩到 stadium / end_turn / JEV / LLM。
+**下一焦点**：无（当前证据边界内全部路径已闭环；宣称边界见 `docs/claims-register.md`）。窄刀（088–101）实证关闭；报告层单调校准（task 102）与赛制混因复活（task 103）双双钉死——格级外部效度未建立是跨池 + 跨窗 + 低混因子图稳健的结构事实。**对齐窗重验线终局（task 107，2026-11-07）：GHIJ pairings 供给侧结构性断档（2026 年起 GHI 390 场 0 对局行，唯一供给 = SEASAC 类特别赛事、9 池密度 ~6%），预注册触发条件（池内 ≥1,000 局且 ≥26 格 n≥20）可预见供给下不可达 → 对齐窗状态 = 「不可验证（供给约束）」，R3 声明入 claims register 守则 5。t105 触发条件与双 sentinel 值守原样维持，供给恢复即自动执行 RUN 判决（R1 解禁 / R2 注明「对齐窗已验证」）。不新增 MCTS，不重开 088–091，不重开 R，不宣称 30.4%，不扩到 stadium / end_turn / JEV / LLM。
 
 **M13 校准与验证地基（2026-10-31 完成）**：task 094–096 已完成——`results/m13-baseline/` full(409场)/development(286)/validation(123) 三份双轨包 + manifest，raw/SDK **72/72 全等**、72格 `sim_failed=0`、100/100 串行=并行=post-086 events_hash。full 加权/未加权 |Δ| **18.065%/18.065%**；development **19.195%/18.279%**；validation **16.270%/17.986%**。独立审查 2 Important + 3 Minor 已 TDD 修复；最终全量 pytest **1674 passed**、全仓 Ruff 0.16.4 **零告警**。lint loop 保留新版默认规则，125 个未跟踪本地脚本按 SHA-256 清单移入 `results/m13-scratch/`，6 个已跟踪历史实验脚本 37 项告警已清理；未新增排除或告警抑制。未改 Agent、DSL、引擎规则或对局行为；M14 已随后按预登记完成 no-go 归因试点。
 

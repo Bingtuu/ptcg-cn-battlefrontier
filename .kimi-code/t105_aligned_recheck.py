@@ -1,9 +1,10 @@
 """task 105 — 对齐窗重验自动管道（只读；三态 WAIT/EXPLORATORY/RUN）.
 
-协议见 tasks/task 105.md：
-  RUN 门槛：池内对局 >=1000 且 >=26 无向格 n>=20
+协议见 tasks/task 105.md；RUN 门槛经 task 110 修订为可达子池口径：
+  判定池 = 9 池构筑中在该对齐窗有 >=1 非镜像对局者（每次运行动态重取）
+  K = C(|判定池|, 2)；RUN 门 = qualified >= min(26, ceil(0.85*K)) 且池内对局 >=1000
   RUN 态：加权 Pearson（权重 real_n）+ 无向格对 bootstrap 10k；CI 下界>0 → R1 复活；
-          CI 含 0/上界<0 → R2 钉死；格数 10–25 → EXPLORATORY 只报点估计。
+          CI 含 0/上界<0 → R2 钉死；10 <= qualified < 门 → EXPLORATORY 只报点估计。
 输出 results/t105-aligned-recheck.json。
 """
 
@@ -48,8 +49,9 @@ POOL = ["Dragapult Dusknoir", "Grimmsnarl Froslass", "Gardevoir", "Raging Bolt O
         "N's Zoroark", "Dragapult", "Flareon Noctowl", "Charizard Pidgeot", "Joltik Box"]
 WINDOW_LO = "2026-09-16"
 RUN_MIN_GAMES = 1000
-RUN_MIN_PAIRS = 26
+ORIGINAL_RUN_MIN_PAIRS = 26  # task 105 原门；task 110 起仅作上限
 PAIR_MIN_N = 20
+GATE_COVER = 0.85  # task 110 冻结常数：覆盖可达 meta 的绝大多数交叉格
 
 
 def corr(xs, ys, w) -> float:
@@ -111,6 +113,11 @@ def main() -> None:
     total = sum(p["n"] for p in pairs)
     qualified = [p for p in pairs if p["n"] >= PAIR_MIN_N]
 
+    # task 110：判定池 = 窗内有非镜像出场的池构筑；门 = min(26, ceil(0.85*K))
+    active_pool = sorted({a for a, _ in real} | {b for _, b in real})
+    k_reachable = len(active_pool) * (len(active_pool) - 1) // 2
+    run_gate = min(ORIGINAL_RUN_MIN_PAIRS, math.ceil(GATE_COVER * k_reachable))
+
     manifest = {}
     if UPSTREAM_MANIFEST.exists():
         m = json.loads(UPSTREAM_MANIFEST.read_text(encoding="utf-8"))
@@ -121,11 +128,16 @@ def main() -> None:
              "census": {"pool_games": total,
                         "pairs_with_games": sum(1 for p in pairs if p["n"] > 0),
                         "pairs_n_ge_20": len(qualified),
-                        "max_pair_n": max((p["n"] for p in pairs), default=0)}}
+                        "max_pair_n": max((p["n"] for p in pairs), default=0),
+                        "active_pool": active_pool,
+                        "reachable_pairs": k_reachable,
+                        "run_gate": run_gate}}
 
     if len(qualified) < 10:
         state["state"] = "WAIT"
-        state["note"] = f"功效不足：{len(qualified)} 格 n>=20（需 >=26 且总对局 >=1000）"
+        state["note"] = (f"功效不足：{len(qualified)} 格 n>=20"
+                         f"（需 >={run_gate} 对且总对局 >={RUN_MIN_GAMES}，"
+                         f"task 110 可达子池门）")
         emit(state)
         return
 
@@ -154,7 +166,7 @@ def main() -> None:
     wmad = (sum(c["n"] * abs(c["sim"] - c["real"]) for c in flat)
             / sum(c["n"] for c in flat))
 
-    if len(qualified) < RUN_MIN_PAIRS or total < RUN_MIN_GAMES:
+    if len(qualified) < run_gate or total < RUN_MIN_GAMES:
         state["state"] = "EXPLORATORY"
         state["primary"] = {"pearson": None if point is None else round(point, 3),
                             "ci95": [round(lo, 3), round(hi, 3)],

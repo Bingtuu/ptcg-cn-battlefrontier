@@ -1,0 +1,903 @@
+{
+ "kinds": {
+  "use_ability": {
+   "A": {
+    "drag-zoro": {
+     "strong_points": 337,
+     "maker_games": 148,
+     "maker_winrate": 37.7,
+     "baseline_winrate": 48.4,
+     "lift_pp": -10.7
+    },
+    "drag-joltik": {
+     "strong_points": 217,
+     "maker_games": 110,
+     "maker_winrate": 37.8,
+     "baseline_winrate": 48.8,
+     "lift_pp": -11.0
+    },
+    "char-grim": {
+     "strong_points": 192,
+     "maker_games": 96,
+     "maker_winrate": 48.4,
+     "baseline_winrate": 50.2,
+     "lift_pp": -1.7
+    }
+   },
+   "B": {
+    "drag-zoro": {
+     "heuristic_per_game": 9.06,
+     "teacher_per_game": 13.33,
+     "ratio": 0.68
+    },
+    "drag-joltik": {
+     "heuristic_per_game": 9.71,
+     "teacher_per_game": 10.64,
+     "ratio": 0.913
+    },
+    "char-grim": {
+     "heuristic_per_game": 5.45,
+     "teacher_per_game": 7.79,
+     "ratio": 0.7
+    }
+   },
+   "verdict": "CLOSE_noise_dominated",
+   "samples": [
+    {
+     "pair": "drag-zoro",
+     "seed": 301000,
+     "player": 1,
+     "turn": 4,
+     "chosen": "use_ability：N的索罗亚克ex",
+     "chosen_visits": 45,
+     "margin": 30,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 0,
+     "turn": 10,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 55,
+     "margin": 10,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 0,
+     "turn": 12,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 50,
+     "margin": 22,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 0,
+     "turn": 12,
+     "chosen": "use_ability：愿增猿",
+     "chosen_visits": 57,
+     "margin": 14,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 0,
+     "turn": 14,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 55,
+     "margin": 10,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 1,
+     "turn": 15,
+     "chosen": "use_ability：N的索罗亚克ex",
+     "chosen_visits": 31,
+     "margin": 19,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301002,
+     "player": 0,
+     "turn": 6,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 41,
+     "margin": 11,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301002,
+     "player": 1,
+     "turn": 8,
+     "chosen": "use_ability：N的索罗亚克ex",
+     "chosen_visits": 69,
+     "margin": 38,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 1,
+     "turn": 14,
+     "chosen": "use_ability：梦幻ex",
+     "chosen_visits": 63,
+     "margin": 26,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 0,
+     "turn": 15,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 45,
+     "margin": 17,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302001,
+     "player": 0,
+     "turn": 15,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 48,
+     "margin": 16,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302004,
+     "player": 1,
+     "turn": 1,
+     "chosen": "use_ability：梦幻ex",
+     "chosen_visits": 84,
+     "margin": 68,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302004,
+     "player": 1,
+     "turn": 5,
+     "chosen": "use_ability：梦幻ex",
+     "chosen_visits": 47,
+     "margin": 17,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302005,
+     "player": 0,
+     "turn": 12,
+     "chosen": "use_ability：多龙奇",
+     "chosen_visits": 68,
+     "margin": 36,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302006,
+     "player": 1,
+     "turn": 2,
+     "chosen": "use_ability：梦幻ex",
+     "chosen_visits": 37,
+     "margin": 14,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302006,
+     "player": 1,
+     "turn": 2,
+     "chosen": "use_ability：密勒顿ex",
+     "chosen_visits": 44,
+     "margin": 11,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 1,
+     "turn": 26,
+     "chosen": "use_ability：愿增猿",
+     "chosen_visits": 57,
+     "margin": 14,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303001,
+     "player": 0,
+     "turn": 7,
+     "chosen": "use_ability：米立龙",
+     "chosen_visits": 62,
+     "margin": 40,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303001,
+     "player": 0,
+     "turn": 10,
+     "chosen": "use_ability：愿增猿",
+     "chosen_visits": 54,
+     "margin": 27,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303002,
+     "player": 0,
+     "turn": 6,
+     "chosen": "use_ability：大比鸟ex",
+     "chosen_visits": 32,
+     "margin": 18,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303002,
+     "player": 0,
+     "turn": 11,
+     "chosen": "use_ability：大比鸟ex",
+     "chosen_visits": 69,
+     "margin": 38,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303002,
+     "player": 1,
+     "turn": 14,
+     "chosen": "use_ability：愿增猿",
+     "chosen_visits": 47,
+     "margin": 16,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303003,
+     "player": 1,
+     "turn": 21,
+     "chosen": "use_ability：愿增猿",
+     "chosen_visits": 67,
+     "margin": 34,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303003,
+     "player": 1,
+     "turn": 22,
+     "chosen": "use_ability：愿增猿",
+     "chosen_visits": 57,
+     "margin": 14,
+     "maker_win": 0
+    }
+   ],
+   "totals": {
+    "strong_points": 746,
+    "maker_games": 354,
+    "maker_winrate": 40.5,
+    "lift_pp": -8.5,
+    "neglect_ratios": [
+     0.68,
+     0.913,
+     0.7
+    ]
+   }
+  },
+  "play_stadium": {
+   "A": {
+    "drag-zoro": {
+     "strong_points": 35,
+     "maker_games": 35,
+     "maker_winrate": 37.1,
+     "baseline_winrate": 48.4,
+     "lift_pp": -11.3
+    },
+    "drag-joltik": {
+     "strong_points": 8,
+     "maker_games": 8,
+     "maker_winrate": 37.5,
+     "baseline_winrate": 48.8,
+     "lift_pp": -11.3
+    },
+    "char-grim": {
+     "strong_points": 65,
+     "maker_games": 58,
+     "maker_winrate": 50.8,
+     "baseline_winrate": 50.2,
+     "lift_pp": 0.6
+    }
+   },
+   "B": {
+    "drag-zoro": {
+     "heuristic_per_game": 1.75,
+     "teacher_per_game": 2.52,
+     "ratio": 0.694
+    },
+    "drag-joltik": {
+     "heuristic_per_game": 0.45,
+     "teacher_per_game": 0.84,
+     "ratio": 0.536
+    },
+    "char-grim": {
+     "heuristic_per_game": 2.07,
+     "teacher_per_game": 2.98,
+     "ratio": 0.695
+    }
+   },
+   "verdict": "CLOSE_noise_dominated",
+   "samples": [
+    {
+     "pair": "drag-zoro",
+     "seed": 301002,
+     "player": 1,
+     "turn": 3,
+     "chosen": "play_stadium：N的城堡",
+     "chosen_visits": 55,
+     "margin": 10,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301005,
+     "player": 1,
+     "turn": 18,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 68,
+     "margin": 36,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301009,
+     "player": 1,
+     "turn": 16,
+     "chosen": "play_stadium：N的城堡",
+     "chosen_visits": 34,
+     "margin": 12,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301009,
+     "player": 0,
+     "turn": 17,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 48,
+     "margin": 20,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301011,
+     "player": 0,
+     "turn": 12,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 58,
+     "margin": 16,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301013,
+     "player": 1,
+     "turn": 21,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 56,
+     "margin": 12,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301014,
+     "player": 0,
+     "turn": 1,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 55,
+     "margin": 10,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301016,
+     "player": 1,
+     "turn": 16,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 47,
+     "margin": 12,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302011,
+     "player": 0,
+     "turn": 4,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 66,
+     "margin": 32,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302030,
+     "player": 0,
+     "turn": 12,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 65,
+     "margin": 30,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302048,
+     "player": 0,
+     "turn": 12,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 46,
+     "margin": 15,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302059,
+     "player": 0,
+     "turn": 19,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 41,
+     "margin": 16,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302073,
+     "player": 0,
+     "turn": 6,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 61,
+     "margin": 22,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302087,
+     "player": 0,
+     "turn": 13,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 65,
+     "margin": 30,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302095,
+     "player": 0,
+     "turn": 3,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 63,
+     "margin": 26,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302099,
+     "player": 0,
+     "turn": 14,
+     "chosen": "play_stadium：阻碍之塔",
+     "chosen_visits": 41,
+     "margin": 10,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303001,
+     "player": 0,
+     "turn": 5,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 62,
+     "margin": 24,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303003,
+     "player": 0,
+     "turn": 11,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 55,
+     "margin": 25,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303005,
+     "player": 0,
+     "turn": 9,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 33,
+     "margin": 10,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303006,
+     "player": 0,
+     "turn": 2,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 75,
+     "margin": 50,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303008,
+     "player": 1,
+     "turn": 2,
+     "chosen": "play_stadium：深钵镇",
+     "chosen_visits": 47,
+     "margin": 16,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303008,
+     "player": 1,
+     "turn": 3,
+     "chosen": "play_stadium：尖钉镇道馆",
+     "chosen_visits": 66,
+     "margin": 32,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303009,
+     "player": 1,
+     "turn": 10,
+     "chosen": "play_stadium：尖钉镇道馆",
+     "chosen_visits": 37,
+     "margin": 16,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303010,
+     "player": 1,
+     "turn": 17,
+     "chosen": "play_stadium：尖钉镇道馆",
+     "chosen_visits": 64,
+     "margin": 28,
+     "maker_win": 0
+    }
+   ],
+   "totals": {
+    "strong_points": 108,
+    "maker_games": 101,
+    "maker_winrate": 45.4,
+    "lift_pp": -4.1,
+    "neglect_ratios": [
+     0.694,
+     0.536,
+     0.695
+    ]
+   }
+  },
+  "end_turn": {
+   "A": {
+    "drag-zoro": {
+     "strong_points": 919,
+     "maker_games": 192,
+     "maker_winrate": 49.1,
+     "baseline_winrate": 48.4,
+     "lift_pp": 0.7
+    },
+    "drag-joltik": {
+     "strong_points": 791,
+     "maker_games": 192,
+     "maker_winrate": 48.5,
+     "baseline_winrate": 48.8,
+     "lift_pp": -0.3
+    },
+    "char-grim": {
+     "strong_points": 808,
+     "maker_games": 193,
+     "maker_winrate": 49.8,
+     "baseline_winrate": 50.2,
+     "lift_pp": -0.4
+    }
+   },
+   "B": {
+    "drag-zoro": {
+     "heuristic_per_game": 7.31,
+     "teacher_per_game": 25.06,
+     "ratio": 0.292
+    },
+    "drag-joltik": {
+     "heuristic_per_game": 8.44,
+     "teacher_per_game": 22.51,
+     "ratio": 0.375
+    },
+    "char-grim": {
+     "heuristic_per_game": 8.51,
+     "teacher_per_game": 21.61,
+     "ratio": 0.394
+    }
+   },
+   "verdict": "CLOSE_noise_dominated",
+   "samples": [
+    {
+     "pair": "drag-zoro",
+     "seed": 301000,
+     "player": 1,
+     "turn": 1,
+     "chosen": "end_turn",
+     "chosen_visits": 44,
+     "margin": 11,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301000,
+     "player": 1,
+     "turn": 4,
+     "chosen": "end_turn",
+     "chosen_visits": 50,
+     "margin": 17,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301000,
+     "player": 0,
+     "turn": 7,
+     "chosen": "end_turn",
+     "chosen_visits": 62,
+     "margin": 24,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301000,
+     "player": 0,
+     "turn": 9,
+     "chosen": "end_turn",
+     "chosen_visits": 84,
+     "margin": 68,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301000,
+     "player": 0,
+     "turn": 11,
+     "chosen": "end_turn",
+     "chosen_visits": 67,
+     "margin": 34,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 0,
+     "turn": 1,
+     "chosen": "end_turn",
+     "chosen_visits": 33,
+     "margin": 12,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 0,
+     "turn": 4,
+     "chosen": "end_turn",
+     "chosen_visits": 32,
+     "margin": 13,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-zoro",
+     "seed": 301001,
+     "player": 1,
+     "turn": 7,
+     "chosen": "end_turn",
+     "chosen_visits": 67,
+     "margin": 34,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 1,
+     "turn": 2,
+     "chosen": "end_turn",
+     "chosen_visits": 28,
+     "margin": 10,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 1,
+     "turn": 6,
+     "chosen": "end_turn",
+     "chosen_visits": 50,
+     "margin": 28,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 0,
+     "turn": 14,
+     "chosen": "end_turn",
+     "chosen_visits": 68,
+     "margin": 36,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 0,
+     "turn": 15,
+     "chosen": "end_turn",
+     "chosen_visits": 69,
+     "margin": 38,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 1,
+     "turn": 17,
+     "chosen": "end_turn",
+     "chosen_visits": 44,
+     "margin": 16,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 1,
+     "turn": 19,
+     "chosen": "end_turn",
+     "chosen_visits": 47,
+     "margin": 19,
+     "maker_win": 0
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302000,
+     "player": 0,
+     "turn": 19,
+     "chosen": "end_turn",
+     "chosen_visits": 68,
+     "margin": 36,
+     "maker_win": 1
+    },
+    {
+     "pair": "drag-joltik",
+     "seed": 302001,
+     "player": 0,
+     "turn": 4,
+     "chosen": "end_turn",
+     "chosen_visits": 59,
+     "margin": 18,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 0,
+     "turn": 1,
+     "chosen": "end_turn",
+     "chosen_visits": 59,
+     "margin": 18,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 0,
+     "turn": 4,
+     "chosen": "end_turn",
+     "chosen_visits": 35,
+     "margin": 10,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 1,
+     "turn": 4,
+     "chosen": "end_turn",
+     "chosen_visits": 48,
+     "margin": 33,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 0,
+     "turn": 7,
+     "chosen": "end_turn",
+     "chosen_visits": 43,
+     "margin": 23,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 0,
+     "turn": 8,
+     "chosen": "end_turn",
+     "chosen_visits": 59,
+     "margin": 18,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 0,
+     "turn": 9,
+     "chosen": "end_turn",
+     "chosen_visits": 60,
+     "margin": 20,
+     "maker_win": 1
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 1,
+     "turn": 9,
+     "chosen": "end_turn",
+     "chosen_visits": 61,
+     "margin": 22,
+     "maker_win": 0
+    },
+    {
+     "pair": "char-grim",
+     "seed": 303000,
+     "player": 0,
+     "turn": 12,
+     "chosen": "end_turn",
+     "chosen_visits": 63,
+     "margin": 26,
+     "maker_win": 1
+    }
+   ],
+   "totals": {
+    "strong_points": 2518,
+    "maker_games": 577,
+    "maker_winrate": 49.1,
+    "lift_pp": 0.0,
+    "neglect_ratios": [
+     0.292,
+     0.375,
+     0.394
+    ]
+   }
+  }
+ },
+ "pairs": [
+  "drag-zoro",
+  "drag-joltik",
+  "char-grim"
+ ],
+ "gates": {
+  "margin": 10,
+  "games": 15,
+  "lift_pp": 10.0,
+  "neglect_ratio": 0.3333333333333333
+ }
+}

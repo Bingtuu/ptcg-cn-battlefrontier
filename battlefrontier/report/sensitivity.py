@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from battlefrontier.report import SIM_INTERPRETATION_NOTE
 from battlefrontier.report.winrate import (
     Z_95,
     WinrateReport,
@@ -173,4 +174,6 @@ def format_sensitivity(rep: SensitivityReport) -> str:
             f"（{r.wins_a}/{r.decided}）｜ΔWR {_signed_pct(comp.d_wr)}"
             f"（CI {_signed_pct(comp.d_ci[0])}..{_signed_pct(comp.d_ci[1])}）"
             f"｜z={comp.z:+.2f} p={comp.p:.4g} {_sig_marker(comp.p)}")
+    # task 114：sim 解释限定语（claims register 守则 1；format_report 末行先例）
+    lines.append(SIM_INTERPRETATION_NOTE)
     return "\n".join(lines)

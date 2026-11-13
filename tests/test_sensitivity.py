@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from battlefrontier.report import SIM_INTERPRETATION_NOTE
 from battlefrontier.report.sensitivity import (
     diff_ci,
     format_sensitivity,
@@ -106,6 +107,8 @@ def test_format_sensitivity_meta_and_table(tmp_path):
     assert f"#{base_id}" in text and f"#{var_id}" in text
     assert "v1" in text and "种子" in text and "ΔWR" in text
     assert "65.0%" in text and "35.0%" in text and "-30.0%" in text
+    # task 114：sim 解释限定语（claims register 守则 1；format_report 末行先例）
+    assert text.rstrip().endswith(SIM_INTERPRETATION_NOTE)
 
 
 def test_format_sensitivity_zero_decided(tmp_path):

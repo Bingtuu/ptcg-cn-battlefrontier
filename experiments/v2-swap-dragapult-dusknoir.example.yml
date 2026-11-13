@@ -1,0 +1,26 @@
+# task 113 — v2 换卡敏感性首个正式资产：多龙巴鲁托 黑夜魔灵 1 卡组 × 3 换卡扫描
+# 规格：docs/superpowers/specs/2026-11-13-task-113-v2-swap-asset-design.md
+# base + 3 variants 各 500 局、同种子区间 CRN 成对（对齐 v2 矩阵口径）；启发式 agent。
+# 刀 C = 阴性对照（1-of 边缘科技位互换，预期 |ΔWR| CI 覆盖 0）。
+# 跑批：
+#   bfsim run experiments/v2-swap-dragapult-dusknoir.example.yml --workers 16 --results results/v2-swap-dragapult.db
+#   bfsim sensitivity <base_id> <variant_id>... --results results/v2-swap-dragapult.db --out results/v2-swap-dragapult
+name: v2-swap-dragapult-dusknoir
+games: 500
+seed_start: 400000
+decks:
+  a: {source: db, deck_id: "mik_moe:676344"}
+  b: {source: db, deck_id: "mik_moe:676344"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: swapA-nestball-for-ultraball
+    swaps:
+      - {side: a, out: 高级球, out_count: 1, in: 巢穴球, in_count: 1}
+  - name: swapB-hawlucha-for-dreepy2
+    swaps:
+      - {side: a, out: 多龙奇, out_count: 1, in: 摔角鹰人, in_count: 1}
+  - name: swapC-script-for-yungoos-negctrl
+    swaps:
+      - {side: a, out: 愿增猿, out_count: 1, in: 弗图博士的剧本, in_count: 1}

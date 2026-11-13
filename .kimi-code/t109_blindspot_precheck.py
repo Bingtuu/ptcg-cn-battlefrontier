@@ -81,8 +81,6 @@ def main() -> int:
             a = out["kinds"][k]["A"].setdefault(pair, {})
             pts = strong[k]
             games_hit = len({(p["seed"], p["player"]) for p in pts})
-            games_any = len({(seed_of[g], pl) for g, _ in rows
-                             for pl in (0, 1)})
             wins = sum(p["maker_win"] for p in pts)
             rate = 100.0 * wins / len(pts) if pts else 0.0
             a.update({

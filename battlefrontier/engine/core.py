@@ -1071,6 +1071,32 @@ class GameEngine:
             update["item_lock_mark"] = None
         if update:
             self._set_player(player, p.model_copy(update=update))
+        # task 120：回合末盘面快照（只动事件发射层；检查阶段前，回放可读性）。
+        # _on_turn_end 会被回合结束路径 + 检查入口补调重复经过（同回合同玩家），
+        # 以下「末位事件去重」保证每回合每人只发一条。
+        if not (self.events and self.events[-1].kind == "board_snapshot"
+                and self.events[-1].turn == self.state.turn
+                and self.events[-1].player == player):
+            self._emit("board_snapshot", player=player, **self._board_snapshot())
+
+    def _mon_snapshot(self, mon: InPlayPokemon, player: int) -> str:
+        hp_max = self._effective_hp(mon, player)
+        hp = hp_max - mon.damage
+        return (f"{mon.current.card.name} HP{hp}/{hp_max}"
+                f" 能{len(mon.attached_energy)}")
+
+    def _board_snapshot(self) -> dict[str, object]:
+        """双方盘面紧凑快照：战斗场/备战/手牌/牌库/奖赏（回放渲染用）。"""
+        out: dict[str, object] = {}
+        for i, p in enumerate(self.state.players):
+            out[f"p{i}"] = {
+                "active": self._mon_snapshot(p.active, i) if p.active else None,
+                "bench": [self._mon_snapshot(m, i) for m in p.bench],
+                "hand": len(p.hand),
+                "deck": len(p.deck),
+                "prizes": len(p.prizes),
+            }
+        return out
 
     # ── 宝可梦检查（task 026 WP7，D-WP7-1/2；rules-manual §7.2）──────────────
 

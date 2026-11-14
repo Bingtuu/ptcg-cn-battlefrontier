@@ -44,6 +44,16 @@ def render_log(events: list[GameEvent]) -> str:
         # 观测事件（task 042，D-042-2）：Agent 搜索内部状态外化，回放显式跳过
         if ev.kind == "mcts_consider":
             continue
+        if ev.kind == "board_snapshot":
+            lines.append(f"回合{ev.turn} | —— 盘面（回合结束）——")
+            for side, label in (("p0", "玩家0"), ("p1", "玩家1")):
+                s = ev.detail[side]
+                bench = "、".join(s["bench"]) if s["bench"] else "（空）"
+                active = s["active"] or "无"
+                lines.append(
+                    f"  {label} 战斗场: {active} | 备战: {bench}"
+                    f" | 手牌 {s['hand']} 牌库 {s['deck']} 奖赏 {s['prizes']}")
+            continue
         template = _TEMPLATES.get(ev.kind, ev.kind)
         detail = {"player": ev.player, **ev.detail}
         line = template.format_map(_SafeDict(detail))

@@ -127,6 +127,12 @@ decks:
   a: {source: file, path: my-deck.txt}
 ```
 
+写完卡表先跑预检（秒级、零跑批：60 张校验 / 卡名与印刷命中 / DSL 覆盖状态）：
+
+```bash
+bfsim check-deck my-deck.txt
+```
+
 **场景 2：指定假想敌。** `decks.a` / `decks.b` 完全独立，敌方可以是 db 赛事卡组（`deck_id`）、另一个 file 卡表，或用 `matrix` 段对整池自动展开全部配对（见 §6）。
 
 **场景 3：估算换卡的胜率影响。** 加 `variants` 段（换入卡建议带 `in_id` 指定覆盖印刷），一次跑出 baseline + 各变体（同种子 CRN 成对）：

@@ -370,26 +370,32 @@ def _data_version(db_path: str, snapshot_date: str | None) -> str:
         return str(date)
 
 
+def _resolve_decklist_entry(db, name: str, card_id: str | None):
+    """decklist 单行解析：card_id 给定时按印刷（未命中/卡名不一致显式报错，
+    不猜）；缺省卡名 search 首命中。返回 (card_id, db record)。"""
+    if card_id is not None:
+        rec = db.get_card(card_id)
+        if rec is None:
+            raise ValueError(f"decklist 印刷 card_id 未命中（不猜）: {card_id}")
+        if rec.name_full != name:
+            raise ValueError(
+                f"decklist 印刷与卡名不一致（不猜）: {card_id}"
+                f" =「{rec.name_full}」≠「{name}」")
+        return card_id, rec
+    found = db.search_cards(name=name, limit=1)
+    if not found:
+        raise ValueError(f"decklist 卡名未命中（不猜）: {name}")
+    card_id = found[0].card_id
+    return card_id, db.get_card(card_id)
+
+
 def _load_decklist_file(db, path: str) -> tuple[list[CardDef], list[str]]:
     entries = parse_decklist(Path(path).read_text(encoding="utf-8"))
     cards: list[CardDef] = []
     warnings: list[str] = []
     ids: list[str] = []
     for count, name, card_id in entries:
-        if card_id is not None:
-            rec = db.get_card(card_id)
-            if rec is None:
-                raise ValueError(f"decklist 印刷 card_id 未命中（不猜）: {card_id}")
-            if rec.name_full != name:
-                raise ValueError(
-                    f"decklist 印刷与卡名不一致（不猜）: {card_id}"
-                    f" =「{rec.name_full}」≠「{name}」")
-        else:
-            found = db.search_cards(name=name, limit=1)
-            if not found:
-                raise ValueError(f"decklist 卡名未命中（不猜）: {name}")
-            card_id = found[0].card_id
-            rec = db.get_card(card_id)
+        card_id, rec = _resolve_decklist_entry(db, name, card_id)
         card_def, ws = carddef_from_db(rec)
         warnings.extend(ws)
         cards.extend([card_def] * count)

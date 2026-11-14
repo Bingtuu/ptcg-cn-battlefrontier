@@ -95,6 +95,13 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
+### 2026-11-14 task 119/120/121：使用便利性三层优化（预检 / 盘面快照回放 / 森林图）
+
+- **task 119 ✅ `bfsim check-deck`**：卡表跑前预检（60 张校验 / 卡名与印刷命中 / 每卡 DSL 状态 / 构成汇总），秒级零跑批；experiment.py 抽 `_resolve_decklist_entry` 公共解析助手（run 装载与预检同口径）。6 测（真实 db 跟随 test_deckload 先例）+ CLI 实证（模板 7 张正确拒绝）。
+- **task 120 ✅ 盘面快照回放**：`_on_turn_end` 收尾发射 `board_snapshot`（双方战斗场 HP/能量、备战、手牌/牌库/奖赏；末位事件去重防补调重发）；`render_log` 渲染两行盘面表，旧库回放不破。事件面只增不改（task 108 纪律）；全量 1722 绿零存量断言改动；并行 vs 串行 events_hash 20/20。
+- **task 121 ✅ 换卡森林图**：`forest_svg` 手写轻量 SVG（零图表依赖），每变体 CI 须线 + ΔWR 点 + 零线，显著变体红色加粗，标题内嵌限定语；swap_pack 增产 swap.svg 并内嵌 swap.html；task 117 真实库实证数值一致。
+- **遗留**：提交（119/120/121 同批）。
+
 ### 2026-11-14 task 118：decklist 印刷级行 + README 备赛三场景食谱
 
 - **缺口修复 ✅**：file 卡表导入补 `[card_id]` 印刷后缀（`2 巢穴球 [CSVH1C-043]`；无后缀 = 现状卡名首命中）——消除与 task 115 前 swap 同款的 vanilla 静默退化风险；未命中/卡名不一致显式报错（不猜）。`parse_decklist` 三元组化（存量 2 处解包机械更新）。TDD 红→绿（红 7 → 局部 40 passed + ruff 零告警）。

@@ -121,6 +121,72 @@ _FIELDS = (
 )
 
 
+# ── task 121：森林图（手写轻量 SVG，零图表依赖）────────────
+
+_FOREST_W, _FOREST_ROW_H = 720, 48
+_FOREST_PAD_L, _FOREST_PAD_R, _FOREST_PAD_T, _FOREST_PAD_B = 200, 40, 40, 40
+
+
+def _esc(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def forest_svg(rep: SensitivityReport) -> str:
+    """每变体一行：ΔWR 点估计 + CI 须线 + 零线参照；CI 不跨零加粗着色。
+
+    数值直接取 VariantComparison（与 md/csv/json 同一来源，不另算）。
+    """
+    rows = [c for c in rep.variants if c.d_ci is not None]
+    if not rows:
+        return ('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="60">'
+                '<text x="10" y="30" font-size="14">无可用 CI 的变体</text></svg>')
+    lows = [c.d_ci[0] * 100 for c in rows]
+    highs = [c.d_ci[1] * 100 for c in rows]
+    lo, hi = min(lows + [0.0]), max(highs + [0.0])
+    span = (hi - lo) or 1.0
+    plot_w = _FOREST_W - _FOREST_PAD_L - _FOREST_PAD_R
+
+    def x(v: float) -> float:
+        return _FOREST_PAD_L + (v - lo) / span * plot_w
+
+    height = _FOREST_PAD_T + _FOREST_PAD_B + _FOREST_ROW_H * len(rows)
+    parts = [
+        (f'<svg xmlns="http://www.w3.org/2000/svg" width="{_FOREST_W}" height="{height}" '
+         'font-family="sans-serif">'),
+        (f'<text x="{_FOREST_W // 2}" y="22" text-anchor="middle" font-size="15">'
+         '换卡敏感性森林图（ΔWR %，95% CI；同模拟器内对比，不构成真实预测）</text>'),
+    ]
+    zero_x = x(0.0)
+    parts.append(f'<line x1="{zero_x:.1f}" y1="{_FOREST_PAD_T - 8}" '
+                 f'x2="{zero_x:.1f}" y2="{height - _FOREST_PAD_B + 8}" '
+                 'stroke="#888" stroke-dasharray="4 3"/>')
+    for tick in range(int(lo) // 5 * 5, int(hi) + 6, 5):
+        tx = x(tick)
+        parts.append(f'<line x1="{tx:.1f}" y1="{height - _FOREST_PAD_B}" '
+                     f'x2="{tx:.1f}" y2="{height - _FOREST_PAD_B + 6}" stroke="#444"/>')
+        parts.append(f'<text x="{tx:.1f}" y="{height - _FOREST_PAD_B + 22}" '
+                     f'text-anchor="middle" font-size="12">{tick}%</text>')
+    for i, comp in enumerate(rows):
+        y = _FOREST_PAD_T + _FOREST_ROW_H * i + _FOREST_ROW_H // 2
+        d = comp.d_wr * 100
+        c_lo, c_hi = comp.d_ci[0] * 100, comp.d_ci[1] * 100
+        sig = comp.p is not None and comp.p < 0.05
+        color = "#c0392b" if sig else "#2c3e50"
+        parts.append(f'<text x="{_FOREST_PAD_L - 10}" y="{y + 4}" '
+                     f'text-anchor="end" font-size="13">{_esc(comp.variant)}</text>')
+        parts.append(f'<line x1="{x(c_lo):.1f}" y1="{y}" x2="{x(c_hi):.1f}" y2="{y}" '
+                     f'stroke="{color}" stroke-width="2"/>')
+        for v in (c_lo, c_hi):
+            parts.append(f'<line x1="{x(v):.1f}" y1="{y - 5}" x2="{x(v):.1f}" '
+                         f'y2="{y + 5}" stroke="{color}" stroke-width="2"/>')
+        parts.append(f'<circle cx="{x(d):.1f}" cy="{y}" r="5" fill="{color}"/>')
+        parts.append(f'<text x="{x(c_hi) + 8:.1f}" y="{y + 4}" font-size="12" '
+                     f'fill="{color}">{d:+.1f}%</text>')
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
 def write_swap_pack(directory: str | Path, rep: SensitivityReport,
                     replays: tuple[SwapReplay, ...]) -> dict[str, Path]:
     out = Path(directory)
@@ -131,9 +197,15 @@ def write_swap_pack(directory: str | Path, rep: SensitivityReport,
         "html": out / "swap.html",
         "csv": out / "swap.csv",
         "json": out / "swap.json",
+        "svg": out / "swap.svg",  # task 121：森林图
     }
     paths["md"].write_text(markdown, encoding="utf-8")
-    paths["html"].write_text(deviation_html(markdown), encoding="utf-8")
+    svg = forest_svg(rep)
+    paths["svg"].write_text(svg, encoding="utf-8")
+    html = deviation_html(markdown)
+    # 森林图内嵌（自生成 SVG，变体名已转义；置于转义正文之后）
+    html = html.replace("</pre></body>", f"</pre>\n<h2>森林图</h2>\n{svg}\n</body>")
+    paths["html"].write_text(html, encoding="utf-8")
     rows = swap_rows(rep)
     with paths["csv"].open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(_FIELDS))

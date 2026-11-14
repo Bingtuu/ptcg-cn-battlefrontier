@@ -92,3 +92,26 @@ def test_cli_sensitivity_writes_swap_pack(tmp_path, capsys) -> None:
     variant = next(row for row in payload["rows"] if row["role"] == "variant")
     assert abs(variant["d_wr"] - 0.2) < 1e-9
     assert "使用招式" in (out / "swap.md").read_text(encoding="utf-8")
+
+
+def test_pack_includes_forest_svg_task121(tmp_path) -> None:
+    """task 121：换卡包增产 swap.svg（森林图）并嵌入 swap.html。"""
+    import xml.etree.ElementTree as ET
+
+    from battlefrontier.report.swap_pack import forest_svg
+
+    db, base_id, var_id = _seed(tmp_path)
+    try:
+        rep = sensitivity_report(db, base_id, [var_id])
+        replays = swap_replays(db, rep, 1)
+        paths = write_swap_pack(tmp_path / "pack", rep, replays)
+    finally:
+        db.close()
+    svg = paths["svg"].read_text(encoding="utf-8")
+    ET.fromstring(svg)  # XML 良构
+    comp = rep.variants[0]
+    assert comp.variant in svg
+    assert f"{comp.d_wr * 100:.1f}" in svg  # 点估计数值（%）
+    assert "<svg" in paths["html"].read_text(encoding="utf-8")
+    # 纯函数出口与包内文件一致
+    assert forest_svg(rep) == svg

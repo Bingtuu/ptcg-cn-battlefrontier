@@ -17,6 +17,20 @@ from battlefrontier.runner.experiment import (
 from battlefrontier.runner.results_db import ResultsDB
 
 
+def _cmd_check_deck(args: argparse.Namespace) -> int:
+    """task 119：卡表预检（跑前体检，零跑批）。错误打印并退出码 1。"""
+    from battlefrontier.runner.deck_check import check_decklist, format_deck_check
+
+    db_path = args.db or load_db_path()
+    try:
+        rep = check_decklist(db_path, args.decklist, cards_dir=args.cards_dir)
+    except (ValueError, OSError) as e:
+        print(f"[预检失败] {e}")
+        return 1
+    print(format_deck_check(rep))
+    return 0
+
+
 def _summarize(db: ResultsDB, exp_id: int, label: str, defn) -> str:
     games = db.games(exp_id)
     wins_a = sum(1 for g in games if g["winner"] == 0)
@@ -798,6 +812,11 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="bfsim")
     sub = parser.add_subparsers(dest="cmd")
+    chk_deck_p = sub.add_parser("check-deck", help="卡表预检（跑前体检，零跑批；task 119）")
+    chk_deck_p.add_argument("decklist", help="decklist txt 路径（每行「N 卡名 [card_id]」）")
+    chk_deck_p.add_argument("--db", default=None,
+                            help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    chk_deck_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
     run_p = sub.add_parser("run", help="按实验定义 YAML 跑实验并落结果库")
     run_p.add_argument("experiment", help="实验定义 YAML 路径")
     run_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
@@ -830,7 +849,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     sen_p.add_argument(
         "--out", default=None,
-        help="换卡包目录（默认 results/sensitivity-<base_id>）：md/html/csv/json",
+        help="换卡包目录（默认 results/sensitivity-<base_id>）：md/html/csv/json/svg",
     )
     cal_p = sub.add_parser("calibration",
                            help="M6 偏差表：模拟矩阵 vs 真实赛事 matchup（task 030）")
@@ -993,6 +1012,8 @@ def main(argv: list[str] | None = None) -> int:
                       help="完整报告 JSON 输出路径（含逐行明细；缺省只打印摘要）")
     args = parser.parse_args(argv)
 
+    if args.cmd == "check-deck":
+        return _cmd_check_deck(args)
     if args.cmd == "run":
         return _cmd_run(args)
     if args.cmd == "report":

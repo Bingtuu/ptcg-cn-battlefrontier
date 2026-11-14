@@ -11,8 +11,6 @@ total_visits；action 标签 = kind：可读参数（attack→招式名、traine
 D-042-4 报告三件套：按 kind 访问份额 / 归一化熵 top N / 选中份额分桶 × 胜率。
 """
 
-import hashlib
-import json
 
 import pytest
 from helpers import basic, deck60, engine_at, in_play, inst, main_state
@@ -179,15 +177,14 @@ class TestActionLabel:
 class TestObservabilityScope:
     def test_events_hash_excludes_mcts_consider(self) -> None:
         """events_hash payload 过滤 mcts_consider（观测事件不进行为校验，
-        跨版本可比）；事件本体仍留在事件流落库。"""
+        跨版本可比）；事件本体仍留在事件流落库。task 122 起 seq 重编号，
+        口径单一直接来源 = play.events_hash_for（本测试不再复写算法）。"""
+        from battlefrontier.runner.play import events_hash_for
+
         agents = [_mcts(worlds=1, iterations=2), _mcts(seed=99, worlds=1, iterations=2)]
         r = play_game(deck60(), deck60(), seed=5, agents=agents)
         assert any(ev.kind == "mcts_consider" for ev in r.events)  # 确有被过滤事件
-        payload = json.dumps(
-            [ev.model_dump(mode="json") for ev in r.events if ev.kind != "mcts_consider"],
-            ensure_ascii=False, sort_keys=True,
-        )
-        assert r.events_hash == hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        assert r.events_hash == events_hash_for(r.events)
 
     def test_same_seed_same_hash_with_consider_events(self) -> None:
         """同种子双跑 events_hash 逐局一致（采集引入后确定性不破）。"""

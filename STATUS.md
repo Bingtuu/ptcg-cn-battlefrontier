@@ -95,6 +95,13 @@ task 080 已合入 main `1afa4e2`（PR #8）。Diupi-Yun 正式矩阵（077–08
 
 ## 工作记录
 
+### 2026-11-14 task 122：agent_explain 决策理由标注（策略透明化首刀）
+
+- **实现 ✅**：启发式自省（`explain_enabled` + `last_explanation`）+ 三数值键决策点标注（attack 有效伤害 / promote pokemon_score 全分支 / place 放置键），Runner 发射 `agent_explain` 观测事件（task 042 同口径：排除 hash、render 显示 `决策[kind]：候选 a(分) > b(分) → 选择`）。
+- **hash 口径修正（测试抓出的真问题）**：观测事件插入致后续 seq 错位 → `events_hash_for` 单一直接来源（过滤 + seq 重编号），开/关标注同种子 hash 一致；旧复写算法测试改引权威函数。串并 20/20。
+- **范围（如实）**：retreat / ability / 能量附着为门控 tuple 键，逐分支设计留档后续（不造新评分逻辑）。
+- **遗留**：全量回归 + 提交。
+
 ### 2026-11-14 task 119/120/121：使用便利性三层优化（预检 / 盘面快照回放 / 森林图）
 
 - **task 119 ✅ `bfsim check-deck`**：卡表跑前预检（60 张校验 / 卡名与印刷命中 / 每卡 DSL 状态 / 构成汇总），秒级零跑批；experiment.py 抽 `_resolve_decklist_entry` 公共解析助手（run 装载与预检同口径）。6 测（真实 db 跟随 test_deckload 先例）+ CLI 实证（模板 7 张正确拒绝）。

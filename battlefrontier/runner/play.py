@@ -26,7 +26,18 @@ DEFAULT_MAX_TURNS = 200
 
 # 观测事件 kind（task 042，D-042-2）：Agent 搜索内部状态的外化，不影响对局
 # 行为——events_hash 计算排除该类，保持行为校验跨版本可比
-OBSERVATION_KINDS = frozenset({"mcts_consider"})
+OBSERVATION_KINDS = frozenset({"mcts_consider", "agent_explain"})
+
+
+def events_hash_for(events: list) -> str:
+    """events_hash 口径（单一直接来源）：观测事件过滤 + seq 重编号（task 122，
+    观测事件插入使后续 seq 错位，过滤后连续化保证开/关观测 hash 可比）。"""
+    payload = json.dumps(
+        [dict(ev.model_dump(mode="json"), seq=i) for i, ev in enumerate(
+            ev for ev in events if ev.kind not in OBSERVATION_KINDS)],
+        ensure_ascii=False, sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _find_card(state: GameState, iid: int) -> CardInstance | None:
@@ -165,6 +176,15 @@ def play_game(
         if consideration is not None:
             agent.last_consideration = None
             _emit_consideration(engine, player, consideration)
+        # task 122：启发式决策理由外化——读 last_explanation（同 mcts_consider
+        # 观测口径：排除 events_hash、行为零变化）
+        explanation = getattr(agent, "last_explanation", None)
+        if explanation is not None:
+            agent.last_explanation = None
+            engine.events.append(GameEvent(
+                seq=len(engine.events), turn=engine.state.turn,
+                phase=engine.state.phase, player=player,
+                kind="agent_explain", detail=explanation))
         # task 050（D-M11-1）：采集钩子在 observe 返回后回调（view = Agent 所见，
         # 不含隐藏信息）；None 路径零开销
         if collector is not None:
@@ -178,12 +198,8 @@ def play_game(
         engine.apply(player, action)
 
     s = engine.state
-    payload = json.dumps(
-        # D-042-2：观测事件（mcts_consider）不进行为校验，payload 过滤
-        [ev.model_dump(mode="json") for ev in engine.events
-         if ev.kind not in OBSERVATION_KINDS],
-        ensure_ascii=False, sort_keys=True,
-    )
+    # D-042-2 + task 122：观测事件（mcts_consider / agent_explain）过滤 + seq 重编号
+    game_hash = events_hash_for(engine.events)
     return GameResult(
         winner=s.winner,
         is_draw=s.is_draw,
@@ -191,7 +207,7 @@ def play_game(
         phase=s.phase,
         first_player=s.first_player,
         events=engine.events,
-        events_hash=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+        events_hash=game_hash,
         collected_rows=(
             collector.finish(s.winner, s.is_draw) if collector is not None else None),
         snapshot_rows=(

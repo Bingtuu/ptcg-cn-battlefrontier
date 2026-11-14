@@ -54,6 +54,14 @@ def render_log(events: list[GameEvent]) -> str:
                     f"  {label} 战斗场: {active} | 备战: {bench}"
                     f" | 手牌 {s['hand']} 牌库 {s['deck']} 奖赏 {s['prizes']}")
             continue
+        if ev.kind == "agent_explain":
+            # task 122：决策理由（观测事件）：top-3 候选评分 → 选择
+            cands = " > ".join(
+                f"{c['label']}({c['score']})" for c in ev.detail["candidates"])
+            lines.append(
+                f"回合{ev.turn} | · 决策[{ev.detail['kind']}]：候选 {cands}"
+                f" → {ev.detail['chosen']}")
+            continue
         template = _TEMPLATES.get(ev.kind, ev.kind)
         detail = {"player": ev.player, **ev.detail}
         line = template.format_map(_SafeDict(detail))

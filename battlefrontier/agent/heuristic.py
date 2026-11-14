@@ -353,8 +353,27 @@ class HeuristicAgent:
     def __init__(self, params: HeuristicParams | None = None, card_effects=None) -> None:
         self.params = params or HeuristicParams()
         self.card_effects = card_effects
+        # task 122：决策理由自省（观测事件用，行为零变化；explain_enabled=False
+        # 关标注，events_hash 不受影响——观测 kind 已排除）
+        self.explain_enabled = True
+        self.last_explanation: dict | None = None
+
+    def _explain(self, kind: str, ranked: list[tuple[str, float]],
+                 chosen_label: str) -> None:
+        """记录 top-3 候选与评分（ranked 已按优劣排序）为 last_explanation。"""
+        if not self.explain_enabled:
+            return
+        self.last_explanation = {
+            "kind": kind,
+            "candidates": [
+                {"label": label, "score": round(float(score), 1)}
+                for label, score in ranked[:3]
+            ],
+            "chosen": chosen_label,
+        }
 
     def observe(self, view: VisibleGameState, legal_actions: list[Action]) -> Action:
+        self.last_explanation = None
         if not legal_actions:
             raise ValueError("无合法行动可选")
         by_kind: dict[str, list[Action]] = {}
@@ -375,7 +394,17 @@ class HeuristicAgent:
 
     def _pick_place(self, view: VisibleGameState, acts: list[Action]) -> Action:
         hand = {c.iid: c for c in view.own.hand}
-        return min(acts, key=lambda a: self._place_key(hand[a.iid], view.own.hand))
+        chosen = min(acts, key=lambda a: self._place_key(hand[a.iid], view.own.hand))
+        if self.explain_enabled:
+            ordered = sorted(acts, key=lambda a: self._place_key(hand[a.iid], view.own.hand))
+            self._explain(
+                "place_active",
+                [(hand[a.iid].card.name,
+                  float(pokemon_score(hand[a.iid], self.params)))
+                 for a in ordered],
+                hand[chosen.iid].card.name,
+            )
+        return chosen
 
     def _place_key(self, card: CardInstance, hand: tuple) -> tuple:
         """开局放置键，长度固定 4。
@@ -414,8 +443,22 @@ class HeuristicAgent:
             mon = view.own.bench[act.bench_index]
             return (-pokemon_score(mon, self.params), act.bench_index)
 
+        def explain(chosen: Action, key) -> None:
+            if not self.explain_enabled:
+                return
+            ordered = sorted(acts, key=key)
+            self._explain(
+                "promote",
+                [(view.own.bench[a.bench_index].current.card.name,
+                  float(pokemon_score(view.own.bench[a.bench_index], self.params)))
+                 for a in ordered],
+                view.own.bench[chosen.bench_index].current.card.name,
+            )
+
         if not self.params.ko_prize_lookahead_gate:
-            return min(acts, key=score_key)
+            chosen = min(acts, key=score_key)
+            explain(chosen, score_key)
+            return chosen
 
         looks = {
             act.bench_index: self._ko_prize_lookahead(
@@ -433,7 +476,9 @@ class HeuristicAgent:
                     return (0, *score_key(act))
                 return (1, -(look.best_damage or 0), *score_key(act))
 
-            return min(acts, key=conv_key)
+            chosen = min(acts, key=conv_key)
+            explain(chosen, conv_key)
+            return chosen
 
         # task 086：落后且路径可见时，仅对复制候选加奖差层（不抬无复制高印面）。
         if (
@@ -452,13 +497,17 @@ class HeuristicAgent:
                     return (1, -(look.best_damage or 0), *score_key(act))
                 return (2, *score_key(act))
 
-            return min(acts, key=race_key)
+            chosen = min(acts, key=race_key)
+            explain(chosen, race_key)
+            return chosen
 
         def ko_key(act: Action) -> tuple:
             look = looks[act.bench_index]
             return (0 if look.can_ko else 1, *score_key(act))
 
-        return min(acts, key=ko_key)
+        chosen = min(acts, key=ko_key)
+        explain(chosen, ko_key)
+        return chosen
 
     # ── chooser 选择 ────────────────────────────────────
 
@@ -1246,6 +1295,26 @@ class HeuristicAgent:
                 ):
                     damage = look.best_damage
                 return (damage, -act.attack_index)
+        else:
+            def rank(act: Action) -> tuple[int, int]:
+                return (table[act.attack_index][0], -act.attack_index)
 
-            return max(candidates, key=rank)
-        return max(candidates, key=lambda a: (table[a.attack_index][0], -a.attack_index))
+        chosen = max(candidates, key=rank)
+        # task 122：决策理由（与 rank 同一口径的有效伤害）
+        if self.explain_enabled:
+            def damage_of(act: Action) -> int:
+                return rank(act)[0]
+
+            def label_of(act: Action) -> str:
+                attacks, _ = self._attack_sources(view)
+                if 0 <= act.attack_index < len(attacks):
+                    return attacks[act.attack_index].name
+                return f"attack#{act.attack_index}"
+
+            ordered = sorted(candidates, key=lambda a: (-damage_of(a), a.attack_index))
+            self._explain(
+                "attack",
+                [(label_of(a), float(damage_of(a))) for a in ordered],
+                label_of(chosen),
+            )
+        return chosen

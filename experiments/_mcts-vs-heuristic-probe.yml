@@ -1,0 +1,10 @@
+# 冠军差距评估探针：MCTS(2x50) vs 启发式 同对局——量化策略 headroom
+name: mcts-vs-heuristic-probe
+games: 30
+seed_start: 425000
+decks:
+  a: {source: db, deck_id: "mik_moe:689871"}
+  b: {source: db, deck_id: "mik_moe:687339"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50}}
+  b: {type: heuristic}

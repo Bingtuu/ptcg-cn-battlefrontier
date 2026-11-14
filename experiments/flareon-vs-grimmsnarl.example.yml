@@ -1,0 +1,18 @@
+# 火伊布 猫头夜鹰 vs 玛俐的长毛巨魔 雪妖女 —— 三联研究（真实胜率/卡表改进/策略）
+# 有向对局（A=火伊布 被调整侧）；2,000 局 CRN 成对；变体带 in_id 覆盖印刷。
+name: flareon-vs-grimmsnarl
+games: 2000
+seed_start: 420000
+decks:
+  a: {source: db, deck_id: "mik_moe:689871"}
+  b: {source: db, deck_id: "mik_moe:687339"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: knife-flareon-ex-minus1-leafeon
+    swaps:
+      - {side: a, out: 火伊布ex, out_count: 1, in: 叶伊布ex, in_count: 1, in_id: CSV9.5C-006}
+  - name: probe-karate-candy
+    swaps:
+      - {side: a, out: 空手道王的修炼, out_count: 1, in: 神奇糖果, in_count: 1, in_id: CSVH1C-045}

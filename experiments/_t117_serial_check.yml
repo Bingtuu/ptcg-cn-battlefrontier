@@ -1,0 +1,10 @@
+# task 117 串并一致抽验（gate 5）：同定义同种子，workers=1 重放 20 局比对 events_hash
+name: v2-swap-scale-serial-check
+games: 20
+seed_start: 410000
+decks:
+  a: {source: db, deck_id: "mik_moe:676344"}
+  b: {source: db, deck_id: "mik_moe:676344"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

@@ -1,0 +1,18 @@
+# task 117 — 换卡敏感性扩容：多龙黑夜魔灵 2000 局口径（B″ 引擎刀 + C″ 阴性对照）
+# B″ 复核 task 115 的 -5.2pp 是否站稳；C″ 阴性对照验 2000 局口径噪声底。
+name: v2-swap-scale-dragapult-dusknoir
+games: 2000
+seed_start: 410000
+decks:
+  a: {source: db, deck_id: "mik_moe:676344"}
+  b: {source: db, deck_id: "mik_moe:676344"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: swapB3-dreepy-minus1-hawlucha
+    swaps:
+      - {side: a, out: 多龙奇, out_count: 1, in: 摔角鹰人, in_count: 1, in_id: CSV1C-079}
+  - name: swapC3-negctrl-yungoos-script
+    swaps:
+      - {side: a, out: 愿增猿, out_count: 1, in: 弗图博士的剧本, in_count: 1, in_id: CSV6C-125}

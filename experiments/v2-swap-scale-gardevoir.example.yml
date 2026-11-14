@@ -1,0 +1,19 @@
+# task 117 — 换卡敏感性扩容：沙奈朵 2000 局口径（引擎刀 + 阴性对照）
+# 引擎刀：愿增猿 4→3（发动机特性源减一）← 含羞苞（覆盖印刷）。
+# 阴性对照：吼叫尾 1→0 ← 秘密箱（两张 1-of 科技位互换，预期 ≈0）。
+name: v2-swap-scale-gardevoir
+games: 2000
+seed_start: 410000
+decks:
+  a: {source: db, deck_id: "mik_moe:678647"}
+  b: {source: db, deck_id: "mik_moe:678647"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: swap-yungoos-minus1-budew
+    swaps:
+      - {side: a, out: 愿增猿, out_count: 1, in: 含羞苞, in_count: 1, in_id: CSV9.5C-004}
+  - name: swap-negctrl-scream-tail-chest
+    swaps:
+      - {side: a, out: 吼叫尾, out_count: 1, in: 秘密箱, in_count: 1, in_id: CSV8C-176}

@@ -47,22 +47,25 @@ def _cmd_field_pick(args: argparse.Namespace) -> int:
         field_pick,
         format_field_pick,
         intl_cells_from_contrast,
-        load_field_distribution,
+        load_field_snapshot,
         pool_name_maps,
         sim_cells_from_pack,
+        window_gap_days,
     )
 
     pool = load_target_pool(args.pool)
     cn_to_en, en_names = pool_name_maps(pool)
-    share_raw = load_field_distribution(args.field)
+    share_raw, snap_meta = load_field_snapshot(args.field)
     share = adapt_field_share(share_raw, cn_to_en)
 
     intl_cells = []
+    intl_meta: dict = {}
     if args.intl_db:
         contrast = pairing_contrast(
             args.intl_db, en_names, date_from=args.from_date,
             date_to=args.to_date, basis="intl_aligned", division="master")
         intl_cells = intl_cells_from_contrast(contrast)
+        intl_meta = {"date_from": args.from_date, "date_to": args.to_date}
     sim_cells = []
     if args.sim_pack:
         pack = _json.loads(Path(args.sim_pack).read_text(encoding="utf-8"))
@@ -70,6 +73,10 @@ def _cmd_field_pick(args: argparse.Namespace) -> int:
 
     matrix = assemble_matrix(intl_cells, sim_cells, en_names)
     rep = field_pick(share, matrix, en_names, n_sim=args.n_sim, seed=args.seed)
+    gap = window_gap_days(snap_meta, intl_meta) if intl_meta else None
+    if gap is not None and gap > 28:
+        print(f"[告警] field 快照与 intl matchup 窗口错位 {gap} 天（>28），"
+              "meta 漂移可能使排序失真——建议对齐窗口或下调结论强度")
     print(format_field_pick(rep))
     return 0
 

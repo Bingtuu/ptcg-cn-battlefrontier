@@ -90,3 +90,50 @@ def test_format_含限定语与排序():
     assert "同模拟器内" in text and "弱参照" in text
     data_rows = [l for l in text.splitlines() if " | " in l and "卡组" not in l]
     assert data_rows[0].startswith("A |")  # 排序第一
+    assert "真实格贡献" in text
+
+
+# ── task 123 修订测试（M14 review A1/A2/C2）────────────────
+
+def test_小样本真实格收缩():
+    """n<20 的 intl 格向 50% 收缩（(n·wr+K·0.5)/(n+K)），n≥20 原样。"""
+    from battlefrontier.report.field_pick import shrink_intl_cell
+
+    small = shrink_intl_cell(MatchupCell("A", "B", 0.9, n=10, source="intl"))
+    assert small.shrunk and small.wr_a == pytest.approx((10 * 0.9 + 10) / 30)
+    big = shrink_intl_cell(MatchupCell("A", "B", 0.9, n=20, source="intl"))
+    assert not big.shrunk and big.wr_a == 0.9
+    sim = shrink_intl_cell(MatchupCell("A", "B", 0.9, n=5, source="sim"))
+    assert not sim.shrunk  # 只收缩真实格
+
+
+def test_intl_成对一致_覆盖_sim_反向():
+    sim = [MatchupCell("A", "B", 0.6, n=500, source="sim"),
+           MatchupCell("B", "A", 0.41, n=500, source="sim")]
+    intl = [MatchupCell("A", "B", 0.55, n=40, source="intl")]
+    matrix = assemble_matrix(intl, sim, ["A", "B"])
+    assert matrix[("B", "A")].source == "intl"  # 不再滞留 sim
+    assert matrix[("B", "A")].wr_a == pytest.approx(0.45)
+
+
+def test_镜像纳入_期望胜率():
+    """镜像格（源提供）纳入期望；无镜像格自然剔除。"""
+    cells = _sim_cells() + [MatchupCell("A", "A", 0.55, n=500, source="sim")]
+    matrix = assemble_matrix([], cells, POOL)
+    field = {"A": 0.5, "B": 0.3, "C": 0.2}
+    # A: .5*.55(镜像) + .3*.6 + .2*.7 = .595
+    assert expected_winrate("A", field, matrix) == pytest.approx(0.595)
+
+
+def test_来源构成与数据不足标注():
+    sim = _sim_cells()
+    intl = [MatchupCell("A", "B", 0.55, n=40, source="intl")]
+    matrix = assemble_matrix(intl, sim, POOL + ["D"])
+    # D 完全无数据 → 缺格 share=1.0 ≥0.2 → data_poor
+    rep = field_pick({"A": 0.5, "B": 0.3, "C": 0.2, "D": 1e-9},
+                     matrix, POOL + ["D"], n_sim=20)
+    row_d = next(r for r in rep.rows if r["deck"] == "D")
+    assert row_d["data_poor"] and row_d["missing_share"] > 0.2
+    row_a = next(r for r in rep.rows if r["deck"] == "A")
+    assert 0.0 < row_a["intl_value_share"] < 1.0  # 混合来源可分解
+    assert "⚠数据不足" in format_field_pick(rep)

@@ -20,16 +20,31 @@ QUALIFIER_HEADER = (
 )
 
 MISSING_WR = 0.5  # 缺格占位胜率（不猜方向）
+PAIR_MIN_N = 20   # 复用 task 110 纪律：真实格最小样本量
+_SHRINK_K = 20.0  # 经验贝叶斯收缩强度（n<PAIR_MIN_N 的真实格向 50% 收缩）
 
 
 @dataclass(frozen=True)
 class MatchupCell:
-    """有向格：a 对 b 的胜率（a 视角）。source = intl|sim|missing。"""
+    """有向格：a 对 b 的胜率（a 视角）。source = intl|sim|missing。
+
+    task 123 修订（M14 review）：shrunk=True = 真实格因 n<PAIR_MIN_N
+    已向 50% 收缩（小样本噪声不入矩阵）；镜像格同对与主格同 source。
+    """
     a: str
     b: str
     wr_a: float
     n: int = 0
     source: str = "sim"
+    shrunk: bool = False
+
+
+def shrink_intl_cell(cell: MatchupCell) -> MatchupCell:
+    """真实格小样本收缩：wr' = (n·wr + K·0.5)/(n+K)；n≥门槛原样返回。"""
+    if cell.source != "intl" or cell.n >= PAIR_MIN_N:
+        return cell
+    wr = (cell.n * cell.wr_a + _SHRINK_K * MISSING_WR) / (cell.n + _SHRINK_K)
+    return MatchupCell(cell.a, cell.b, wr, n=cell.n, source="intl", shrunk=True)
 
 
 @dataclass
@@ -64,7 +79,9 @@ def load_field_distribution(path: str | Path) -> dict[str, float]:
 def assemble_matrix(intl_cells: list[MatchupCell],
                     sim_cells: list[MatchupCell],
                     pool_names: list[str]) -> dict[tuple[str, str], MatchupCell]:
-    """三层合成矩阵（有向）。同一格 intl 优先；镜像格 = 1 - wr（平按 0 计）。"""
+    """三层合成矩阵（有向）。修订：来源**成对一致**——intl 格的主格与镜像格
+    同为 intl（覆盖 sim）；小样本真实格先收缩再入矩阵；缺格按 50% 占位。
+    """
     matrix: dict[tuple[str, str], MatchupCell] = {}
     for cell in sim_cells:
         if cell.a in pool_names and cell.b in pool_names:
@@ -72,15 +89,18 @@ def assemble_matrix(intl_cells: list[MatchupCell],
     for cell in intl_cells:
         if cell.a not in pool_names or cell.b not in pool_names:
             continue
-        matrix[(cell.a, cell.b)] = cell  # intl 覆盖 sim
-        matrix.setdefault((cell.b, cell.a), MatchupCell(
-            cell.b, cell.a, 1.0 - cell.wr_a, n=cell.n, source="intl"))
-    # 反向格补全：有向格缺反向时按镜像补（同 source 降级可信）
+        cell = shrink_intl_cell(cell)
+        matrix[(cell.a, cell.b)] = cell
+        # 成对一致：镜像格同为 intl（覆盖该对的 sim 反向格）
+        matrix[(cell.b, cell.a)] = MatchupCell(
+            cell.b, cell.a, 1.0 - cell.wr_a, n=cell.n, source="intl",
+            shrunk=cell.shrunk)
+    # 反向格补全（sim 格）：有向格缺反向时按镜像补（同 source）
     for (a, b), cell in list(matrix.items()):
         if (b, a) not in matrix:
             matrix[(b, a)] = MatchupCell(b, a, 1.0 - cell.wr_a, n=cell.n,
                                          source=cell.source)
-    # 缺格占位
+    # 缺格占位（不含镜像——镜像按口径由源提供或剔除）
     for a in pool_names:
         for b in pool_names:
             if a != b and (a, b) not in matrix:
@@ -90,9 +110,14 @@ def assemble_matrix(intl_cells: list[MatchupCell],
 
 def expected_winrate(deck: str, field_share: dict[str, float],
                      matrix: dict[tuple[str, str], MatchupCell]) -> float:
-    """deck 对 field 的期望胜率 = Σ share × wr(deck vs f)（镜像不计）。"""
+    """deck 对 field 的期望胜率 = Σ share × wr(deck vs f)。
+
+    口径（task 123 修订）：镜像局（f == deck）**纳入**——真实赛场高使用率卡组
+    大量打镜像；镜像格用源数据（sim 偏差包含镜像格），源缺镜像时自然剔除。
+    """
     return sum(share * matrix[(deck, f)].wr_a
-               for f, share in field_share.items() if f != deck)
+               for f, share in field_share.items()
+               if (deck, f) in matrix)
 
 
 def field_pick(field_share: dict[str, float],
@@ -109,15 +134,16 @@ def field_pick(field_share: dict[str, float],
     base = np.array([field_share[n] for n in names])
     rng = np.random.default_rng(seed)
 
-    samples: list[dict[str, float]] = []
+    def _exp(c: str, shares: dict[str, float]) -> float:
+        return sum(shares[f] * matrix[(c, f)].wr_a
+                   for f in shares if (c, f) in matrix)
+
     top1_count = {c: 0 for c in candidates}
     exp_by_deck = {c: [] for c in candidates}
     for _ in range(n_sim):
         w = rng.dirichlet(base * concentration + 1e-9)
         jittered = dict(zip(names, w))
-        exps = {c: sum(jittered[f] * matrix[(c, f)].wr_a
-                       for f in jittered if f != c) for c in candidates}
-        samples.append(exps)
+        exps = {c: _exp(c, jittered) for c in candidates}
         top1_count[max(exps, key=exps.get)] += 1
         for c in candidates:
             exp_by_deck[c].append(exps[c])
@@ -126,6 +152,15 @@ def field_pick(field_share: dict[str, float],
     rows = []
     for c in candidates:
         arr = np.array(exp_by_deck[c])
+        # 来源构成（task 123 修订）：真实格贡献占比 + 缺格 field 占比
+        intl_value = sum(field_share[f] * matrix[(c, f)].wr_a
+                         for f in field_share
+                         if (c, f) in matrix
+                         and matrix[(c, f)].source == "intl")
+        exp_full = expected_winrate(c, field_share, matrix) or 1e-9
+        missing_share = sum(
+            field_share[f] for f in field_share
+            if (c, f) in matrix and matrix[(c, f)].source == "missing")
         rows.append({
             "deck": c,
             "exp_wr": expected_winrate(c, field_share, matrix),
@@ -133,7 +168,11 @@ def field_pick(field_share: dict[str, float],
             "mc_p5": float(np.percentile(arr, 5)),
             "mc_p95": float(np.percentile(arr, 95)),
             "top1_rate": top1_count[c] / n_sim,
+            "intl_value_share": intl_value / exp_full,
+            "missing_share": missing_share,
+            "data_poor": missing_share >= 0.2,
             "low_conf_cells": sum(1 for f in field_share if f != c
+                                  and (c, f) in matrix
                                   and matrix[(c, f)].source == "missing"),
         })
     rows.sort(key=lambda r: -r["exp_wr"])
@@ -143,16 +182,38 @@ def field_pick(field_share: dict[str, float],
 
 
 def format_field_pick(rep: FieldPickReport) -> str:
-    """人读报告：头注限定语 + 排序表。"""
+    """人读报告：头注限定语 + 排序表（含真实格贡献与数据不足标注）。"""
     lines = [QUALIFIER_HEADER, "",
              f"选卡参考（field 蒙特卡洛 n={rep.n_sim}；缺格格数 {rep.n_low_conf_cells}）",
-             "卡组 | 期望胜率 | MC均值 [P5..P95] | 登顶率 | 缺格"]
+             "卡组 | 期望胜率 | MC均值 [P5..P95] | 登顶率 | 真实格贡献 | 缺格"]
     for r in rep.rows:
+        flag = "  ⚠数据不足" if r["data_poor"] else ""
         lines.append(
             f"{r['deck']} | {r['exp_wr'] * 100:.1f}% | "
             f"{r['mc_mean'] * 100:.1f}% [{r['mc_p5'] * 100:.1f}..{r['mc_p95'] * 100:.1f}%] | "
-            f"{r['top1_rate'] * 100:.0f}% | {r['low_conf_cells']}")
+            f"{r['top1_rate'] * 100:.0f}% | {r['intl_value_share'] * 100:.0f}% | "
+            f"{r['low_conf_cells']}{flag}")
     return "\n".join(lines)
+
+
+def load_field_snapshot(path: str | Path) -> tuple[dict[str, float], dict]:
+    """field 快照 + meta（含窗口日期）；份额经 load_field_distribution 归一。"""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    meta = data.get("meta", {}) if isinstance(data, dict) else {}
+    return load_field_distribution(path), meta
+
+
+def window_gap_days(meta_a: dict, meta_b: dict) -> int | None:
+    """两源窗口错位天数（任一端缺日期返 None）。"""
+    from datetime import date
+
+    a0 = meta_a.get("date_from")
+    b0 = meta_b.get("date_from")
+    if not (a0 and b0):
+        return None
+    d = lambda s: date.fromisoformat(s)
+    # 错位 = 两窗口起点的间隔（粗粒度足够做漂移警告）
+    return abs((d(a0) - d(b0)).days)
 
 
 # ── CLI 数据适配（task 123）──────────────────────────────

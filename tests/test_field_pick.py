@@ -1,0 +1,92 @@
+"""task 123：field_pick 选卡器测试（四期 PRD M14）。
+
+实现先于测试落盘（主会话直写，TDD 顺序偏差如实披露于 task 文档）；
+测试按预注册判据逐项对拍：期望胜率手算复现 / 蒙特卡洛钉种子复现 /
+缺格与双源优先级 / 限定语头注。
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from battlefrontier.report.field_pick import (
+    QUALIFIER_HEADER,
+    MatchupCell,
+    assemble_matrix,
+    expected_winrate,
+    field_pick,
+    format_field_pick,
+    load_field_distribution,
+)
+
+POOL = ["A", "B", "C"]
+
+
+def _sim_cells():
+    return [
+        MatchupCell("A", "B", 0.6, n=500, source="sim"),
+        MatchupCell("B", "A", 0.4, n=500, source="sim"),
+        MatchupCell("A", "C", 0.7, n=500, source="sim"),
+        MatchupCell("C", "A", 0.3, n=500, source="sim"),
+        MatchupCell("B", "C", 0.5, n=500, source="sim"),
+        MatchupCell("C", "B", 0.5, n=500, source="sim"),
+    ]
+
+
+def test_expected_winrate_手算复现():
+    matrix = assemble_matrix([], _sim_cells(), POOL)
+    field = {"A": 0.5, "B": 0.3, "C": 0.2}
+    # A: .5*镜像(不计) 跳过 → .3*.6 + .2*.7 = .32
+    assert expected_winrate("A", field, matrix) == pytest.approx(0.32)
+    # B: .5*.4 + .2*.5 = .30
+    assert expected_winrate("B", field, matrix) == pytest.approx(0.30)
+
+
+def test_field_distribution_归一化(tmp_path):
+    p = tmp_path / "f.json"
+    p.write_text(json.dumps({"decks": [
+        {"display_name": "A", "value": 2.0}, {"display_name": "B", "value": 1.0},
+    ]}), encoding="utf-8")
+    share = load_field_distribution(p)
+    assert share == {"A": pytest.approx(2 / 3), "B": pytest.approx(1 / 3)}
+
+
+def test_缺格占位_low_confidence():
+    matrix = assemble_matrix([], _sim_cells(), POOL + ["D"])
+    assert matrix[("D", "A")].source == "missing"
+    assert matrix[("D", "A")].wr_a == 0.5
+
+
+def test_intl_优先于_sim():
+    sim = [MatchupCell("A", "B", 0.6, n=500, source="sim")]
+    intl = [MatchupCell("A", "B", 0.55, n=40, source="intl")]
+    matrix = assemble_matrix(intl, sim, ["A", "B"])
+    assert matrix[("A", "B")].source == "intl"
+    assert matrix[("A", "B")].wr_a == 0.55
+    assert matrix[("B", "A")].wr_a == pytest.approx(0.45)
+
+
+def test_蒙特卡洛_钉种子可复现():
+    matrix = assemble_matrix([], _sim_cells(), POOL)
+    field = {"A": 0.5, "B": 0.3, "C": 0.2}
+    r1 = field_pick(field, matrix, POOL, n_sim=200, seed=7)
+    r2 = field_pick(field, matrix, POOL, n_sim=200, seed=7)
+    r3 = field_pick(field, matrix, POOL, n_sim=200, seed=8)
+    assert r1.rows == r2.rows  # 同种子同输出
+    assert r1.rows != r3.rows  # 不同种子不同抽样
+    assert abs(sum(r["top1_rate"] for r in r1.rows) - 1.0) < 1e-9
+    # A 期望最高（.32 > B .30），登顶率应最高
+    top = max(r1.rows, key=lambda r: r["exp_wr"])
+    assert top["deck"] == "A" and top["top1_rate"] > 0.5
+
+
+def test_format_含限定语与排序():
+    matrix = assemble_matrix([], _sim_cells(), POOL)
+    rep = field_pick({"A": 0.5, "B": 0.3, "C": 0.2}, matrix, POOL, n_sim=50)
+    text = format_field_pick(rep)
+    assert text.startswith(QUALIFIER_HEADER[:20])
+    assert "同模拟器内" in text and "弱参照" in text
+    data_rows = [l for l in text.splitlines() if " | " in l and "卡组" not in l]
+    assert data_rows[0].startswith("A |")  # 排序第一

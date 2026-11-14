@@ -31,6 +31,49 @@ def _cmd_check_deck(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_field_pick(args: argparse.Namespace) -> int:
+    """task 123：metamages 式选卡器（四期 PRD M14）。
+
+    field 快照（CN 使用率）× matchup 三层矩阵（intl 真实 / sim 同口径 / 缺格
+    占位）→ 期望胜率排序 + 蒙特卡洛排序稳定性。全程限定语头注。
+    """
+    import json as _json
+
+    from battlefrontier.data.pairings import pairing_contrast
+    from battlefrontier.data.pool import load_target_pool
+    from battlefrontier.report.field_pick import (
+        adapt_field_share,
+        assemble_matrix,
+        field_pick,
+        format_field_pick,
+        intl_cells_from_contrast,
+        load_field_distribution,
+        pool_name_maps,
+        sim_cells_from_pack,
+    )
+
+    pool = load_target_pool(args.pool)
+    cn_to_en, en_names = pool_name_maps(pool)
+    share_raw = load_field_distribution(args.field)
+    share = adapt_field_share(share_raw, cn_to_en)
+
+    intl_cells = []
+    if args.intl_db:
+        contrast = pairing_contrast(
+            args.intl_db, en_names, date_from=args.from_date,
+            date_to=args.to_date, basis="intl_aligned", division="master")
+        intl_cells = intl_cells_from_contrast(contrast)
+    sim_cells = []
+    if args.sim_pack:
+        pack = _json.loads(Path(args.sim_pack).read_text(encoding="utf-8"))
+        sim_cells = sim_cells_from_pack(pack.get("cells", []), cn_to_en)
+
+    matrix = assemble_matrix(intl_cells, sim_cells, en_names)
+    rep = field_pick(share, matrix, en_names, n_sim=args.n_sim, seed=args.seed)
+    print(format_field_pick(rep))
+    return 0
+
+
 def _summarize(db: ResultsDB, exp_id: int, label: str, defn) -> str:
     games = db.games(exp_id)
     wins_a = sum(1 for g in games if g["winner"] == 0)
@@ -817,6 +860,15 @@ def main(argv: list[str] | None = None) -> int:
     chk_deck_p.add_argument("--db", default=None,
                             help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     chk_deck_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    fp_p = sub.add_parser("field-pick", help="选卡参考：field 分布 × matchup 矩阵（task 123，四期 M14）")
+    fp_p.add_argument("--field", required=True, help="field 快照 JSON（CN 使用率，ptcgdb stats usage 出口）")
+    fp_p.add_argument("--pool", required=True, help="卡池 YAML（CN↔en 名映射源）")
+    fp_p.add_argument("--intl-db", default=None, help="上游 db 路径（intl matchup 格来源；缺省只用 sim/缺格）")
+    fp_p.add_argument("--from", dest="from_date", default="2026-09-16", help="intl 窗起点")
+    fp_p.add_argument("--to", dest="to_date", default="2026-11-14", help="intl 窗终点（含）")
+    fp_p.add_argument("--sim-pack", default=None, help="偏差包 deviation.json（sim matchup 格来源）")
+    fp_p.add_argument("--n-sim", type=int, default=1000, help="field 蒙特卡洛次数（默认 1000）")
+    fp_p.add_argument("--seed", type=int, default=123, help="蒙特卡洛种子（默认 123）")
     run_p = sub.add_parser("run", help="按实验定义 YAML 跑实验并落结果库")
     run_p.add_argument("experiment", help="实验定义 YAML 路径")
     run_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
@@ -1014,6 +1066,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "check-deck":
         return _cmd_check_deck(args)
+    if args.cmd == "field-pick":
+        return _cmd_field_pick(args)
     if args.cmd == "run":
         return _cmd_run(args)
     if args.cmd == "report":

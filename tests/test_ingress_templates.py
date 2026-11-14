@@ -25,5 +25,5 @@ def test_three_ingress_templates_load() -> None:
     assert named.decks.a.source == "file"
     assert named.decks.b.path == named.decks.a.path
     text = Path(named.decks.a.path).read_text(encoding="utf-8")
-    assert parse_decklist(text)[0] == (4, "沙奈朵ex")
-    assert sum(n for n, _ in parse_decklist(text)) != 60
+    assert parse_decklist(text)[0] == (4, "沙奈朵ex", None)
+    assert sum(n for n, _, _ in parse_decklist(text)) != 60

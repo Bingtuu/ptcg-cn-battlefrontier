@@ -203,9 +203,13 @@ def load_experiment(path: str | Path) -> ExperimentDef:
 
 # ── 本地 decklist ────────────────────────────────────────
 
-def parse_decklist(text: str) -> list[tuple[int, str]]:
-    """行格式「N 卡名」（# 注释、空行跳过）。"""
-    entries: list[tuple[int, str]] = []
+def parse_decklist(text: str) -> list[tuple[int, str, str | None]]:
+    """行格式「N 卡名」或「N 卡名 [card_id]」（# 注释、空行跳过）。
+
+    task 118：可选 [card_id] 印刷后缀（卡名解析 = search 首命中不可控时，
+    印刷级指定防 vanilla 静默退化）；无后缀 = None（现状路径）。
+    """
+    entries: list[tuple[int, str, str | None]] = []
     for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -213,7 +217,19 @@ def parse_decklist(text: str) -> list[tuple[int, str]]:
         parts = line.split(maxsplit=1)
         if len(parts) != 2 or not parts[0].isdigit() or int(parts[0]) <= 0:
             raise ValueError(f"decklist 第 {lineno} 行格式错误（应为「N 卡名」）: {raw!r}")
-        entries.append((int(parts[0]), parts[1].strip()))
+        rest = parts[1].strip()
+        card_id: str | None = None
+        if rest.endswith("]"):
+            name, _, bracket = rest.partition("[")
+            card_id = bracket[:-1].strip()
+            if not name.strip() or not card_id:
+                raise ValueError(
+                    f"decklist 第 {lineno} 行印刷后缀格式错误（应为「N 卡名 [card_id]」）: {raw!r}")
+            rest = name.strip()
+        if "[" in rest or "]" in rest:
+            raise ValueError(
+                f"decklist 第 {lineno} 行印刷后缀格式错误（应为「N 卡名 [card_id]」）: {raw!r}")
+        entries.append((int(parts[0]), rest, card_id))
     if not entries:
         raise ValueError("decklist 为空")
     return entries
@@ -359,12 +375,22 @@ def _load_decklist_file(db, path: str) -> tuple[list[CardDef], list[str]]:
     cards: list[CardDef] = []
     warnings: list[str] = []
     ids: list[str] = []
-    for count, name in entries:
-        found = db.search_cards(name=name, limit=1)
-        if not found:
-            raise ValueError(f"decklist 卡名未命中（不猜）: {name}")
-        card_id = found[0].card_id
-        card_def, ws = carddef_from_db(db.get_card(card_id))
+    for count, name, card_id in entries:
+        if card_id is not None:
+            rec = db.get_card(card_id)
+            if rec is None:
+                raise ValueError(f"decklist 印刷 card_id 未命中（不猜）: {card_id}")
+            if rec.name_full != name:
+                raise ValueError(
+                    f"decklist 印刷与卡名不一致（不猜）: {card_id}"
+                    f" =「{rec.name_full}」≠「{name}」")
+        else:
+            found = db.search_cards(name=name, limit=1)
+            if not found:
+                raise ValueError(f"decklist 卡名未命中（不猜）: {name}")
+            card_id = found[0].card_id
+            rec = db.get_card(card_id)
+        card_def, ws = carddef_from_db(rec)
         warnings.extend(ws)
         cards.extend([card_def] * count)
         ids.extend([card_id] * count)

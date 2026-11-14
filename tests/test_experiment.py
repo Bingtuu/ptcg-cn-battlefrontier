@@ -77,13 +77,78 @@ def test_load_invalid(tmp_path, bad):
 
 def test_parse_decklist():
     assert parse_decklist("4 沙奈朵ex\n2 博士的研究\n# 注释行\n\n1 基本超能量\n") == [
-        (4, "沙奈朵ex"), (2, "博士的研究"), (1, "基本超能量")]
+        (4, "沙奈朵ex", None), (2, "博士的研究", None), (1, "基本超能量", None)]
 
 
-@pytest.mark.parametrize("bad", ["4\n", "0 沙奈朵ex\n", "x 沙奈朵ex\n"])
+def test_parse_decklist_印刷级行_task118():
+    """task 118：可选 [card_id] 印刷后缀；无后缀 = None（现状路径）。"""
+    assert parse_decklist("2 巢穴球 [CSVH1C-043]\n1 基本超能量\n") == [
+        (2, "巢穴球", "CSVH1C-043"), (1, "基本超能量", None)]
+
+
+@pytest.mark.parametrize("bad", ["4\n", "0 沙奈朵ex\n", "x 沙奈朵ex\n",
+                                 "2 巢穴球 [CSVH1C-043\n", "2 巢穴球 []\n"])
 def test_parse_decklist_invalid(bad):
     with pytest.raises(ValueError):
         parse_decklist(bad)
+
+
+# ── task 118：decklist 印刷级装载（[card_id] 后缀）─────────
+
+def _fake_db_t118(records: dict[str, str]):
+    """records: card_id -> 卡名。search 按名取首个 id；get_card 未命中返 None。"""
+    import types
+
+    class FakeDb:
+        def search_cards(self, name=None, limit=1):
+            for cid, n in records.items():
+                if n == name:
+                    return [types.SimpleNamespace(card_id=cid)]
+            return []
+
+        def get_card(self, card_id):
+            if card_id not in records:
+                return None
+            return types.SimpleNamespace(
+                card_id=card_id, name_full=records[card_id],
+                card_type="trainer", stage=None, hp=None, types=(),
+                weakness=None, resistance=None, attacks=(), retreat_cost=0,
+                rule_box_type=None, prize_cards=1, trainer_subtype="物品",
+                provides=None, evolves_from_text=None, evolution_chain_id=None,
+                is_basic_energy=False, is_ace_spec=False)
+
+    return FakeDb()
+
+
+def _decklist_t118(tmp_path, line: str) -> str:
+    p = tmp_path / "deck.txt"
+    p.write_text(line + "\n", encoding="utf-8")
+    return str(p)
+
+
+def test_load_decklist_file_印刷级行命中覆盖印刷(tmp_path):
+    """[card_id] 给定时按印刷装载（不走 search 首命中）。"""
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db = _fake_db_t118({"CSVE1C-PSY": "基本超能量", "X-404": "基本超能量"})
+    cards, _ = _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量 [CSVE1C-PSY]"))
+    assert len(cards) == 60 and cards[0].card_id == "CSVE1C-PSY"
+
+
+def test_load_decklist_file_印刷未命中_显式报错(tmp_path):
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db = _fake_db_t118({"CSVE1C-PSY": "基本超能量"})
+    with pytest.raises(ValueError, match="card_id"):
+        _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量 [X-404]"))
+
+
+def test_load_decklist_file_印刷与卡名不一致_显式报错(tmp_path):
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db = _fake_db_t118({"CSVE1C-PSY": "基本超能量", "CSVH1C-043": "巢穴球"})
+    with pytest.raises(ValueError, match="不一致"):
+        _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量 [CSVH1C-043]"))
 
 
 # ── Agent 构建 ───────────────────────────────────────────

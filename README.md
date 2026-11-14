@@ -109,6 +109,42 @@ bfsim sensitivity 1 2                          # baseline vs 变体并排对比
 
 报告给出每个变体的胜率变化（ΔWR）、95% 置信区间与显著性检验（两比例 z 检验）。
 
+### 5.5 备赛三场景（导入卡表 / 假想敌 / 换卡估算）
+
+**场景 1：导入自己的卡表。** 写一个 txt（每行「张数 卡名」，满 60 张；卡名可加 `[card_id]` 指定印刷，防止同名多印刷时落到无效果印刷——task 118）：
+
+```text
+# my-deck.txt
+4 多龙奇
+3 多龙巴鲁托ex
+2 高级球 [30thC-101]
+1 巢穴球 [CSVH1C-043]
+# …凑满 60 张
+```
+
+```yaml
+decks:
+  a: {source: file, path: my-deck.txt}
+```
+
+**场景 2：指定假想敌。** `decks.a` / `decks.b` 完全独立，敌方可以是 db 赛事卡组（`deck_id`）、另一个 file 卡表，或用 `matrix` 段对整池自动展开全部配对（见 §6）。
+
+**场景 3：估算换卡的胜率影响。** 加 `variants` 段（换入卡建议带 `in_id` 指定覆盖印刷），一次跑出 baseline + 各变体（同种子 CRN 成对）：
+
+```yaml
+variants:
+  - name: 多龙奇减一换摔角鹰人
+    swaps:
+      - {side: a, out: 多龙奇, out_count: 1, in: 摔角鹰人, in_count: 1, in_id: CSV1C-079}
+```
+
+```bash
+bfsim run my-swap.yml --workers 16 --results results/my-swap.db
+bfsim sensitivity 1 2 --results results/my-swap.db --out results/my-swap
+```
+
+**功效口径（task 113/117 实证）**：500 局 CRN 的 CI 半宽 ≈±6pp（±2pp 级效应判不动）；**2,000 局口径 CI 半宽 ≈±3pp，≥3pp 效应可分辨**——定量判断请用 2,000 局以上。读数纪律：阴性对照（机制惰性卡互换）验噪声底；「1-of 卡 = 边缘」的先验不成立（task 117 反例），1-of 互换读数按探针解读。全部结论 = 同模拟器内敏感性，不构成真实预测。
+
 ### 6. matchup 矩阵与校准（M6）
 
 实验定义改用 `matrix` 段，即可对卡组池自动展开全部无向配对（镜像不打）：

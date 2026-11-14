@@ -1,0 +1,29 @@
+# 太晶伊布（火伊布 猫头夜鹰）换卡敏感性 —— vs 多龙黑夜（绑定对局）
+# 基线 = experiments/t1114-tera-eevee-vs-dragapult.yml（实验#1，26.2%）
+# 变体与基线同种子区间 460000..461999，CRN 成对；B 固定 mik_moe:711851
+# 刀位依据败因解剖：火伊布ex 是生死线（败局 80% 零出手）
+name: t1114-swap-protect-bibfin
+games: 2000
+seed_start: 460000
+decks:
+  a: {source: db, deck_id: "mik_moe:711874"}
+  b: {source: db, deck_id: "mik_moe:711851"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: knife-flareon3
+    swaps:
+      - {side: a, out: 空手道王的修炼, out_count: 1, in: 火伊布ex, in_count: 1, in_id: CSV9.5C-023}
+  - name: knife-eevee3
+    swaps:
+      - {side: a, out: 波波, out_count: 1, in: 伊布ex, in_count: 1, in_id: CSV9.5C-140}
+  - name: knife-bibfin2
+    swaps:
+      - {side: a, out: 古剑豹, out_count: 1, in: 友好宝芬, in_count: 1, in_id: CSV7C-177}
+  - name: knife-leafeon2
+    swaps:
+      - {side: a, out: 大比鸟ex, out_count: 1, in: 叶伊布ex, in_count: 1, in_id: CSV9.5C-006}
+  - name: knife-munkidori
+    swaps:
+      - {side: a, out: 太乐巴戈斯ex, out_count: 1, in: 愿增猿, in_count: 1, in_id: CSV8C-094}

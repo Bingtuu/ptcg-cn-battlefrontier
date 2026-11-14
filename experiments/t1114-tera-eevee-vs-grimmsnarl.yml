@@ -1,0 +1,13 @@
+# 太晶伊布（火伊布 猫头夜鹰） vs 玛俐的长毛巨魔 雪妖女 —— 备赛三联研究之二
+# A = mik_moe:711874（2026高级赛秋季场公开组正赛 #5，2026-11-08）
+# B = mik_moe:692446（城市赛冠军，2026-10-18；近一周无排位出场，取最近冠军表）
+# 2,000 局 CRN 成对；真实 intl 参照：n=1/向，无有效数据
+name: t1114-tera-eevee-vs-grimmsnarl
+games: 2000
+seed_start: 462000
+decks:
+  a: {source: db, deck_id: "mik_moe:711874"}
+  b: {source: db, deck_id: "mik_moe:692446"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

@@ -1,0 +1,13 @@
+# 太晶伊布（火伊布 猫头夜鹰） vs 多龙巴鲁托 黑夜魔灵 —— 备赛三联研究之一
+# A = mik_moe:711874（2026高级赛秋季场公开组正赛 #5，2026-11-08）
+# B = mik_moe:711851（2026高级赛秋季场 #1，2026-11-08）
+# 2,000 局 CRN 成对；真实 intl 参照：Flareon Noctowl vs Dragapult 42.9% (n=7)
+name: t1114-tera-eevee-vs-dragapult
+games: 2000
+seed_start: 460000
+decks:
+  a: {source: db, deck_id: "mik_moe:711874"}
+  b: {source: db, deck_id: "mik_moe:711851"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

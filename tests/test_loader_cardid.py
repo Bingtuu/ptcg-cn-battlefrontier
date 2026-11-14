@@ -243,6 +243,149 @@ def test_prepare_variant_换入卡按_card_id_补入文档_缺失带告警(monke
     assert any("异文鸟" in w and "Y-9" in w for w in new_prep2.warnings)
 
 
+# ── task 115：swap in_id 印刷级指定 ───────────────────────
+
+def _fake_db_by_id(records: dict[str, tuple[str, str]]):
+    """records: card_id -> (name, type)。search 按名取首个 id；get_card 未命中返 None。"""
+    import types
+
+    class FakeDb:
+        def search_cards(self, name=None, limit=1):
+            for cid, (n, _) in records.items():
+                if n == name:
+                    return [types.SimpleNamespace(card_id=cid)]
+            return []
+
+        def get_card(self, card_id):
+            if card_id not in records:
+                return None
+            n, ctype = records[card_id]
+            return types.SimpleNamespace(
+                card_id=card_id, name_full=n, card_type=ctype, stage=None,
+                hp=None, types=(), weakness=None, resistance=None, attacks=(),
+                retreat_cost=0, rule_box_type=None, prize_cards=1,
+                trainer_subtype="物品", provides=None, evolves_from_text=None,
+                evolution_chain_id=None, is_basic_energy=False, is_ace_spec=False,
+            )
+
+        def close(self):
+            pass
+
+    return FakeDb()
+
+
+def _prep_115(lib):
+    import battlefrontier.runner.experiment as exp_mod
+
+    base_effects, _ = exp_mod.assemble_card_effects([[_item("双文鸟", "X-1")]], lib)
+    return exp_mod.PreparedExperiment(
+        deck_a=[_item("双文鸟", "X-1")], deck_b=[_item("白板鸟", "W-1")],
+        card_effects=base_effects,
+        deck_a_id="a", deck_b_id="b", data_version="test")
+
+
+def test_prepare_variant_in_id_指定覆盖印刷(monkeypatch):
+    """task 115：in_id 给定时按印刷解析（可命中 DSL 覆盖印刷），同名 search 首命中不再唯一路径。"""
+    import battlefrontier.runner.experiment as exp_mod
+    from battlefrontier.runner.experiment import (
+        SwapCfg,
+        VariantCfg,
+        prepare_variant,
+    )
+
+    monkeypatch.setattr("ptcgdb.sdk.open_db",
+                        lambda path: _fake_db_by_id({
+                            "X-1": ("双文鸟", "trainer"), "X-2": ("双文鸟", "trainer"),
+                            "X-9": ("双文鸟", "trainer")}))
+    lib = CardLibrary.from_docs([
+        ("双文鸟-甲.yml", parse_card_doc(DRAW_YAML.format(cid="X-1"))),
+        ("双文鸟-乙.yml", parse_card_doc(SHUFFLE_YAML.format(cid="X-2"))),
+    ])
+    monkeypatch.setattr(exp_mod, "load_card_dir", lambda cards_dir: lib)
+    prep = _prep_115(lib)
+
+    variant = VariantCfg(name="v", swaps=[SwapCfg(
+        side="a", out="双文鸟", out_count=1,
+        **{"in": "双文鸟", "in_count": 1, "in_id": "X-2"})])
+    new_prep = prepare_variant(prep, variant, ":memory:", cards_dir="unused")
+    assert "X-2" in new_prep.card_effects  # 覆盖印刷按 card_id 补入文档
+    assert not [w for w in new_prep.warnings if "X-2" in w]
+
+
+def test_prepare_variant_in_id_未命中_显式报错(monkeypatch):
+    import pytest
+
+    import battlefrontier.runner.experiment as exp_mod
+    from battlefrontier.runner.experiment import (
+        SwapCfg,
+        VariantCfg,
+        prepare_variant,
+    )
+
+    monkeypatch.setattr("ptcgdb.sdk.open_db",
+                        lambda path: _fake_db_by_id({"X-1": ("双文鸟", "trainer")}))
+    lib = CardLibrary.from_docs([
+        ("双文鸟-甲.yml", parse_card_doc(DRAW_YAML.format(cid="X-1")))])
+    monkeypatch.setattr(exp_mod, "load_card_dir", lambda cards_dir: lib)
+    prep = _prep_115(lib)
+
+    variant = VariantCfg(name="v", swaps=[SwapCfg(
+        side="a", out="双文鸟", out_count=1,
+        **{"in": "双文鸟", "in_count": 1, "in_id": "X-404"})])
+    with pytest.raises(ValueError, match="in_id"):
+        prepare_variant(prep, variant, ":memory:", cards_dir="unused")
+
+
+def test_prepare_variant_in_id_与卡名不一致_显式报错(monkeypatch):
+    import pytest
+
+    import battlefrontier.runner.experiment as exp_mod
+    from battlefrontier.runner.experiment import (
+        SwapCfg,
+        VariantCfg,
+        prepare_variant,
+    )
+
+    monkeypatch.setattr("ptcgdb.sdk.open_db",
+                        lambda path: _fake_db_by_id({
+                            "X-1": ("双文鸟", "trainer"), "Y-1": ("异文鸟", "trainer")}))
+    lib = CardLibrary.from_docs([
+        ("双文鸟-甲.yml", parse_card_doc(DRAW_YAML.format(cid="X-1")))])
+    monkeypatch.setattr(exp_mod, "load_card_dir", lambda cards_dir: lib)
+    prep = _prep_115(lib)
+
+    variant = VariantCfg(name="v", swaps=[SwapCfg(
+        side="a", out="双文鸟", out_count=1,
+        **{"in": "双文鸟", "in_count": 1, "in_id": "Y-1"})])
+    with pytest.raises(ValueError, match="不一致"):
+        prepare_variant(prep, variant, ":memory:", cards_dir="unused")
+
+
+def test_prepare_variant_in_id_同名未覆盖印刷_告警不硬错(monkeypatch):
+    """in_id 指到 DSL 未覆盖印刷：与现状 vanilla 结算同规则——告警透传、不挂载、不抛错。"""
+    import battlefrontier.runner.experiment as exp_mod
+    from battlefrontier.runner.experiment import (
+        SwapCfg,
+        VariantCfg,
+        prepare_variant,
+    )
+
+    monkeypatch.setattr("ptcgdb.sdk.open_db",
+                        lambda path: _fake_db_by_id({
+                            "X-1": ("双文鸟", "trainer"), "X-9": ("双文鸟", "trainer")}))
+    lib = CardLibrary.from_docs([
+        ("双文鸟-甲.yml", parse_card_doc(DRAW_YAML.format(cid="X-1")))])
+    monkeypatch.setattr(exp_mod, "load_card_dir", lambda cards_dir: lib)
+    prep = _prep_115(lib)
+
+    variant = VariantCfg(name="v", swaps=[SwapCfg(
+        side="a", out="双文鸟", out_count=1,
+        **{"in": "双文鸟", "in_count": 1, "in_id": "X-9"})])
+    new_prep = prepare_variant(prep, variant, ":memory:", cards_dir="unused")
+    assert "X-9" not in new_prep.card_effects
+    assert any("双文鸟" in w and "X-9" in w for w in new_prep.warnings)
+
+
 # ── 定义库审计（cards/ 收窄与出库断言，无 db 依赖）─────────
 
 CARDS_DIR = Path(__file__).parent.parent / "cards"

@@ -118,7 +118,11 @@ class AgentSides(FrozenModel):
 # ── 换卡敏感性：variants（PRD §9，task 023）───────────────
 
 class SwapCfg(FrozenModel):
-    """一次换卡：side 方卡组拿出 out×out_count，放入 in×in_count（`in` 为关键字走别名）。"""
+    """一次换卡：side 方卡组拿出 out×out_count，放入 in×in_count（`in` 为关键字走别名）。
+
+    task 115：可选 `in_id` 指定换入印刷（db search 首命中不可控，印刷级指定防
+    vanilla 静默退化）；给定时校验存在性与卡名一致（不猜），缺省 = 现状路径。
+    """
 
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
@@ -127,6 +131,7 @@ class SwapCfg(FrozenModel):
     out_count: int = Field(gt=0)
     in_: str = Field(alias="in")
     in_count: int = Field(gt=0)
+    in_id: str | None = None
 
     @model_validator(mode="after")
     def _check_side(self) -> SwapCfg:
@@ -417,10 +422,20 @@ def prepare_variant(prep: PreparedExperiment, variant: VariantCfg,
         for swap in variant.swaps:
             if swap.in_ in in_cards:
                 continue
-            found = db.search_cards(name=swap.in_, limit=1)
-            if not found:
-                raise ValueError(f"换入卡名未命中（不猜）: {swap.in_}")
-            card_def, _ = carddef_from_db(db.get_card(found[0].card_id))
+            if swap.in_id is not None:
+                rec = db.get_card(swap.in_id)
+                if rec is None:
+                    raise ValueError(f"换入 in_id 未命中（不猜）: {swap.in_id}")
+                if rec.name_full != swap.in_:
+                    raise ValueError(
+                        f"in_id 与卡名不一致（不猜）: {swap.in_id}"
+                        f" =「{rec.name_full}」≠ in「{swap.in_}」")
+            else:
+                found = db.search_cards(name=swap.in_, limit=1)
+                if not found:
+                    raise ValueError(f"换入卡名未命中（不猜）: {swap.in_}")
+                rec = db.get_card(found[0].card_id)
+            card_def, _ = carddef_from_db(rec)
             in_cards[swap.in_] = card_def
     finally:
         db.close()

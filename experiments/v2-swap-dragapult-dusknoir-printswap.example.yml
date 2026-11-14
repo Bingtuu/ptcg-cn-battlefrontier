@@ -1,0 +1,19 @@
+# task 115 — 覆盖印刷重跑 task 113 A/B：in_id 印刷级换卡（真功能替代）
+# A′ 高级球−1 ← 巢穴球 CSVH1C-043（DSL 覆盖印刷）；B′ 多龙奇−1 ← 摔角鹰人 CSV1C-079（DSL 覆盖印刷）
+# 种子 400000..400499 与 task 113 CRN 可比；阴性对照已在 task 113 建立，本批不重跑。
+name: v2-swap-dragapult-dusknoir-printswap
+games: 500
+seed_start: 400000
+decks:
+  a: {source: db, deck_id: "mik_moe:676344"}
+  b: {source: db, deck_id: "mik_moe:676344"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}
+variants:
+  - name: swapA2-nestball-covered-for-ultraball
+    swaps:
+      - {side: a, out: 高级球, out_count: 1, in: 巢穴球, in_count: 1, in_id: CSVH1C-043}
+  - name: swapB2-hawlucha-covered-for-dreepy2
+    swaps:
+      - {side: a, out: 多龙奇, out_count: 1, in: 摔角鹰人, in_count: 1, in_id: CSV1C-079}

@@ -92,12 +92,33 @@ def _summarize(db: ResultsDB, exp_id: int, label: str, defn) -> str:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    from battlefrontier.runner.coverage import (
+        format_coverage,
+        run_coverages,
+        strict_violations,
+    )
     from battlefrontier.runner.experiment import run_group
 
     exp_path = Path(args.experiment)
     defn = load_experiment(exp_path)
     definition_yaml = exp_path.read_text(encoding="utf-8")
     db_path = args.db or load_db_path()
+
+    # task 131：跑前 DSL 覆盖率报告 + strict 门槛（装载后、开跑前；strict 拒绝 = 零局跑批）
+    covers = run_coverages(defn, db_path, cards_dir=args.cards_dir)
+    print(format_coverage(covers))
+    violations = strict_violations(covers)
+    if args.strict_coverage:
+        if violations:
+            for v in violations:
+                print(f"[strict-coverage] {v}")
+            print("[strict-coverage] 存在无文档非基本能量卡，拒绝开跑（零局跑批）")
+            return 1
+        print("[strict-coverage] 通过：参赛卡组 DSL 全覆盖（基本能量豁免不计）")
+    elif violations:
+        for v in violations:
+            print(f"[覆盖率告警] {v}（按无效果结算，对手强度可能被静默扭曲）")
+
     if defn.matrix is not None:
         from battlefrontier.runner.experiment import run_matrix
 
@@ -850,6 +871,19 @@ def _cmd_report(args: argparse.Namespace) -> int:
             )
 
             print(format_mcts_report(mcts_report(db, args.experiment_id)))
+        if args.autopsy:
+            from battlefrontier.report.autopsy import (
+                autopsy_report,
+                format_autopsy,
+                write_autopsy_packs,
+            )
+
+            autopsy = autopsy_report(db, args.experiment_id,
+                                     sample_n=args.autopsy_sample)
+            autopsy_dir = (Path(args.out) / "autopsy" if args.out
+                           else Path("results") / f"report-{args.experiment_id}-autopsy")
+            autopsy_paths = write_autopsy_packs(autopsy_dir, autopsy, db)
+            print(format_autopsy(autopsy, autopsy_paths))
         out_dir = (Path(args.out) if args.out
                    else Path("results") / f"report-{args.experiment_id}-log")
         paths = write_battle_log_pack(out_dir, log)
@@ -883,6 +917,8 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--db", default=None,
                        help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     run_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    run_p.add_argument("--strict-coverage", action="store_true",
+                       help="跑前 DSL 覆盖率门槛（task 131）：存在无文档非基本能量卡即拒绝开跑")
     rep_p = sub.add_parser("report", help="胜率报告（Wilson 95%% CI + 先后手拆分）")
     rep_p.add_argument("experiment_id", type=int, help="实验 id")
     rep_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
@@ -893,6 +929,10 @@ def main(argv: list[str] | None = None) -> int:
         "--replay-sample", type=int, default=3,
         help="抽样回放局数（默认 3，完成局按种子升序；0 表示不写回放正文）",
     )
+    rep_p.add_argument("--autopsy", action="store_true",
+                       help="追加败局解剖分节（task 124：终局类型 × 死亡回合分桶 + 抽样回放）")
+    rep_p.add_argument("--autopsy-sample", type=int, default=1,
+                       help="败局解剖每桶抽样局数（默认 1，按种子升序）")
     rep_p.add_argument(
         "--out", default=None,
         help="对局包目录（默认 results/report-<id>-log）：md/html/csv/json",

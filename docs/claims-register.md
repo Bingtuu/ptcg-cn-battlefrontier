@@ -42,4 +42,5 @@
 - task 102 `tasks/task 102.md` + `results/t102-calibration.json`（校准层预注册 FAIL）
 - task 103 `tasks/task 103.md` + `results/t103-regulation-audit.json`（赛制混因审计 + db 修订发现）
 - task 107 `tasks/done/task 107.md`（对齐窗供给约束终局：R3 不可验证声明 + 可达上限量化）
+- task 124 `tasks/task 124.md`（败局解剖 `--autopsy` 分节：终局类型 × 死亡回合分桶 + 每桶抽样回放；输出自带 sim 限定语，受守则 1 约束）
 - M13 地基 `results/m13-baseline/manifest.json`（dev/val 划分与限制声明）

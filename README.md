@@ -79,6 +79,7 @@ bfsim run my-first-match.yml --workers 4
 bfsim report 1              # 1 = 实验 id（run 完成时会打印）
 bfsim report 1 --decisions  # 追加「关键决策聚合」分节：每张卡的选择分布与对应胜率
 bfsim report 1 --mcts-consider  # 追加 MCTS 决策分析：行动类别访问份额 / 高熵决策点 / 置信×胜率
+bfsim report 1 --autopsy  # 追加败局解剖：终局类型 × 死亡回合分桶（≤6/7–9/10–12/13–15/>15）+ 每桶抽样回放包
 ```
 
 ```
@@ -132,6 +133,8 @@ decks:
 ```bash
 bfsim check-deck my-deck.txt
 ```
+
+`bfsim run` 开跑前默认输出每个参赛卡组的 DSL 覆盖率报告（覆盖 / vanilla 异文本 / 无文档三态 + 豁免细分）；`--strict-coverage` 时存在「无文档且非豁免」（非基本能量、非纯白板卡面）卡即拒绝开跑（零局跑批），报错指明卡组侧与卡名。
 
 **场景 2：指定假想敌。** `decks.a` / `decks.b` 完全独立，敌方可以是 db 赛事卡组（`deck_id`）、另一个 file 卡表，或用 `matrix` 段对整池自动展开全部配对（见 §6）。
 
@@ -244,7 +247,7 @@ PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -X utf8 -m pytest -q
 - **引擎与观测层收官**（108）：事件序观感债修复（招式效果窗口内昏厥/拿奖事件滞后到链收尾入流，replay 抽查 20/20 四指标等价 + 排水内层帧漏洞修复）。
 - **M12 残留盲区清零**（109）：use_ability / play_stadium / end_turn 三盲区预注册诊断预检全部关闭（教师强信号 lift 均 ≤ 0——use_ability 甚至 −8.5pp 反向；end_turn 与 066 低上限结论互证）。
 
-**度量地基**：`results/m13-baseline/` 三份双轨偏差包（full/development/validation，72/72 格 `sim_failed=0`，串行=并行 100/100）；启发式加权 |Δ| 15.0%–18.1% 为**自对局结构度量**，非精度指标。全量 **1708 测试绿** + ruff 零告警；DSL 定义库 134 份（v1/v2 池零缺口）；四类 AI（启发式 / 随机 / MCTS / 蒸馏学生）+ 学得评估器与蒸馏模型资产 `models/`。
+**度量地基**：`results/m13-baseline/` 三份双轨偏差包（full/development/validation，72/72 格 `sim_failed=0`，串行=并行 100/100）；启发式加权 |Δ| 15.0%–18.1% 为**自对局结构度量**，非精度指标。全量 **1708 测试绿** + ruff 零告警；DSL 定义库 136 份（v1/v2 池零缺口，task 132 备赛批 +2）；四类 AI（启发式 / 随机 / MCTS / 蒸馏学生）+ 学得评估器与蒸馏模型资产 `models/`。
 
 **待触发（值守线 task 112）**：t105 哨兵 + cron 周期普查（当前 WAIT：9/18 对 n≥20、池内 1,520 局），达标（≥18 对且 ≥1,000 局）即自动出 RUN 判决（R1 解禁 / R2 钉死）；判决报告必嵌「真实侧 = 国际线上周赛 meta」限定语。新方向立项待 Owner 拍板。
 

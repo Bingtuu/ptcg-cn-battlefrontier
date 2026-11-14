@@ -916,3 +916,124 @@ effects:
     assert e.state.players[1].active.damage == 20
     muted = in_play(1, mon_card("电蜘蛛", energy_type="无", has_ability=True), energies=1)
     assert damage_of(muted, able, tower=True) == 20
+
+
+# ── task 132：move_energy destination=hand（古剑豹 冰柱环）───────────────────
+
+
+def _engine_with(active_energies: int, choose: int = 1, filters: str = ""):
+    atk = mon_card("古剑豹", attacks=(AttackDef(name="冰柱环", cost=("无",), damage=None),))
+    energies = tuple(inst(20 + i, energy()) for i in range(active_energies))
+    active = in_play(1, atk).model_copy(update={"attached_energy": energies})
+    state = main_state()
+    p0 = state.players[0].model_copy(update={"active": active})
+    filters_part = f", filters: [{filters}]" if filters else ""
+    doc = parse_card_doc(f"""
+card:
+  name_group: 古剑豹
+effects:
+  - trigger: on_attack
+    attack: 冰柱环
+    actions:
+      - {{action: move_energy, selector: own_attached_energy, choose: {choose}{filters_part}, destination: hand, args: {{scope: self}}}}
+""")
+    return with_effects(state.model_copy(update={"players": (p0, state.players[1])}),
+                        {"古剑豹": doc})
+
+
+def test_move_energy_hand_pick_one_back_to_hand() -> None:
+    """冰柱环：选 1 张自身附着能量回自己手牌——手牌 +1、附着 -1。"""
+    e = _engine_with(active_energies=2)
+    hand_n = len(e.state.players[0].hand)
+    e.apply(0, Action(kind="attack", attack_index=0))
+    assert e.state.phase == "choice"
+    assert e.state.pending_choice.pool == "own_attached_energy"
+    assert e.state.pending_choice.min_choose == 1
+    assert e.state.pending_choice.max_choose == 1
+    picked = e.state.pending_choice.pool_iids[0]
+    e.apply(0, Action(kind="choose", choices=(picked,)))
+    p0 = e.state.players[0]
+    assert len(p0.hand) == hand_n + 1
+    assert any(c.iid == picked for c in p0.hand)
+    assert len(p0.active.attached_energy) == 1
+    assert all(c.iid != picked for c in p0.active.attached_energy)
+
+
+def test_move_energy_hand_choose_multi() -> None:
+    """choose=N（N>1）：一次选 N 张，全部回手。"""
+    e = _engine_with(active_energies=3, choose=2)
+    hand_n = len(e.state.players[0].hand)
+    e.apply(0, Action(kind="attack", attack_index=0))
+    pool = tuple(e.state.pending_choice.pool_iids)
+    assert len(pool) == 3
+    e.apply(0, Action(kind="choose", choices=pool[:2]))
+    p0 = e.state.players[0]
+    assert len(p0.hand) == hand_n + 2
+    assert len(p0.active.attached_energy) == 1
+
+
+def test_move_energy_hand_pool_smaller_than_choose() -> None:
+    """附着不足 N 张：按尽数口径选 min(N, 身上张数) 张。"""
+    e = _engine_with(active_energies=2, choose=3)
+    hand_n = len(e.state.players[0].hand)
+    e.apply(0, Action(kind="attack", attack_index=0))
+    pool = tuple(e.state.pending_choice.pool_iids)
+    assert len(pool) == 2
+    e.apply(0, Action(kind="choose", choices=pool))
+    p0 = e.state.players[0]
+    assert len(p0.hand) == hand_n + 2
+    assert p0.active.attached_energy == ()
+
+
+def test_move_energy_hand_empty_pool_fizzles() -> None:
+    """来源宝可梦无可选能量（附着 1 张但 filters 全不命中）：不弹选择、无事发生
+    （对齐 deck 空池口径）。附着 0 张时招式本身不可发动，故用 filters 构造空池。"""
+    e = _engine_with(active_energies=1, filters="energy_雷")
+    hand_n = len(e.state.players[0].hand)
+    deck_n = len(e.state.players[0].deck)
+    e.apply(0, Action(kind="attack", attack_index=0))
+    p0 = e.state.players[0]
+    assert e.state.phase != "choice"
+    assert len(p0.hand) == hand_n
+    assert len(p0.deck) == deck_n
+
+
+def _bad_hand_doc(action_line: str) -> "object":
+    return parse_card_doc(f"""
+card:
+  name_group: 古剑豹
+effects:
+  - trigger: on_attack
+    attack: 冰柱环
+    actions:
+      - {action_line}
+""")
+
+
+@pytest.mark.parametrize("action_line", [
+    # 缺 scope=self
+    "{action: move_energy, selector: own_attached_energy, choose: 1, destination: hand}",
+    # 缺 choose=N
+    "{action: move_energy, selector: own_attached_energy, destination: hand, args: {scope: self}}",
+    # up_to 与 hand 同用
+    "{action: move_energy, selector: own_attached_energy, choose: 1, destination: hand, args: {scope: self, up_to: true}}",
+    # opt_exact 与 hand 同用
+    "{action: move_energy, selector: own_attached_energy, choose: 1, destination: hand, args: {scope: self, opt_exact: true}}",
+    # any_count 与 hand 互斥
+    "{action: move_energy, selector: own_attached_energy, choose: 1, destination: hand, args: {scope: self, any_count: true}}",
+    # target_pool 与 hand 互斥
+    "{action: move_energy, selector: own_attached_energy, choose: 1, destination: hand, args: {scope: self, target_pool: self}}",
+    # target_filters 与 hand 互斥
+    "{action: move_energy, selector: own_attached_energy, choose: 1, destination: hand, args: {scope: self, target_filters: [basic_energy]}}",
+])
+def test_move_energy_hand_illegal_combos(action_line: str) -> None:
+    """hand 形态的参数非法组合：装载可通过词表、执行期 DslError。"""
+    doc = _bad_hand_doc(action_line)
+    atk = mon_card("古剑豹", attacks=(AttackDef(name="冰柱环", cost=("无",), damage=None),))
+    active = in_play(1, atk, energies=1)
+    state = main_state()
+    p0 = state.players[0].model_copy(update={"active": active})
+    e = with_effects(state.model_copy(update={"players": (p0, state.players[1])}),
+                     {"古剑豹": doc})
+    with pytest.raises(DslError, match="move_energy"):
+        e.apply(0, Action(kind="attack", attack_index=0))

@@ -1,0 +1,27 @@
+# 古剑豹（CSV9C-053，基础，特性：埋入雪中）
+# text_raw 原文：「特性: 埋入雪中
+# 在自己的回合，当将这张卡牌从手牌使出放于备战区时，可使用1次。将场上的竞技场放于弃牌区。
+#
+# 【水】【水】【无】 冰柱环 120
+# 选择这只宝可梦身上附着的1个能量，放回手牌。」
+# 埋入雪中：trigger_on_event=own_play_from_hand_to_bench（摔角鹰人先例：仅主阶段
+# 从手牌放备战区触发；「可使用」的放弃选项不建模，附录 A·2026-09-07 决议）；
+# 「将场上的竞技场放于弃牌区」= discard_stadium（大比鸟ex 狂风呼啸先例，
+# D-WP7-6：有即弃、入其持有者弃牌区，无竞技场 no-op）。
+# 冰柱环：伤害 120 + 自身附着能量 1 个回手牌（move_energy destination=hand，
+# task 132 新形态：scope=self + choose=1 必选；附着不足按尽数、池空无事发生）。
+card:
+  name_group: 古剑豹
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-14）：全 H 标 3 印刷，
+  # 均在 standard-2026-09-16 快照内合法（G 标 10 印刷文本不同，不并入）
+  card_ids: [CSV9C-053, CSVM2aC-003, SVP-385]
+effects:
+  - trigger: trigger_on_event
+    event: own_play_from_hand_to_bench
+    actions:
+      - {action: discard_stadium}
+  - trigger: on_attack
+    attack: 冰柱环
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 120}}
+      - {action: move_energy, selector: own_attached_energy, choose: 1, destination: hand, args: {scope: self}}

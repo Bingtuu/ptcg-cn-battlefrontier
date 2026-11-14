@@ -1572,9 +1572,10 @@ def _switch(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
 
 def _relocate_energy(
     ctx: ExecutionContext, energy_iids: set[int], target_iid: int | None,
-    *, to_deck: bool,
+    *, to_deck: bool, to_hand: bool = False,
 ) -> tuple[int, tuple]:
-    """把 energy_iids 从场上摘下：to_deck 则洗入自己牌库，否则附到 target_iid。"""
+    """把 energy_iids 从场上摘下：to_deck 洗入自己牌库 / to_hand 进自己手牌 /
+    否则附到 target_iid。"""
     p = ctx.player_state
     mons = ([p.active] if p.active else []) + list(p.bench)
     moved = tuple(e for m in mons for e in m.attached_energy if e.iid in energy_iids)
@@ -1583,12 +1584,12 @@ def _relocate_energy(
         if not any(e.iid in energy_iids for e in mon.attached_energy):
             return mon
         kept = tuple(e for e in mon.attached_energy if e.iid not in energy_iids)
-        if to_deck or mon.current.iid != target_iid:
+        if to_deck or to_hand or mon.current.iid != target_iid:
             return mon.model_copy(update={"attached_energy": kept})
         return mon.model_copy(update={"attached_energy": kept + moved})
 
     def place(mon: InPlayPokemon) -> InPlayPokemon:
-        if to_deck or mon.current.iid != target_iid:
+        if to_deck or to_hand or mon.current.iid != target_iid:
             return strip(mon)
         if any(e.iid in energy_iids for e in mon.attached_energy):
             return strip(mon)
@@ -1600,6 +1601,8 @@ def _relocate_energy(
     }
     if to_deck and moved:
         update["deck"] = ctx.engine.rng.shuffle(p.deck + moved)
+    if to_hand and moved:
+        update["hand"] = p.hand + moved
     ctx.set_player_state(p.model_copy(update=update))
     return len(moved), moved
 
@@ -1618,6 +1621,9 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     opt_exact=true（激流水泵，TPCi 2024-09-12）：可放弃；若执行则必须
     恰好 min(N, 身上张数) 张（够 N 不可少选，不足则尽数）。选 0 / 池空不洗牌。
     两种新形态都写 optional_done。
+    task 132：destination=hand + scope=self + choose=N（古剑豹 冰柱环）——
+    所选能量从来源宝可梦取下进自己手牌；必选（不支持 up_to/opt_exact）；
+    不足 N 张按尽数选 min(N, 身上张数)；池空不弹选择直接无事发生。
     """
     if node.selector != "own_attached_energy":
         raise DslError(
@@ -1638,13 +1644,21 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
     target_pool = node.args.get("target_pool")
     scope = node.args.get("scope")
     to_deck = node.destination == "deck"
+    to_hand = node.destination == "hand"
     to_self = any_count and target_pool == "self"
-    if node.destination not in (None, "deck"):
+    if node.destination not in (None, "deck", "hand"):
         raise DslError(
-            f"move_energy 的 destination 暂仅支持 deck（收到 {node.destination!r}）"
+            f"move_energy 的 destination 暂仅支持 deck/hand（收到 {node.destination!r}）"
         )
     if to_deck and (any_count or target_pool is not None):
         raise DslError("move_energy destination=deck 与 any_count/target_pool 互斥（不猜）")
+    if to_hand and (any_count or target_pool is not None):
+        raise DslError("move_energy destination=hand 与 any_count/target_pool 互斥（不猜）")
+    if to_hand and (up_to or opt_exact):
+        raise DslError(
+            "move_energy destination=hand 不支持 up_to/opt_exact"
+            f"（hand 为必选形态；收到 up_to={up_to!r}/opt_exact={opt_exact!r}，不猜）"
+        )
     if to_self and node.destination is not None:
         raise DslError("move_energy target_pool=self 不与 destination 同用（不猜）")
     if any_count and target_pool != "self":
@@ -1661,19 +1675,30 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
             f"（收到 scope={scope!r}/up_to={up_to!r}/opt_exact={opt_exact!r}"
             f"/choose={node.choose!r}）"
         )
-    if not to_deck and not to_self and node.choose is None:
+    if to_hand and (scope != "self" or node.choose is None):
+        raise DslError(
+            "move_energy destination=hand 需要 scope=self、choose=N"
+            f"（收到 scope={scope!r}/choose={node.choose!r}）"
+        )
+    if not to_deck and not to_self and not to_hand and node.choose is None:
         raise DslError("move_energy 需要 choose=N（转附必须经 chooser 交互选择）")
-    if (to_deck or to_self) and node.args.get("target_filters"):
+    if (to_deck or to_self or to_hand) and node.args.get("target_filters"):
         raise DslError("move_energy 新形态不支持 target_filters（目标固定，不猜）")
     target_filters = tuple(node.args.get("target_filters", ()))
     p = ctx.player_state
     mons = ([p.active] if p.active else []) + list(p.bench)
-    if to_deck or to_self:
+    if to_deck or to_self or to_hand:
         source = _find_source_mon(ctx)
         if source is None:
             raise DslError("move_energy：来源宝可梦不在场上")
         if choice is None:
-            if to_deck:
+            if to_self:
+                pool = tuple(
+                    e for m in mons if m.current.iid != source.current.iid
+                    for e in m.attached_energy if matches(e, node.filters)
+                )
+                exclude = tuple(e.iid for e in source.attached_energy)
+            else:
                 pool = tuple(
                     e for e in source.attached_energy if matches(e, node.filters)
                 )
@@ -1682,18 +1707,12 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
                     for m in mons if m.current.iid != source.current.iid
                     for e in m.attached_energy
                 )
-            else:
-                pool = tuple(
-                    e for m in mons if m.current.iid != source.current.iid
-                    for e in m.attached_energy if matches(e, node.filters)
-                )
-                exclude = tuple(e.iid for e in source.attached_energy)
             if not pool:
                 return {"moved": 0, "iids": [], "optional_done": False}
-            cap = node.choose if to_deck else len(pool)
+            cap = len(pool) if to_self else node.choose if to_deck else min(node.choose, len(pool))
             need = NeedChoice(
                 pool="own_attached_energy", filters=node.filters,
-                min_choose=0, max_choose=cap, exclude_iids=exclude,
+                min_choose=0 if (to_deck or to_self) else cap, max_choose=cap, exclude_iids=exclude,
             )
             need.exact_or_zero = bool(to_deck and opt_exact)
             return need
@@ -1709,13 +1728,17 @@ def _move_energy(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
                     f"（收到 {len(choice)} 张）"
                 )
         n, moved = _relocate_energy(
-            ctx, set(choice), None if to_deck else source.current.iid,
-            to_deck=to_deck,
+            ctx, set(choice), None if to_deck or to_hand else source.current.iid,
+            to_deck=to_deck, to_hand=to_hand,
         )
         return {
             "moved": n, "energy_iids": [e.iid for e in moved],
             "optional_done": n > 0,
-            **({"shuffled": n > 0} if to_deck else {"target_iid": source.current.iid}),
+            **(
+                {"shuffled": n > 0} if to_deck
+                else {"target_iid": source.current.iid} if to_self
+                else {}
+            ),
         }
     if choice is None:
         if not resolve_pool(p, "own_attached_energy", node.filters):

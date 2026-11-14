@@ -13,6 +13,7 @@ from pathlib import Path
 
 from battlefrontier.data.cards import carddef_from_db
 from battlefrontier.dsl.loader import load_card_dir
+from battlefrontier.runner.coverage import classify_dsl
 from battlefrontier.runner.experiment import (
     DEFAULT_CARDS_DIR,
     _resolve_decklist_entry,
@@ -59,12 +60,7 @@ def check_decklist(db_path: str, path: str | Path,
             resolved_id, rec = _resolve_decklist_entry(db, name, card_id)
             card_def, ws = carddef_from_db(rec)
             rep.warnings.extend(ws)
-            if resolved_id in lib:
-                dsl = "covered"
-            elif lib.by_name(name):
-                dsl = "vanilla"
-            else:
-                dsl = "no_doc"
+            dsl = classify_dsl(resolved_id, name, lib)
             rep.entries.append(DeckEntryCheck(
                 count=count, name=name, card_id=resolved_id,
                 supertype=card_def.supertype, dsl=dsl))

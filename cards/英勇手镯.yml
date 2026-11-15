@@ -1,0 +1,15 @@
+# 英勇手镯（CSV10.6C-082，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的宝可梦（除「拥有规则的宝可梦」外）所使用的招式给对手战斗场上的「宝可梦【ex】」造成的伤害「+30」。」
+# 声明式常驻修正：引擎读 passive_static 的 modify_damage 声明，在招式伤害结算
+# （rules-manual §6 顺序 2：基准后、弱点抗性前）求和；args.target_rule_box=ex
+# 校验防守方规则盒（对非 ex 不加；极限腰带/空手道王的修炼先例）；
+# 「除拥有规则的宝可梦外」= 道具附着限制（全局规则），引擎附着枚举暂未按
+# 规则盒过滤——存量全局缺口，非本卡效果语义（task 136 遗留）。
+card:
+  name_group: 英勇手镯
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：全库 1 印刷，I 标
+  card_ids: [CSV10.6C-082]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_damage, args: {amount: 30, target_rule_box: ex}}

@@ -1,0 +1,21 @@
+# 桌台市（CSV1C-126，竞技场）
+# text_raw 原文：「双方玩家，每次在自己的回合有1次机会，可抛掷1次硬币。如果为
+# 正面，则选择自己牌库中的1张宝可梦，在给对手看过之后，加入手牌。并重洗牌库。」
+# stadium_grant = 双方各每回合 1 次的授予行动（引擎 use_stadium 骨架，task 017，
+# 深钵镇/城镇百货先例）；授予内容即掷币 1 次（使用授予必掷；反面 = 空结算）；
+# 正面分支的检索/展示/洗牌三节点同挂 if_flip_heads 节点门控（粉碎之锤先例）——
+# 反面既不检索也不洗牌，对齐原文「如果为正面，则…并重洗牌库」的分支结构。
+card:
+  name_group: 桌台市
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：G 标 2 印刷全收，
+  # 均在当前 standard 快照（standard-2026-09-16）合法集内
+  card_ids: [CSV1C-126, CSVE1C-168]
+effects:
+  - trigger: stadium_grant
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: coin_flip}
+      - {action: search_deck, selector: own_deck, filters: [pokemon], choose: 1, destination: hand, condition: if_flip_heads}
+      - {action: reveal, selector: own_hand, filters: [pokemon], condition: if_flip_heads}
+      - {action: shuffle_deck, condition: if_flip_heads}

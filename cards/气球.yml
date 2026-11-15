@@ -1,0 +1,17 @@
+# 气球（CSV10.5C-082，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的宝可梦【撤退】所需能量减少2个。」
+# 声明式常驻修正（task 026 WP4，D-WP4-1 🔲 待核）：引擎 _effective_retreat_cost
+# 读 passive_static 声明（解释器不执行），撤退枚举与执行两触点接入。value=2
+# 为持有者道具口径（无 scope 键），与其他来源减免加总后 clamp 下限 0；道具被弃
+# /替换即失效（求值点实时读声明，紧急滑板先例）。
+card:
+  name_group: 气球
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：I 标 2 印刷。
+  # 另有 D 标 4 印刷（CS1DC-189 / CS1bC-128 / CS1bC-197 / CSAC-017）为异标点
+  # 文本（多一个「，」），且不在当前 standard 快照（2026-09-16）合法集内，不挂；
+  # G 标 CSV3C-119 为异文本（【2阶进化】限定、全部消除），拆 气球-2阶进化.yml。
+  card_ids: [CSV10.5C-082, SVP-485]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: modify_retreat_cost, args: {value: 2}}

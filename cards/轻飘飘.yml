@@ -1,0 +1,17 @@
+# 轻飘飘（CSV10.6C-041，基础，超属性）
+# text_raw 原文：「【超】 大海之影 20
+# 在下一个对手的回合，对手无法从手牌使出物品。」
+# 大海之影：damage 20 + lock_play（args.category=item）——受击方玩家侧回合标记
+# （turn 戳，对齐 lock_retreat 结构），下个对手回合物品从手牌打出枚举门控，
+# 其自己回合结束解除（含羞苞 痒痒花粉先例，task 029，D-029-3）。
+card:
+  name_group: 轻飘飘
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：2 印刷全收，I 标；
+  # E 标 CS3bC-041 为异文本类（自我再生/泼水），不混入
+  card_ids: [CSV10.6C-041, CSV10.6C-124]
+effects:
+  - trigger: on_attack
+    attack: 大海之影
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 20}}
+      - {action: lock_play, args: {category: item}}

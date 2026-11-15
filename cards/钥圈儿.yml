@@ -1,0 +1,34 @@
+# 钥圈儿（CSV1C-060，基础，超属性 70）——G 标「恶作剧之锁」文本类
+# （同名多文本拆分纪律：E 标「解锁」类 5 印刷 / B 标「金属音」类 1 印刷 /
+# H 标「开锁抽取」类 1 印刷归一化 text_raw 均异，不在本文件挂载，db 实测 2026-11-15）
+# text_raw 原文：「特性: 恶作剧之锁
+# 只要这只宝可梦在战斗场上，双方场上【基础】宝可梦的特性（除「恶作剧之锁」外），全部消除。
+#
+# 【无】 狙落 10
+# 在造成伤害前，将放于对手战斗宝可梦身上的「宝可梦道具」放于弃牌区。」
+# 恶作剧之锁（task 139，D-139-3/4）：suppress_ability 阶段过滤 args.stage=basic
+# （目标 = 【基础】宝可梦；stage 词值开放字符串，求值点校验暂仅 basic）+
+# args.except_ability=恶作剧之锁（具名豁免——消除面含持有者自身（基础），
+# 无豁免即自我封存；豁免按 CardDef.ability_names 比对，目标卡全部特性名
+# 命中豁免名即不适用该消除声明）+
+# condition holder_is_active（「只要这只宝可梦在战斗场上」，监视塔先例的
+# 宝可梦来源扩展：condition 对声明持有者求值，退备战区/被消除即解锁）。
+# 消除落点 = 既有 _ability_suppressed 统一守卫清单（ability_manual 枚举门 +
+# 宝可梦卡来源被动 aura + trigger_on_event 分发），双方场上全生效。
+# 狙落（D-139-2）：discard selector=opponent_active_tool——对手战斗宝可梦身上
+# 道具自动弃置（无选择、无道具时空结算 no-op），节点序在 damage 之前即
+# 「在造成伤害前」；道具进对手弃牌区 + discard_tool 事件（道具拆除器同口径）。
+card:
+  name_group: 钥圈儿
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：G 标 3 印刷
+  card_ids: [CSV1C-060, CSVL1C-028, CSVL1C-069]
+effects:
+  - trigger: passive_static
+    condition: holder_is_active
+    actions:
+      - {action: suppress_ability, args: {stage: basic, except_ability: 恶作剧之锁}}
+  - trigger: on_attack
+    attack: 狙落
+    actions:
+      - {action: discard, selector: opponent_active_tool}
+      - {action: damage, selector: opponent_active, args: {amount: 10}}

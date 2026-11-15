@@ -81,6 +81,10 @@ class CardDef(FrozenModel):
     # 特性存在标记（对齐 db cards.abilities 非空，task 026 WP7 雪妖女 冻结帷幕：
     # 「拥有特性」过滤用——db 是否有特性条目的物化投影，引擎不解析特性内容）
     has_ability: bool = False
+    # 特性名物化投影（task 139 钥圈儿 恶作剧之锁「除『恶作剧之锁』外」式
+    # 按特性名排除的消除声明用；对齐 db cards.abilities[].name，无特性 = 空组；
+    # 引擎不解析特性内容，仅作声明匹配数据）
+    ability_names: tuple[str, ...] = ()
 
 
 class CardInstance(FrozenModel):
@@ -113,6 +117,13 @@ class InPlayPokemon(FrozenModel):
     # 检查阶段恢复条件 = 持有者回合结束 且 (turn, current) != 标记（施加当回合不恢复）；
     # None（如直接构造入场）= 持有者回合结束即恢复；恢复后清回 None
     paralyzed_mark: tuple[int, int] | None = None
+    # 时效减伤标记（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：
+    # prevent_attack_damage 原语写入 = (施加时 turn, 施加方 player, 失效 turn,
+    # 攻击方阶段限定 int|None, 攻击方属性排除 tuple)；生效 iff s.turn == 失效turn
+    # 且 current_player != 施加方（(player, turn) 对唯一 = 「下一个对手的回合」
+    # 窗口）；对手回合结束（core._on_turn_end）清除；随 InPlayPokemon 走
+    # （撤退/进化保留——「这只宝可梦」），昏厥/离场即消失
+    attack_shield: tuple[int, int, int, int | None, tuple[str, ...]] | None = None
 
     @property
     def current(self) -> CardInstance:
@@ -208,6 +219,11 @@ class PendingChoice(FrozenModel):
     copy_stack: tuple[CopyFrame, ...] = ()
     # 本效果已进入的 (来源 iid, 招式名)，含宣言招式。同键不再可选，避免复制环
     copy_chain: tuple[tuple[int, str], ...] = ()
+    # 模式二选一（task 139 乌栗 choose_mode）：mode_options = 冻结的模式选择池
+    # （选择 = 池内下标）；mode = 已选模式名（模式内节点挂起时冻结，恢复时穿透
+    # 重建 ctx.mode，同 flip 口径）
+    mode_options: tuple[str, ...] = ()
+    mode: str | None = None
 
 
 class PlayerState(FrozenModel):
@@ -240,8 +256,10 @@ class PlayerState(FrozenModel):
     extra_prize_attack_ko: bool = False
     # 回合级伤害修正标记（task 026 WP7 空手道王的修炼，D-WP7-3）：on_play 的
     # modify_damage 写入——元素 = (增减值, 目标规则盒限定 | None)，与道具/竞技场/
-    # aura 三来源求和；自己回合结束（_on_turn_end / 检查阶段入口）清除
-    turn_damage_mods: tuple[tuple[int, str | None], ...] = ()
+    # aura 三来源求和；自己回合结束（_on_turn_end / 检查阶段入口）清除。
+    # 目标规则盒限定 = 单值（target_rule_box=ex）或列表（task 139 乌栗
+    # 「宝可梦【ex】・V」[ex, v]），str | list[str]（开放词表，对齐 db rule_box_type）
+    turn_damage_mods: tuple[tuple[int, str | list[str] | None], ...] = ()
     # 精确口径昏厥标记（task 026 WP7 古玉鱼 嫉妒业火，D-WP7-7）：「上一个对手的回合」
     # 内我方宝可梦因对手招式伤害被昏厥（宽口径 own_ko_during_opponent_turn 不含
     # 伤害来源判别）；_knockout_one 在招式上下文置位，我方回合结束清除

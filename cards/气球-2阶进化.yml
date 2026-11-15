@@ -1,0 +1,15 @@
+# 气球-2阶进化（CSV3C-119，宝可梦道具）
+# text_raw 原文：「身上放有这张卡牌的【2阶进化】宝可梦【撤退】所需能量，全部消除。」
+# 同名异文本拆分档（task 026 归组决议；主档 气球.yml = I 标「减少2个。」类）：
+# 声明式常驻修正（task 026 WP4），引擎 _effective_retreat_cost 读 passive_static
+# 声明。持有者须为【2阶进化】（条件词 holder_stage:2，task 027 新冲天能量先例，
+# 读栈顶 CardDef.stage）；满足则撤退费归零（value=all，驱劲能量 未来先例，
+# 归零旗标与数值减免无顺序依赖），非 2 阶持有者条件不成立 → 无修正。
+card:
+  name_group: 气球
+  card_ids: [CSV3C-119]
+effects:
+  - trigger: passive_static
+    condition: holder_stage:2
+    actions:
+      - {action: modify_retreat_cost, args: {value: all}}

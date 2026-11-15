@@ -87,6 +87,11 @@ class ExecutionContext:
         self.prev_optional_done: bool | None = None
         # 本攻击已进入的复制链（task 076）：(来源 iid, 招式名)。空 = 非复制结算
         self.copy_chain: tuple[tuple[int, str], ...] = ()
+        # 当前效果块（run_effect 进入时设置；choose_mode 分支可行性按整效果节点扫描）
+        self.effect: Effect | None = None
+        # 已选模式名（task 139 乌栗 choose_mode）：分支节点条件 if_mode:<名> 读取；
+        # 挂起恢复时经 PendingChoice.mode 穿透重建（同 flip 口径）
+        self.mode: str | None = None
 
     @property
     def player_state(self) -> PlayerState:
@@ -164,6 +169,24 @@ def _node_condition_met(ctx: ExecutionContext, condition: str) -> bool:
         return holder is not None and any(
             e.card.energy_type == energy_type for e in holder.attached_energy
         )
+    if condition.startswith("if_attached_energy_ge:"):
+        # task 136（胖嘟嘟ex 力量压制）：来源宝可梦附着能量 ≥ N 才放行
+        # （「附着能量比使用这个招式所需能量多2个」——N = 卡面费用 + 2，编写期推导）
+        raw = condition.split(":", 1)[1]
+        try:
+            n = int(raw)
+        except ValueError:
+            raise DslError(
+                f"节点 condition 参数畸形 {condition!r}"
+                f"（if_attached_energy_ge 需 int）"
+            ) from None
+        if n < 0:
+            raise DslError(
+                f"节点 condition 参数畸形 {condition!r}"
+                f"（if_attached_energy_ge 需非负 int）"
+            )
+        holder = _source_holder(ctx)
+        return holder is not None and len(holder.attached_energy) >= n
     if condition == "if_prev_optional_done":
         if ctx.prev_optional_done is None:
             raise DslError(
@@ -171,6 +194,32 @@ def _node_condition_met(ctx: ExecutionContext, condition: str) -> bool:
                 "（无可选结果，不猜）"
             )
         return ctx.prev_optional_done
+    if condition.startswith("if_opponent_active_type:"):
+        # task 139（雪童子-冰砾）：对手战斗宝可梦栈顶属性 = 指定属性才放行
+        energy_type = condition.split(":", 1)[1]
+        if not energy_type:
+            raise DslError(
+                f"节点 condition 参数畸形 {condition!r}"
+                f"（if_opponent_active_type 需非空属性）"
+            )
+        opp_active = ctx.engine.state.players[1 - ctx.player].active
+        return (
+            opp_active is not None
+            and opp_active.current.card.energy_type == energy_type
+        )
+    if condition.startswith("if_mode:"):
+        # task 139（乌栗 choose_mode）：本效果内已选模式 = 指定模式名才放行
+        name = condition.split(":", 1)[1]
+        if not name:
+            raise DslError(
+                f"节点 condition 参数畸形 {condition!r}（if_mode 需非空模式名）"
+            )
+        if ctx.mode is None:
+            raise DslError(
+                f"节点 condition {condition!r} 需要本效果内前置 choose_mode 节点"
+                f"（无模式选择，不猜）"
+            )
+        return ctx.mode == name
     if condition not in _NODE_CONDITIONS:
         raise DslError(
             f"未知节点 condition 词 {condition!r}（不猜；扩展请在 dsl/interpreter.py 注册）"
@@ -199,6 +248,7 @@ def run_effect(
     discarded_count: int = 0,
     flip_heads_count: int | None = None,
     prev_optional_done: bool | None = None,
+    mode: str | None = None,
 ) -> NeedChoice | None:
     """执行效果块：成本 → 动作序列；逐节点发事件（PRD §5.4）。
 
@@ -212,6 +262,8 @@ def run_effect(
     ctx.discarded_this_effect）；
     flip_heads_count 是挂起瞬间冻结的本效果掷币正面次数（task 040 F1，恢复时重建
     ctx.flip_heads_count，同 discarded_count 口径）。
+    mode 是挂起瞬间冻结的已选模式名（task 139 choose_mode，恢复时重建 ctx.mode，
+    同 flip 口径；嵌套 copy 帧不穿透）。
     condition / limit 在本期仅随 effect_start 事件记录，强制约束（特性限次等）
     由引擎在行动枚举/执行层完成（task 011）。
     """
@@ -221,8 +273,38 @@ def run_effect(
     ctx.discarded_this_effect = discarded_count
     ctx.flip_heads_count = flip_heads_count
     ctx.prev_optional_done = prev_optional_done
+    ctx.mode = mode
+    ctx.effect = effect
     ctx.bound_attack = effect.attack
     card_name = ctx.source.card.name
+    steps = flatten_steps(effect)
+    # 模式分支静态校验（task 139）：一效果至多 1 个 choose_mode 节点；if_mode
+    # 引用须在本效果内有前置 choose_mode 声明且命中其 options（不猜——拼错模式
+    # 名 = 分支永不执行，编写期暴露）
+    mode_nodes = [n for _, n in steps if n.action == "choose_mode"]
+    if len(mode_nodes) > 1:
+        raise DslError(
+            f"一效果至多 1 个 choose_mode 节点（收到 {len(mode_nodes)} 个；"
+            f"{ctx.effect_id}，不猜）"
+        )
+    mode_node = mode_nodes[0] if mode_nodes else None
+    mode_refs = [n.condition for _, n in steps
+                 if n.condition is not None and n.condition.startswith("if_mode:")]
+    if mode_refs and mode_node is None:
+        raise DslError(
+            f"节点条件 if_mode 需要本效果内前置 choose_mode 节点"
+            f"（{ctx.effect_id}，不猜）"
+        )
+    if mode_node is not None:
+        from battlefrontier.dsl.chooser import choose_mode_options
+
+        options = set(choose_mode_options(mode_node.args))
+        for ref in mode_refs:
+            if ref.split(":", 1)[1] not in options:
+                raise DslError(
+                    f"节点条件 {ref!r} 未命中本效果 choose_mode 的 options"
+                    f"（{ctx.effect_id}，不猜）"
+                )
     if start == 0 and choice is None:  # 恢复执行（带 choice）不重复发 effect_start
         ctx.emit(
             "effect_start",
@@ -232,7 +314,6 @@ def run_effect(
             condition=effect.condition,
             limit=effect.limit,
         )
-    steps = flatten_steps(effect)
     for cursor in range(start, len(steps)):
         # 终局守卫（task 026 WP2）：效果中途 game_over（奖赏拿完/判负）→ 后续节点不执行
         if ctx.engine.state.phase == "game_over":
@@ -270,6 +351,8 @@ def run_effect(
             result.flip_heads_count = ctx.flip_heads_count
             # 前序可选节点结果随挂起冻结（task 071 WP16，同 flip 口径）
             result.prev_optional_done = ctx.prev_optional_done
+            # 已选模式名随挂起冻结（task 139 choose_mode，同 flip 口径）
+            result.mode = ctx.mode
             # 扁平步骤段（cost/actions）随挂起标注（task 032 WP1，D-032-1：
             # Agent 据此区分代价支付/收益选择方向，同四件套穿透口径）
             result.step_phase = phase

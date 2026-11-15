@@ -1,0 +1,31 @@
+# 胖嘟嘟ex（CSV10.6C-042，1阶，超属性，HP270，ex）
+# text_raw 原文：「特性: 海之咒术
+# 只要这只宝可梦在战斗场上，对手无法从手牌使出「物品」，也无法使出「宝可梦道具」放于宝可梦身上。
+#
+# 【超】【无】 力量压制 80+
+# 如果身上附着的能量比使用这个招式所需能量多2个的话，则追加造成80伤害。」
+# 海之咒术：passive_static lock_play 广义门类（task 136 引擎扩展，D-136-1）——
+# category=item（对手物品从手牌打出枚举门控）+ category=tool（对手道具附着枚举
+# 门控），condition holder_is_active（「只要这只宝可梦在战斗场上」；退到备战区/
+# 特性被消除即解锁，引擎求值点实时扫场）。
+# 力量压制：基准 80 无条件照打；追加 80 走节点级门控 if_attached_energy_ge:4
+# （所需能量 2 个 + 2 = 4，古玉鱼 嫉妒业火两段式先例；节点各吃一次攻方
+# modify_damage 修正，与嫉妒业火同口径）。
+card:
+  name_group: 胖嘟嘟ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：3 印刷全收，I 标
+  card_ids: [CSV10.6C-042, CSV10.6C-162, CSV10.6C-170]
+effects:
+  - trigger: passive_static
+    condition: holder_is_active
+    actions:
+      - {action: lock_play, args: {category: item}}
+  - trigger: passive_static
+    condition: holder_is_active
+    actions:
+      - {action: lock_play, args: {category: tool}}
+  - trigger: on_attack
+    attack: 力量压制
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 80}}
+      - {action: damage, selector: opponent_active, args: {amount: 80}, condition: if_attached_energy_ge:4}

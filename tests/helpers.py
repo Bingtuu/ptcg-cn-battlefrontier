@@ -79,8 +79,9 @@ def effects_by_name(library) -> dict:
     （防错挂守卫不放宽）。task 070 WP1a 追加：高级球/裁判（30th 同效果异文本
     再录拆分，D-070-3 预期同组多文档）。task 071：咕咕（三刺击 / 寂静之翼）同名异文本。
     task 134：能量转移（主类 / H6 异文本类）。
+    task 139：索财灵（连掷硬币 / 小使者）/ 雪童子（惊吓 / 冰砾）。
     """
-    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙", "高级球", "裁判", "咕咕", "能量转移"}
+    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙", "高级球", "裁判", "咕咕", "能量转移", "能量回收", "气球", "索财灵", "雪童子"}
     docs = list({id(d): d for d in library.values()}.values())
     names = [d.card.name_group for d in docs]
     dupes = {n for n in names if names.count(n) > 1}

@@ -1,0 +1,25 @@
+# 索财灵（CSV9C-096，基础，超属性）——H 标「小使者」文本类
+# （同名多文本拆分纪律：本印刷与 索财灵-连掷硬币.yml（G 标连掷硬币类 3 印刷）
+# 归一化 text_raw 不一致，db 实测 2026-11-15；task 139 印刷补挂侧 quest：
+# CSV9C-096（4 张在用）判异文本 → 拆分新档）
+# text_raw 原文：「【无】 小使者
+# 选择自己牌库中最多2张基本能量，在给对手看过之后，加入手牌。并重洗牌库。
+#
+# 【无】【无】【无】 撞击 50」
+# 小使者：search_deck 检索 up-to 2（米立龙 揽客同 up-to 纪律：min_choose=0）
+# + reveal（一期口径：仅落结构化事件流，对手可见视图不建模泄露——能量回收
+# 同口径）+ shuffle_deck（「并重洗牌库」）；牌库无基本能量时空结算仍重洗。
+# 「撞击 50」为白板固定伤害招式，无需 DSL 绑定。
+card:
+  name_group: 索财灵
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：H 标 2 印刷
+  card_ids: [CSV9C-096, CSVM2cC-004]
+effects:
+  - trigger: on_attack
+    attack: 小使者
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [basic_energy], choose: 2, destination: hand}
+      - {action: reveal, selector: own_hand, filters: [basic_energy]}
+      - {action: shuffle_deck}

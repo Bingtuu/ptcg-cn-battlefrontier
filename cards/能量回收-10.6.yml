@@ -1,0 +1,19 @@
+# 能量回收（CSV10.6C-079，物品）——I 标 10.6 弹异文本等价类拆分档
+# （同名多文本拆分纪律：本印刷 text_raw「在给对手看过之后加入手牌」无逗号，
+# 与主类 能量回收.yml 14 印刷「在给对手看过之后，加入手牌」归一化文本不一致，
+# 2026-11-15 db 实测；效果语义同主类）
+# text_raw 原文：「选择自己弃牌区中最多2张基本能量，在给对手看过之后加入手牌。」
+# 「最多2张」= up-to（min_choose=0，args.up_to，水莲的照顾先例）；reveal 一期口径：
+# 仅落结构化事件流（iids+卡名），对手可见视图不建模泄露（超级能量回收同口径）。
+card:
+  name_group: 能量回收
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：本档 1 印刷，I 标；
+  # 主类 14 印刷与其余「将自己弃牌区中的2张…」异文本类见 能量回收.yml 注记
+  card_ids: [CSV10.6C-079]
+effects:
+  - trigger: on_play
+    # 决策聚合锚点（task 022）：回收选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [basic_energy], choose: 2, destination: hand, args: {up_to: true}}
+      - {action: reveal, selector: own_hand, filters: [basic_energy]}

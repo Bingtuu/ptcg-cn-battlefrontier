@@ -94,6 +94,11 @@ class NeedChoice:
         self.exact_or_zero: bool = False
         # task 076：被复制招式挂起时标注来源 iid，引擎据此延长 copy_chain
         self.inner_donor_iid: int | None = None
+        # task 139（乌栗 choose_mode）：模式选择池（None = 非模式选择挂起）；
+        # 选择 = 池内下标（choices=(i,)），执行原语预筛不可行模式
+        self.mode_options: tuple[str, ...] | None = None
+        # 解释器挂起时标注（ctx.mode 快照，task 139，同 flip 口径）
+        self.mode: str | None = None
 
 
 def _match_one(card: CardInstance, filter_word: str) -> bool:
@@ -241,6 +246,11 @@ def _match_in_play(
     if filter_word == "no_rule_box":
         # 无规则盒（task 026 WP7 谢米：受保护目标收敛「除拥有规则的宝可梦外」）
         return top.rule_box is None
+    if filter_word in ("stage1_pokemon", "stage2_pokemon"):
+        # 阶段过滤（task 139 重力山 modify_hp args.target_filters 场上维度：
+        # 「所有【2阶进化】宝可梦」；stage 整数词表对齐 CardDef.stage）
+        want = int(filter_word.split("_")[0].replace("stage", ""))
+        return top.supertype == Supertype.POKEMON and top.stage == want
     raise DslError(f"未知 in-play filter 词 '{filter_word}'（chooser 求值点；扩展请在 dsl/chooser.py 注册）")
 
 
@@ -298,6 +308,17 @@ def resolve_pool(
             raise DslError("opponent_attached_energy 池需要对手状态（chooser 内部约定）")
         mons = ([opponent.active] if opponent.active else []) + list(opponent.bench)
         return tuple(e for m in mons for e in m.attached_energy if matches(e, filters))
+    if pool == "tools_attached_both":
+        # task 136（道具拆除器）：双方场上宝可梦身上放着的宝可梦道具
+        # （卡维度池，元素 = 道具卡实例；各道具归属方由执行原语按持有者路由）
+        if opponent is None:
+            raise DslError("tools_attached_both 池需要对手状态（chooser 内部约定）")
+        both = (([p.active] if p.active else []) + list(p.bench)
+                + ([opponent.active] if opponent.active else [])
+                + list(opponent.bench))
+        return tuple(m.attached_tool for m in both
+                     if m.attached_tool is not None
+                     and matches(m.attached_tool, filters))
     if pool == "anchored_pokemon_attack":
         # task 071 WP10：锚点宝可梦的招式索引池（元素 = 招式索引，同
         # opponent_active_attack 口径；可复制性由原语经 exclude_iids 预筛）
@@ -341,6 +362,10 @@ def enumerate_choices(pending: PendingChoice) -> list[Action]:
     pool_buckets——distinct 分桶互异：只产桶值两两互异的子集；
     ordered——选择顺序有语义：每个子集展开为全排列（deck_top 牌顶 FIFO）。
     """
+    if pending.mode_options:
+        # 模式二选一（task 139 choose_mode）：选择 = 池内下标，无子集展开
+        return [Action(kind="choose", choices=(i,))
+                for i in range(len(pending.mode_options))]
     if pending.choose_groups:
         subsets: set[tuple[int, ...]] = {()}
         for group_pool, cap in pending.choose_groups:
@@ -387,6 +412,33 @@ def build_pending(
     copy_chain: tuple[tuple[int, str], ...] = (),
 ) -> PendingChoice:
     """挂起：解析池并冻结，写 pending_choice + 切 phase。"""
+    # 模式二选一（task 139 choose_mode）：非卡池挂起——无 resolve_pool/hp_of，
+    # 模式池原样冻结（执行原语已预筛不可行模式）
+    if need.mode_options is not None:
+        return PendingChoice(
+            player=player, source=source, effect_index=effect_index, cursor=cursor,
+            pool=need.pool, filters=need.filters,
+            min_choose=1, max_choose=1,
+            destination=need.destination,
+            pool_iids=(),
+            payload=need.carry,
+            completion=completion,
+            inner=inner,
+            outer_cursor=outer_cursor,
+            outer_choice=outer_choice,
+            flip_result=need.flip,
+            cost_discarded=need.cost_discarded,
+            discarded_count=need.discarded_count,
+            attacker_iid=need.attacker_iid,
+            flip_heads_count=need.flip_heads_count,
+            step_phase=need.step_phase,
+            prev_optional_done=need.prev_optional_done,
+            outer_carry=outer_carry,
+            copy_stack=copy_stack,
+            copy_chain=copy_chain,
+            mode_options=need.mode_options,
+            mode=need.mode,
+        )
     # choose_groups（task 026 WP6，D-WP6-3）：各组池已由原语按牌库序解析冻结进
     # need.choose_groups，此处只取并集（保序去重）作 pool_iids，不再经 resolve_pool
     if need.choose_groups:
@@ -418,6 +470,7 @@ def build_pending(
             exact_or_zero=need.exact_or_zero,
             copy_stack=copy_stack,
             copy_chain=copy_chain,
+            mode=need.mode,
         )
     # 池归属方决定有效 HP 口径（勇气护符 modify_hp 按持有方求值，task 015）
     owner = 1 - player if need.pool.startswith("opponent") else player
@@ -472,7 +525,132 @@ def build_pending(
         exact_or_zero=need.exact_or_zero,
         copy_stack=copy_stack,
         copy_chain=copy_chain,
+        mode_options=need.mode_options if need.mode_options is not None else (),
+        mode=need.mode,
     )
+
+
+def choose_mode_options(args: dict) -> tuple[str, ...]:
+    """choose_mode 的 args.options 形态校验（task 139 乌栗）：非空互异字符串列表。
+
+    供解释器静态校验（if_mode 引用核对）与执行原语共用（单一求值点）。
+    """
+    options = args.get("options")
+    if not (
+        isinstance(options, (list, tuple))
+        and options
+        and all(isinstance(o, str) and o for o in options)
+        and len(set(options)) == len(options)
+    ):
+        raise DslError(
+            f"choose_mode 的 args.options 须为非空互异字符串列表"
+            f"（收到 {options!r}；不猜）"
+        )
+    return tuple(options)
+
+
+def _trainer_action_feasible(
+    node, p: PlayerState, bench_full: bool,
+    opponent: PlayerState | None,
+    first_turn: bool,
+) -> bool:
+    """单节点落点可行性（task 139 从 playable_feasible 析出）：True = 有合法落点。
+
+    choose_mode 节点自身无池（模式可行性由调用方按分支展开判定），恒 True。
+    """
+    if node.action == "search_deck" and node.destination == "bench" and bench_full:
+        return False
+    if node.action == "choose_mode":
+        return True  # 模式选择本身无池；分支可行性见 playable_feasible
+    if node.action == "attach_energy":
+        # task 026 WP4：bench-only 附着（target_pool=own_bench）能量池/备战池
+        # 为空不可使用（无效果不可使用）；既有 own_pokemon_in_play 形式保持
+        # 不门控（奥琳博士的气魄「无合法目标仍抽 3」存量行为回归）
+        target_pool = node.args.get("target_pool", "own_pokemon_in_play")
+        if target_pool == "own_bench":
+            # 能量来源随 selector（task 071 WP4：弃牌区玻璃喇叭 / 牌库能量涡轮）
+            src = node.selector if node.selector in (
+                "own_discard", "own_deck", "own_hand",
+            ) else "own_discard"
+            if not resolve_pool(p, src, node.filters):
+                return False
+            if not resolve_pool(p, "own_bench", tuple(node.args.get("target_filters", ()))):
+                return False
+        elif target_pool != "own_pokemon_in_play":
+            raise DslError(
+                f"可行性门未支持 attach_energy target_pool={target_pool!r}（不猜）"
+            )
+    if node.action == "discard" and node.selector == "tools_attached_both":
+        # task 136（道具拆除器）：双方场上均无道具 → 无效果不可使用
+        # （能量回收 up-to 先例；opponent 必传——物品枚举点总是传入）
+        if opponent is None:
+            raise DslError(
+                "可行性门 discard tools_attached_both 需要对手状态（不猜）"
+            )
+        own_tools = any(
+            m.attached_tool is not None
+            for m in ([p.active] if p.active else []) + list(p.bench)
+        )
+        opp_tools = any(
+            m.attached_tool is not None
+            for m in ([opponent.active] if opponent.active else [])
+            + list(opponent.bench)
+        )
+        if not (own_tools or opp_tools):
+            return False
+    if node.action == "recover_from_discard":
+        # task 026 WP3：新形式（bench 去向 / hand up-to）弃牌区无匹配不可使用
+        # （无效果不可使用）；既有形式（hand 默认 / deck）保持不门控（存量行为回归）
+        if node.destination not in ("hand", "deck", "bench"):
+            raise DslError(
+                f"可行性门未支持 recover_from_discard destination={node.destination!r}（不猜）"
+            )
+        if node.destination == "bench" or (
+            node.destination == "hand" and node.args.get("up_to")
+        ):
+            if not resolve_pool(p, "own_discard", node.filters):
+                return False
+            if node.destination == "bench" and bench_full:
+                return False
+    if (
+        node.action == "switch" and node.selector == "opponent_bench"
+        and (opponent is None or not opponent.bench)
+    ):
+        return False
+    if node.action == "switch" and node.selector == "own_bench" and not resolve_pool(
+        p, "own_bench", node.filters
+    ):
+        # 交替推车等 own 侧互换：无（过滤后）备战宝可梦不可用
+        # （task 025；task 139 起 filters 收窄池——桃歹郎ex 支配锁链属性过滤）
+        return False
+    if node.action == "move_energy":
+        if not resolve_pool(p, "own_attached_energy", node.filters):
+            return False
+        if len(([p.active] if p.active else []) + list(p.bench)) < 2:
+            return False  # 需要「其他」宝可梦作转附目标
+    if node.action == "evolve":
+        mode = node.args.get("mode")
+        if mode != "skip_stage":
+            raise DslError(f"可行性门未支持 evolve mode={mode!r}（不猜）")
+        # 神奇糖果：「在自己最初的回合…无法使用」+ 手牌有【2阶进化】+
+        # 场上有同链【基础】（「刚出场的宝可梦」= entered_play_this_turn 不可）
+        if first_turn:
+            return False
+        stage2s = [c for c in p.hand if matches(c, ("stage2_pokemon",))]
+        mons = ([p.active] if p.active else []) + list(p.bench)
+        ok = any(
+            any(
+                m.current.card.stage == 0
+                and m.current.card.evolution_chain is not None
+                and m.current.card.evolution_chain == c.card.evolution_chain
+                and m.current.iid not in p.entered_play_this_turn
+                for m in mons
+            )
+            for c in stage2s
+        )
+        if not ok:
+            return False
+    return True
 
 
 def playable_feasible(
@@ -488,7 +666,12 @@ def playable_feasible(
     switch opponent_bench（对手无备战不可用）；move_energy（无已附着能量或
     场上不足 2 只不可用）；evolve skip_stage（神奇糖果：非自己最初回合 +
     手牌有 stage2 + 场上有同链可进化基础）。
-    未知形式 = DslError（不猜， DSL 编写期即暴露）。
+    未知成本形式 = DslError（不猜， DSL 编写期即暴露）。
+
+    模式二选一（task 139 乌栗 choose_mode）：存在 choose_mode 节点时按分支
+    展开——无 condition 节点为公共段（各模式都要求可行），if_mode:<模式> 节点
+    为分支私有；至少一个模式全分支可行才可打出。其余 condition 门控节点
+    （if_flip_* 等运行时门）不参与可行性判定（同「无效果不可使用」只查落点）。
     """
     for node in effect.cost:
         if node.action == "discard" and node.selector == "own_hand":
@@ -502,76 +685,25 @@ def playable_feasible(
             f"成本形式未支持：{node.action}/{node.selector}/count={node.count}/choose={node.choose}"
             f"（可行性门不猜；扩展请在 dsl/chooser.py 注册）"
         )
-    for node in effect.actions:
-        if node.action == "search_deck" and node.destination == "bench" and bench_full:
-            return False
-        if node.action == "attach_energy":
-            # task 026 WP4：bench-only 附着（target_pool=own_bench）能量池/备战池
-            # 为空不可使用（无效果不可使用）；既有 own_pokemon_in_play 形式保持
-            # 不门控（奥琳博士的气魄「无合法目标仍抽 3」存量行为回归）
-            target_pool = node.args.get("target_pool", "own_pokemon_in_play")
-            if target_pool == "own_bench":
-                # 能量来源随 selector（task 071 WP4：弃牌区玻璃喇叭 / 牌库能量涡轮）
-                src = node.selector if node.selector in (
-                    "own_discard", "own_deck", "own_hand",
-                ) else "own_discard"
-                if not resolve_pool(p, src, node.filters):
-                    return False
-                if not resolve_pool(p, "own_bench", tuple(node.args.get("target_filters", ()))):
-                    return False
-            elif target_pool != "own_pokemon_in_play":
-                raise DslError(
-                    f"可行性门未支持 attach_energy target_pool={target_pool!r}（不猜）"
-                )
-        if node.action == "recover_from_discard":
-            # task 026 WP3：新形式（bench 去向 / hand up-to）弃牌区无匹配不可使用
-            # （无效果不可使用）；既有形式（hand 默认 / deck）保持不门控（存量行为回归）
-            if node.destination not in ("hand", "deck", "bench"):
-                raise DslError(
-                    f"可行性门未支持 recover_from_discard destination={node.destination!r}（不猜）"
-                )
-            if node.destination == "bench" or (
-                node.destination == "hand" and node.args.get("up_to")
+    mode_node = next((n for n in effect.actions if n.action == "choose_mode"), None)
+    if mode_node is not None:
+        options = choose_mode_options(mode_node.args)
+        rest = [n for n in effect.actions if n is not mode_node]
+        for opt in options:
+            branch = [
+                n for n in rest
+                if n.condition is None or n.condition == f"if_mode:{opt}"
+            ]
+            if all(
+                _trainer_action_feasible(n, p, bench_full, opponent, first_turn)
+                for n in branch
             ):
-                if not resolve_pool(p, "own_discard", node.filters):
-                    return False
-                if node.destination == "bench" and bench_full:
-                    return False
-        if (
-            node.action == "switch" and node.selector == "opponent_bench"
-            and (opponent is None or not opponent.bench)
-        ):
-            return False
-        if node.action == "switch" and node.selector == "own_bench" and not p.bench:
-            return False  # 交替推车等 own 侧互换：无备战宝可梦不可用（task 025）
-        if node.action == "move_energy":
-            if not resolve_pool(p, "own_attached_energy", node.filters):
-                return False
-            if len(([p.active] if p.active else []) + list(p.bench)) < 2:
-                return False  # 需要「其他」宝可梦作转附目标
-        if node.action == "evolve":
-            mode = node.args.get("mode")
-            if mode != "skip_stage":
-                raise DslError(f"可行性门未支持 evolve mode={mode!r}（不猜）")
-            # 神奇糖果：「在自己最初的回合…无法使用」+ 手牌有【2阶进化】+
-            # 场上有同链【基础】（「刚出场的宝可梦」= entered_play_this_turn 不可）
-            if first_turn:
-                return False
-            stage2s = [c for c in p.hand if matches(c, ("stage2_pokemon",))]
-            mons = ([p.active] if p.active else []) + list(p.bench)
-            ok = any(
-                any(
-                    m.current.card.stage == 0
-                    and m.current.card.evolution_chain is not None
-                    and m.current.card.evolution_chain == c.card.evolution_chain
-                    and m.current.iid not in p.entered_play_this_turn
-                    for m in mons
-                )
-                for c in stage2s
-            )
-            if not ok:
-                return False
-    return True
+                return True
+        return False
+    return all(
+        _trainer_action_feasible(n, p, bench_full, opponent, first_turn)
+        for n in effect.actions
+    )
 
 
 # condition 求值注册表（开放字符串；「只有…时才可使用」类前提，task 014）。
@@ -938,6 +1070,25 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
                     f"/choose={node.choose!r}（不猜）"
                 )
             continue
+        elif node.action == "switch":
+            # task 139（桃歹郎ex 支配锁链）：own 侧换位——（过滤后）备战池非空可行
+            if node.selector != "own_bench" or node.choose != 1:
+                raise DslError(
+                    f"特性可行性门未支持 switch 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            if not resolve_pool(p, "own_bench", node.filters, hp_of=hp_of):
+                return False
+        elif node.action == "apply_status":
+            # task 139（桃歹郎ex 支配锁链）：施加特殊状态（own_active/opponent_active），
+            # 目标由枚举上下文保证在场，恒可行（不眠等免疫在结算落点判定）
+            if node.selector not in ("own_active", "opponent_active") \
+                    or node.choose is not None:
+                raise DslError(
+                    f"特性可行性门未支持 apply_status 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            continue
         elif node.action == "lock_attack":
             # task 071 WP15（火伊布ex 红玉髓）：锁自身全部招式，无池，恒可行
             if node.selector != "self" or node.choose is not None:
@@ -951,6 +1102,15 @@ def ability_feasible(effect: Effect, engine: GameEngine, player: int) -> bool:
             if node.selector != "opponent_pokemon_all" or node.choose is not None:
                 raise DslError(
                     f"特性可行性门未支持 devolve 形式 selector={node.selector!r}"
+                    f"/choose={node.choose!r}（不猜）"
+                )
+            continue
+        elif node.action == "bounce_to_deck":
+            # task 136（土龙节节 逃跑抽取）：自身整叠回库，来源在场上由枚举保证，
+            # 恒可行；无备战判负是结算后果（bounce 附录 A 决议），不进门控
+            if node.selector != "self" or node.choose is not None:
+                raise DslError(
+                    f"特性可行性门未支持 bounce_to_deck 形式 selector={node.selector!r}"
                     f"/choose={node.choose!r}（不猜）"
                 )
             continue

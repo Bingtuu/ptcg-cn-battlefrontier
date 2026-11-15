@@ -1,0 +1,29 @@
+# 太乐巴戈斯ex（CSV9C-175 档，基础，无属性，HP230，ex）
+# text_raw 原文：「【无】【无】 同盟打击 30×
+# 这个招式，在后攻玩家的最初回合无法使用。造成自己备战宝可梦数量×30伤害。
+#
+# 【草】【水】【雷】 皇冠蛋白石 180
+# 在下一个对手的回合，这只宝可梦不会受到【基础】宝可梦（除【无】宝可梦外）的招式的伤害。」
+# 同盟打击：usage_gate=second_player_first_turn（task 138 引擎扩展，D-138-1——
+# 枚举点使用门，区别于古月鸟「招式失败」语义：禁用时不可宣言、攻击机会不消耗）
+# + damage count=bench_count_own per 30（D-138-2 计数词）。
+# 皇冠蛋白石：damage 180 + prevent_attack_damage（D-138-3 时效减伤——
+# timing=opponent_next_turn「在下一个对手的回合」+ attacker_stage=basic「【基础】
+# 宝可梦」+ except_attacker_type=无「除【无】宝可梦外」；只免疫招式伤害，不免疫
+# 招式效果与伤害指示物——卡面仅「伤害」）。
+card:
+  name_group: 太乐巴戈斯ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：7 印刷全收
+  card_ids: [CSV9C-175, CSV9C-232, CSV9C-251, CSV9C-262,
+             CSV9.5C-156, CSV9.5C-248, CSV9.5C-259]
+effects:
+  - trigger: on_attack
+    attack: 同盟打击
+    usage_gate: second_player_first_turn
+    actions:
+      - {action: damage, selector: opponent_active, count: bench_count_own, args: {op: "×", per: 30}}
+  - trigger: on_attack
+    attack: 皇冠蛋白石
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 180}}
+      - {action: prevent_attack_damage, selector: self, args: {timing: opponent_next_turn, attacker_stage: basic, except_attacker_type: 无}}

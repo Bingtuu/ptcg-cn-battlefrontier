@@ -1,0 +1,15 @@
+# 道具拆除器（CSV10.6C-080，物品）
+# text_raw 原文：「选择放于双方场上的宝可梦身上最多2张「宝可梦道具」，放于弃牌区。」
+# discard selector=tools_attached_both（task 136 引擎扩展，D-136-3）：双方场上宝可梦
+# 身上道具池，choose=2 + args.up_to（「最多2张」，min_choose=0）；所选道具摘下进
+# 其持有者（宝可梦操控方）弃牌区；双方场上均无道具不可打出（可行性门，
+# 能量回收 up-to 先例）。
+card:
+  name_group: 道具拆除器
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：2 印刷全收，I 标；
+  # D 标 CS1.5C-047/095 为旧弹印刷（赛制外），不与本档互挂
+  card_ids: [CSV10.6C-080, SVP-483]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: discard, selector: tools_attached_both, choose: 2, args: {up_to: true}}

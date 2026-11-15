@@ -416,6 +416,26 @@ class GameEngine:
             return self._main_actions(player)
         return []
 
+    def _usage_gate_banned(self, player: int, word: str) -> bool:
+        """招式使用门求值（task 138 太乐巴戈斯ex 同盟打击「这个招式，在后攻玩家
+        的最初回合无法使用」，D-138-1）——真 = 该招式此时不可宣言。
+
+        引擎对卡牌内容零硬编码：词 = usage_gates 词表开放词，未知词 DslError
+        （不猜）。turn 计数仅在先攻方回合开始递增（core._begin_turn），故
+        turn==1 覆盖双方各自最初回合；「后攻玩家的最初回合」= turn==1 且
+        行动方 != first_player（先攻最初回合另有全局首回合禁攻，门对
+        first_player 求值为假）。攻击枚举（_main_actions）与执行（_do_attack
+        双保险）共用本求值点。
+        """
+        if word == "second_player_first_turn":
+            return (
+                self.state.turn == 1 and player != self.state.first_player
+            )
+        raise DslError(
+            f"未知招式使用门 {word!r}（usage_gates 词表；不猜——"
+            f"扩展请在 dsl/vocabularies.yml 登记并在 core._usage_gate_banned 求值）"
+        )
+
     def _main_actions(self, player: int) -> list[Action]:
         from battlefrontier.dsl.chooser import (
             ability_feasible,
@@ -437,6 +457,15 @@ class GameEngine:
             if ace_lock_state[0] is None:
                 ace_lock_state[0] = self._ace_spec_play_locked(player)
             return ace_lock_state[0]
+
+        # 被动物品锁（task 136，D-136-1）：对手 passive_static lock_play/item
+        # 声明生效 → 本玩家物品从手牌打出全锁；惰性求值对齐 ace_locked
+        passive_item_lock_state: list[bool | None] = [None]
+
+        def passive_item_locked() -> bool:
+            if passive_item_lock_state[0] is None:
+                passive_item_lock_state[0] = self._passive_play_locked(player, "item")
+            return passive_item_lock_state[0]
 
         # 放置基础宝可梦到备战区：不限次，容量按有效备战上限（规则书·行动阶段；
         # task 026 WP6 零之大空洞 bench_size 声明式覆写，_bench_size 读声明）
@@ -503,10 +532,15 @@ class GameEngine:
 
         # 宝可梦道具：每只限 1 个、不限次（rules-manual §5；attach 是规则行动，
         # 道具效果由 DSL passive_static/grant_attack 声明驱动）；
-        # ACE 锁（D-069-2）：被锁方 ACE SPEC 道具附着不枚举
+        # ACE 锁（D-069-2）：被锁方 ACE SPEC 道具附着不枚举；
+        # 被动道具锁（task 136 胖嘟嘟ex 海之咒术，D-136-1）：对手战斗场声明生效 →
+        # 被锁方道具附着不枚举（已附着道具的效果不受锁影响）
+        tool_play_locked = self._passive_play_locked(player, "tool")
         for c in p.hand:
             if c.card.supertype == Supertype.TRAINER and c.card.trainer_subtype == "宝可梦道具":
                 if c.card.is_ace_spec and ace_locked():
+                    continue
+                if tool_play_locked:
                     continue
                 for t in in_play:
                     if t.attached_tool is None:
@@ -558,6 +592,20 @@ class GameEngine:
                 # task 071 WP15：attack_lock_all 锁全部招式（含道具授予）
                 if p.active.attack_lock_all or attack.name in p.active.attack_locks:
                     continue
+                # 招式使用门（task 138 太乐巴戈斯ex 同盟打击，D-138-1）：
+                # 绑定效果声明 usage_gate 且禁用条件求值真 → 本招式不枚举
+                # （区别于 effect.condition「招式失败」——禁用时攻击机会不消耗）
+                bound = next(
+                    (e for e in doc.effects
+                     if e.trigger == "on_attack" and e.attack == attack.name),
+                    None,
+                ) if doc else None
+                if (
+                    bound is not None
+                    and bound.usage_gate is not None
+                    and self._usage_gate_banned(player, bound.usage_gate)
+                ):
+                    continue
                 # 有效招式费（task 026 WP5，D-WP5-4）：_effective_attack_cost 读 DSL
                 # modify_attack_cost 声明（月月熊 老练招式）；枚举与执行共用求值点
                 # 能量抵费（task 026 WP8，D-WP8-1）：_energy_units_satisfied 逐附着
@@ -568,11 +616,7 @@ class GameEngine:
                     self._effective_attack_cost(p.active, player, attack),
                 ):
                     continue
-                has_dsl = doc is not None and any(
-                    e.trigger == "on_attack" and e.attack == attack.name
-                    for e in doc.effects
-                )
-                if attack.damage is not None or has_dsl:
+                if attack.damage is not None or bound is not None:
                     actions.append(Action(kind="attack", attack_index=i))
 
         # 训练家卡：物品每回合不限次数；支援者每回合限 1 张且先攻方首回合禁用
@@ -587,6 +631,13 @@ class GameEngine:
             if (
                 c.card.trainer_subtype == "物品"
                 and p.item_lock_mark is not None
+            ):
+                continue
+            # 被动物品锁（task 136 胖嘟嘟ex 海之咒术，D-136-1）：对手战斗场
+            # 声明生效 → 被锁方物品从手牌打出不枚举
+            if (
+                c.card.trainer_subtype == "物品"
+                and passive_item_locked()
             ):
                 continue
             # ACE 锁（task 069 WP5，D-069-2）：被锁方 ACE SPEC 物品/支援者不枚举
@@ -1071,6 +1122,30 @@ class GameEngine:
             update["item_lock_mark"] = None
         if update:
             self._set_player(player, p.model_copy(update=update))
+        # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）窗口关闭：
+        # 回合结束方 != 施加方 且 turn 命中失效戳 → 清除对侧（持有者侧）场上
+        # 标记——「下一个对手的回合」随该回合结束而终结（(player, turn) 对唯一，
+        # 不会误清未来窗口；施加方自己回合结束不触本分支）。跨侧清除对齐
+        # 旧竞技场进其放置方弃牌区先例（task 017）
+        other = self.state.players[1 - player]
+        if any(
+            m.attack_shield is not None
+            for m in ([other.active] if other.active else []) + list(other.bench)
+        ):
+            def _expire_shield(mon: InPlayPokemon) -> InPlayPokemon:
+                sh = mon.attack_shield
+                if (
+                    sh is not None
+                    and sh[2] == self.state.turn
+                    and sh[1] != player
+                ):
+                    return mon.model_copy(update={"attack_shield": None})
+                return mon
+
+            self._set_player(1 - player, other.model_copy(update={
+                "active": _expire_shield(other.active) if other.active else None,
+                "bench": tuple(_expire_shield(m) for m in other.bench),
+            }))
         # task 120：回合末盘面快照（只动事件发射层；检查阶段前，回放可读性）。
         # _on_turn_end 会被回合结束路径 + 检查入口补调重复经过（同回合同玩家），
         # 以下「末位事件去重」保证每回合每人只发一条。
@@ -1346,6 +1421,14 @@ class GameEngine:
         ) if doc else None
         if effect_index is not None:
             effect = doc.effects[effect_index]
+            # 招式使用门执行双保险（task 138，D-138-1）：正常路径已被枚举门拦截，
+            # 此处拦截 apply 之外的直接驱动（对齐 suppress_tool 授予招式口径）
+            if effect.usage_gate is not None and self._usage_gate_banned(
+                player, effect.usage_gate
+            ):
+                raise IllegalActionError(
+                    f"usage_gate {effect.usage_gate}：该招式此时不可使用"
+                )
             # on_attack 效果级 condition（task 026 WP1，赫普的古月鸟「则这个招式失败」）：
             # 条件不满足 → 招式失败，不结算伤害/效果，回合照常结束（攻击已消耗）
             if effect.condition is not None:
@@ -1372,6 +1455,10 @@ class GameEngine:
                                  atk, player,
                                  target_rule_box=d.active.current.card.rule_box,
                                  defender=d.active))
+        # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：命中 → 归零
+        # （满 HP 截顶/昏厥路径对 0 伤害自然 no-op；招式伤害瞬时记录仅 final>0 置位）
+        if self._attack_damage_shielded(d.active, atk):
+            dmg = 0
         # 满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）
         dmg = self._survival_cap(defender, d.active, dmg)
         target = d.active.model_copy(update={"damage": d.active.damage + dmg})
@@ -1392,35 +1479,71 @@ class GameEngine:
         self._start_pokemon_check(player)
 
     def _effective_hp(self, mon: InPlayPokemon, player: int) -> int:
-        """最大 HP 含道具常驻修正（rules-manual §8 昏厥判定的 HP 基准）。
+        """最大 HP 含常驻修正（rules-manual §8 昏厥判定的 HP 基准）。
 
-        引擎对卡牌内容零硬编码：修正值读道具 DSL 文档 passive_static 的
-        modify_hp 声明（condition 如 holder_is_basic 在求值点判定）。
-        道具消除（task 029 阻碍之塔，D-029-2）：suppress_tool 在场时道具修正失效
-        （_tool_suppressed 统一守卫）。
+        引擎对卡牌内容零硬编码：修正值读 DSL 文档 passive_static 的
+        modify_hp 声明（condition 如 holder_is_basic 在求值点判定）——
+        ① 持有者道具（道具消除 task 029 阻碍之塔 D-029-2：suppress_tool 在场时
+        道具修正失效，_tool_suppressed 统一守卫）；
+        ② 场上竞技场（task 139 重力山：args.target_filters 场上维度过滤 +
+        args.amount 负修正——「所有【2阶进化】宝可梦的最大HP各-30」；
+        有效 HP 动态求值，场被顶/被弃即恢复；伤害 ≥ 新有效 HP 的昏厥由
+        _do_play_stadium 打出后检查触点承接，同 D-029-2 口径）。
         """
         hp = mon.current.card.hp or 0
         tool = mon.attached_tool
-        if tool is None or self._tool_suppressed(mon):
-            return hp
-        doc = self._effect_doc(tool.card)
-        if doc is None:
-            return hp
-        from battlefrontier.dsl.chooser import condition_met
+        if tool is not None and not self._tool_suppressed(mon):
+            doc = self._effect_doc(tool.card)
+            if doc is not None:
+                from battlefrontier.dsl.chooser import condition_met
 
-        for effect in doc.effects:
-            if effect.trigger != "passive_static":
-                continue
-            # 仅对含 modify_hp 声明的效果求 condition（task 026 WP4：紧急滑板同卡
-            # holder_hp_le 条件读有效 HP——不加此前置过滤会经 condition_met 递归回
-            # 本方法；无关效果的 condition 本就不影响 HP 求和）
-            if not any(node.action == "modify_hp" for node in effect.actions):
-                continue
-            if not condition_met(effect.condition, self, player, mon):
-                continue
-            for node in effect.actions:
-                if node.action == "modify_hp":
-                    hp += node.args["amount"]
+                for effect in doc.effects:
+                    if effect.trigger != "passive_static":
+                        continue
+                    # 仅对含 modify_hp 声明的效果求 condition（task 026 WP4：紧急
+                    # 滑板同卡 holder_hp_le 条件读有效 HP——不加此前置过滤会经
+                    # condition_met 递归回本方法；无关效果的 condition 本就不影响
+                    # HP 求和）
+                    if not any(node.action == "modify_hp" for node in effect.actions):
+                        continue
+                    if not condition_met(effect.condition, self, player, mon):
+                        continue
+                    for node in effect.actions:
+                        if node.action == "modify_hp":
+                            hp += node.args["amount"]
+        stadium = self.state.stadium
+        if stadium is not None:
+            sdoc = self._effect_doc(stadium.card)
+            if sdoc is not None:
+                from battlefrontier.dsl.chooser import matches_in_play
+
+                for effect in sdoc.effects:
+                    if effect.trigger != "passive_static":
+                        continue
+                    for node in effect.actions:
+                        if node.action != "modify_hp":
+                            continue
+                        amount = node.args.get("amount")
+                        if not isinstance(amount, int) or isinstance(amount, bool):
+                            raise DslError(
+                                f"modify_hp 的 amount 须为 int（收到 {amount!r}）"
+                            )
+                        target_filters = node.args.get("target_filters", ())
+                        if target_filters:
+                            if not (
+                                isinstance(target_filters, (list, tuple))
+                                and all(isinstance(f, str) for f in target_filters)
+                            ):
+                                raise DslError(
+                                    f"modify_hp 的 args.target_filters 须为字符串列表"
+                                    f"（收到 {target_filters!r}；不猜）"
+                                )
+                            # 场上维度过滤（开放字符串进 matches_in_play 求值，
+                            # 未知词 DslError；HP 类过滤器按卡面 HP——竞技场修正
+                            # 不作自身输入，防递归）
+                            if not matches_in_play(mon, tuple(target_filters)):
+                                continue
+                        hp += amount
         return hp
 
     def _effective_damage_modifier(
@@ -1470,8 +1593,22 @@ class GameEngine:
                     continue
                 for node in nodes:
                     trb = node.args.get("target_rule_box")
-                    if trb is not None and trb != target_rule_box:
-                        continue
+                    # 规则盒过滤：单值（空手道王的修炼）或列表（task 139 乌栗
+                    # 「宝可梦【ex】・V」= [ex, v] 双规则盒）——目标规则盒命中其一即放行
+                    if trb is not None:
+                        if isinstance(trb, str):
+                            trbs: tuple = (trb,)
+                        elif isinstance(trb, (list, tuple)) and trb and all(
+                            isinstance(t, str) and t for t in trb
+                        ):
+                            trbs = tuple(trb)
+                        else:
+                            raise DslError(
+                                f"modify_damage 的 args.target_rule_box 须为非空"
+                                f"规则盒词或列表（收到 {trb!r}；不猜）"
+                            )
+                        if target_rule_box not in trbs:
+                            continue
                     # task 071 电蜘蛛 复眼：只加成到拥有特性的对手战斗宝可梦
                     wants_ability = node.args.get("target_has_ability")
                     if wants_ability and (
@@ -1540,9 +1677,14 @@ class GameEngine:
             self_doc = self._effect_doc(mon.current.card)
             if self_doc is not None:
                 scan(self_doc, source_kind="self", source_mon=mon)
-        # ④ 回合级标记（on_play modify_damage 写入；target_rule_box 过滤在求和点）
+        # ④ 回合级标记（on_play modify_damage 写入；target_rule_box 过滤在求和点；
+        # 单值/列表同 scan 口径，task 139 乌栗 [ex, v]）
         for amount, trb in p.turn_damage_mods:
-            if trb is None or trb == target_rule_box:
+            if trb is None:
+                mod += amount
+                continue
+            trbs = (trb,) if isinstance(trb, str) else tuple(trb)
+            if target_rule_box in trbs:
                 mod += amount
         return mod
 
@@ -1952,7 +2094,9 @@ class GameEngine:
         不受影响；「已经受到的效果，不会消失」= 落点守卫设计天然满足（拦截新落点，
         不做回顾性清除）；能量离场即失效（求值点实时读声明）。
         一期守卫落点清单：apply_status / place_damage_counters / lock_retreat /
-        devolve——新增攻击效果落点须显式评估是否接入本守卫（不接 = 不受保护，不猜）。
+        devolve / discard selector=opponent_active_tool（task 139 狙落，道具
+        离身类效果）——新增攻击效果落点须显式评估是否接入本守卫（不接 = 不受
+        保护，不猜）。
         """
         from battlefrontier.dsl.chooser import condition_met
 
@@ -2059,6 +2203,35 @@ class GameEngine:
                         return True
         return False
 
+    def _attack_damage_shielded(
+        self, target: InPlayPokemon, attacker: InPlayPokemon | None,
+    ) -> bool:
+        """时效减伤判定（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：目标身上
+        attack_shield 标记生效且攻击方命中来源过滤 → 该次招式伤害归零。
+
+        引擎对卡牌内容零硬编码：标记由 DSL prevent_attack_damage 原语写入
+        （时效词 + 来源过滤词在写入期校验，此处只读结构化标记）。生效窗口 =
+        「下一个对手的回合」：s.turn == 失效turn 且 current_player != 施加方
+        （(player, turn) 对唯一，窗口精确圈定；不随施加后回合数漂移）。
+        来源过滤：攻击方阶段限定（None = 不限）+ 攻击方属性排除。仅招式伤害
+        经本守卫（接入点 = _do_attack 白板 / DSL damage 原语 / copy_attack
+        白板复制，对齐 _survival_cap 三落点纪律）；伤害指示物与招式效果不经
+        （卡面仅「伤害」）。attacker 为 None（来源无法定位）= 不适用。
+        """
+        shield = target.attack_shield
+        if shield is None or attacker is None:
+            return False
+        _set_turn, set_player, expiry_turn, stage, except_types = shield
+        s = self.state
+        if not (s.turn == expiry_turn and s.current_player != set_player):
+            return False
+        if stage is not None and attacker.current.card.stage != stage:
+            return False
+        return not (
+            except_types
+            and attacker.current.card.energy_type in except_types
+        )
+
     def _survival_cap(self, owner: int, target: InPlayPokemon, final: int) -> int:
         """满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）。
 
@@ -2124,8 +2297,20 @@ class GameEngine:
 
     # ── suppression 统一守卫（task 029，D-029-1/2）────────────────────
 
-    def _collect_suppress_types(self, doc, declared: list[str]) -> None:
-        """从一份文档收集 suppress_ability 的 types。with_primitive 定向声明跳过。"""
+    def _collect_suppress_declarations(
+        self, doc, declared: list[str], specs: list[tuple],
+        *, side: int | None = None, mon: InPlayPokemon | None = None,
+    ) -> None:
+        """从一份文档收集 suppress_ability 声明（task 139 广义化，D-139-1）。
+
+        types 进 declared（既有口径不动：竞技场跳源 + with_primitive 定向消除）；
+        stage/except_ability 进 specs（(types|None, stage|None, excludes|None)）。effect.condition（task 139 钥圈儿 holder_is_active
+        「只要这只宝可梦在战斗场上」）：宝可梦来源对声明持有者求值
+        （condition_met），不满足则整效果跳过——来源退备战区/条件翻转即解锁
+        （求值点实时扫场，天然无追溯）；竞技场来源带 condition 仍 DslError（不猜）。
+        """
+        from battlefrontier.dsl.chooser import condition_met
+
         for effect in doc.effects:
             if effect.trigger != "passive_static":
                 continue
@@ -2133,15 +2318,24 @@ class GameEngine:
             if not nodes:
                 continue
             if effect.condition is not None:
-                raise DslError(
-                    "suppress_ability 暂不支持 effect.condition（不猜；需要时再扩展）"
-                )
+                if mon is None:
+                    raise DslError(
+                        "suppress_ability 暂不支持 effect.condition（不猜；需要时再扩展）"
+                    )
+                if not condition_met(effect.condition, self, side, mon):
+                    continue
             for node in nodes:
                 types = node.args.get("types")
+                stage = node.args.get("stage")
+                except_ability = node.args.get("except_ability")
                 primitive = node.args.get("with_primitive")
-                if primitive is not None and types is not None:
+                if primitive is not None and (
+                    types is not None or stage is not None
+                    or except_ability is not None
+                ):
                     raise DslError(
-                        "suppress_ability 的 types 与 with_primitive 互斥（不猜）"
+                        "suppress_ability 的 with_primitive 与 types/stage/"
+                        "except_ability 互斥（不猜）"
                     )
                 if primitive is not None:
                     if not isinstance(primitive, str) or not primitive:
@@ -2150,35 +2344,62 @@ class GameEngine:
                             f"（收到 {primitive!r}）"
                         )
                     continue
-                if types is None:
+                if types is None and stage is None:
                     raise DslError(
-                        "suppress_ability 需要 args.types 或 with_primitive（不猜）"
+                        "suppress_ability 需要 args.types / args.stage / with_primitive"
+                        "（不猜）"
                     )
-                if not (
-                    isinstance(types, list)
-                    and types
-                    and all(isinstance(t, str) for t in types)
-                ):
-                    raise DslError(
-                        f"suppress_ability 的 args.types 须为非空属性列表"
-                        f"（收到 {types!r}；不猜）"
-                    )
-                declared.extend(types)
+                if types is not None:
+                    if not (
+                        isinstance(types, list)
+                        and types
+                        and all(isinstance(t, str) for t in types)
+                    ):
+                        raise DslError(
+                            f"suppress_ability 的 args.types 须为非空属性列表"
+                            f"（收到 {types!r}；不猜）"
+                        )
+                    declared.extend(types)
+                stage_n = None
+                if stage is not None:
+                    # 目标阶段过滤（task 139 钥圈儿「双方场上【基础】宝可梦」）；
+                    # 词值开放字符串，求值点校验——暂仅 basic（不猜，需要时再扩）
+                    if stage != "basic":
+                        raise DslError(
+                            f"suppress_ability 的 args.stage 暂仅支持 basic"
+                            f"（收到 {stage!r}；不猜）"
+                        )
+                    stage_n = 0
+                excludes = None
+                if except_ability is not None:
+                    # 「除『X特性』外」具名豁免（task 139）：目标卡的全部特性名
+                    # 都命中豁免名即不适用该消除声明（CardDef.ability_names ←
+                    # db abilities[].name）
+                    if not isinstance(except_ability, str) or not except_ability:
+                        raise DslError(
+                            "suppress_ability 的 args.except_ability 须为非空特性名"
+                            f"（收到 {except_ability!r}；不猜）"
+                        )
+                    excludes = frozenset((except_ability,))
+                specs.append((
+                    frozenset(types) if types is not None else None,
+                    stage_n,
+                    excludes,
+                ))
 
-    def _suppress_ability_types(self) -> tuple[str, ...] | None:
-        """场上 suppress_ability 的 types 声明（竞技场 + 双方宝可梦）。
+    def _suppress_declarations(self) -> tuple[tuple[str, ...], tuple[tuple, ...]]:
+        """单次扫场收集 suppress_ability 声明：返回 (types, specs)。
 
-        task 071 WP13：来源从仅竞技场扩到双方场上宝可梦。宝可梦来源若已被
-        竞技场 types 命中则跳过（避免自递归；宝可梦之间的类型消除都生效）。
-        with_primitive 定向声明不进本列表（见 _ability_primitive_suppressed）。
-        声明带 condition → DslError（不猜）。求值点实时读声明。
+        来源 = 场上竞技场 + 双方场上宝可梦（task 071 WP13）。宝可梦来源若已被
+        竞技场 types 命中则跳过（避免自递归）。求值点实时读声明。
         """
         declared: list[str] = []
+        specs: list[tuple] = []
         stadium = self.state.stadium
         if stadium is not None:
             doc = self._effect_doc(stadium.card)
             if doc is not None:
-                self._collect_suppress_types(doc, declared)
+                self._collect_suppress_declarations(doc, declared, specs)
         stadium_types = set(declared)
         for side in (0, 1):
             p = self.state.players[side]
@@ -2188,7 +2409,16 @@ class GameEngine:
                 doc = self._effect_doc(m.current.card)
                 if doc is None:
                     continue
-                self._collect_suppress_types(doc, declared)
+                self._collect_suppress_declarations(
+                    doc, declared, specs, side=side, mon=m,
+                )
+        return tuple(declared), tuple(specs)
+
+    def _suppress_ability_types(self) -> tuple[str, ...] | None:
+        """场上 suppress_ability 的 types 声明（竞技场 + 双方宝可梦；task 071
+        WP13 起宝可梦来源也进本列表）。with_primitive 定向声明不进本列表
+        （见 _ability_primitive_suppressed）。"""
+        declared, _ = self._suppress_declarations()
         return tuple(declared) if declared else None
 
     def _ability_primitive_suppressed(self, effect) -> bool:
@@ -2241,8 +2471,24 @@ class GameEngine:
         """
         if card.supertype != Supertype.POKEMON:
             return False
-        types = self._suppress_ability_types()
-        return types is not None and card.energy_type in types
+        types, specs = self._suppress_declarations()
+        if types and card.energy_type in types:
+            return True
+        for spec_types, spec_stage, spec_excludes in specs:
+            if spec_types is not None and card.energy_type not in spec_types:
+                continue
+            if spec_stage is not None and card.stage != spec_stage:
+                continue
+            # 「除『X特性』外」（task 139 钥圈儿，D-139-1）：目标卡的全部特性名
+            # 都被豁免集覆盖 → 该消除声明对其不适用（卡级守卫粒度——单特性卡
+            # 精确等价；混合特性卡保守按消除处理，多特性混合卡出现时再议）
+            if (
+                spec_excludes is not None and card.ability_names
+                and all(n in spec_excludes for n in card.ability_names)
+            ):
+                continue
+            return True
+        return False
 
     def _ability_suppressed(self, mon: InPlayPokemon) -> bool:
         """场上宝可梦维度的特性消除判定（读栈顶卡，见 _ability_suppressed_card）。"""
@@ -2388,18 +2634,32 @@ class GameEngine:
         return args
 
     def _ace_spec_play_locked(self, player: int) -> bool:
-        """ACE 锁（task 069 WP5 盖诺赛克特，D-069-2，🔲 待核）：对手场上宝可梦持
-        passive_static lock_play/ace_spec 声明（condition 如 holder_has_tool 对
-        声明持有者求值）→ 该玩家无法从手牌使出 ACE SPEC 卡（广义五门类：物品/
-        支援者/竞技场打出 + 道具附着 + 能量附着，枚举落点见 _main_actions）。
+        """ACE 锁（task 069 WP5 盖诺赛克特，D-069-2，🔲 待核）：见 _passive_play_locked
+        （本方法是其 category=ace_spec 的兼容包装，行为与 task 069 口径逐字一致）。"""
+        return self._passive_play_locked(player, "ace_spec")
+
+    def _passive_play_locked(self, player: int, category: str) -> bool:
+        """被动打出锁广义化（task 136 胖嘟嘟ex 海之咒术，D-136-1）：对手场上宝可梦持
+        passive_static lock_play/category 声明（condition 如 holder_has_tool /
+        holder_is_active 对声明持有者求值）→ 该玩家对应门类被锁。
+
+        category 门类（args.category 值域，开放字符串 + 求值点校验，不猜）：
+        - ace_spec（task 069 WP5 盖诺赛克特）：ACE SPEC 五门类全锁（物品/支援者/
+          竞技场打出 + 道具附着 + 能量附着，枚举落点见 _main_actions）；
+        - item（task 136 胖嘟嘟ex）：对手无法从手牌使出物品（物品打出枚举落点）；
+        - tool（task 136 胖嘟嘟ex）：对手无法将宝可梦道具放于宝可梦身上
+          （attach_tool 枚举落点；已附着道具的效果不受锁影响）。
 
         特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源声明失效。求值点实时
-        扫场——来源离场/条件不再满足即解锁，天然无追溯。passive_static 挂载的
-        lock_play 仅支持 category=ace_spec（item 锁走 on_attack 解释执行，
-        D-029-3）；其他 category/未知值 = DslError（不猜）。
+        扫场——来源离场/退到备战区（condition 如 holder_is_active 不再满足）/
+        条件翻转即解锁，天然无追溯。
         """
         from battlefrontier.dsl.chooser import condition_met
 
+        if category not in ("ace_spec", "item", "tool"):
+            raise DslError(
+                f"被动打出锁 category 须为 ace_spec/item/tool（收到 {category!r}；不猜）"
+            )
         opp = self.state.players[1 - player]
         for m in ([opp.active] if opp.active else []) + list(opp.bench):
             # 特性消除（task 029 监视塔，D-029-1）：宝可梦卡来源声明失效
@@ -2415,12 +2675,14 @@ class GameEngine:
                 if not nodes:
                     continue
                 for node in nodes:
-                    category = node.args.get("category")
-                    if category != "ace_spec":
+                    declared = node.args.get("category")
+                    if declared not in ("ace_spec", "item", "tool"):
                         raise DslError(
-                            f"passive_static 挂载的 lock_play 仅支持 category=ace_spec"
-                            f"（收到 {category!r}；item 锁走 on_attack 解释执行，不猜）"
+                            f"passive_static 挂载的 lock_play 仅支持 "
+                            f"category=ace_spec/item/tool（收到 {declared!r}；不猜）"
                         )
+                if not any(n.args.get("category") == category for n in nodes):
+                    continue
                 if not condition_met(effect.condition, self, 1 - player, m):
                     continue
                 return True
@@ -2712,6 +2974,7 @@ class GameEngine:
         outer_carry: tuple[int, ...] = (),
         copy_stack: tuple[CopyFrame, ...] = (),
         copy_chain: tuple[tuple[int, str], ...] = (),
+        mode: str | None = None,
     ) -> None:
         """task 108 包装层：招式效果窗口的昏厥事件缓冲进出。
 
@@ -2736,7 +2999,7 @@ class GameEngine:
                 discarded_count=discarded_count, attacker_iid=attacker_iid,
                 flip_heads_count=flip_heads_count,
                 prev_optional_done=prev_optional_done, outer_carry=outer_carry,
-                copy_stack=copy_stack, copy_chain=copy_chain,
+                copy_stack=copy_stack, copy_chain=copy_chain, mode=mode,
             )
         finally:
             if completion == "attack":
@@ -2764,6 +3027,7 @@ class GameEngine:
         outer_carry: tuple[int, ...] = (),
         copy_stack: tuple[CopyFrame, ...] = (),
         copy_chain: tuple[tuple[int, str], ...] = (),
+        mode: str | None = None,
     ) -> None:
         """跑效果或挂起：NeedChoice → phase="choice" + pending_choice；完成 → 按 completion 收尾。
 
@@ -2813,7 +3077,7 @@ class GameEngine:
                               flip=flip, cost_discarded=cost_discarded,
                               discarded_count=discarded_count,
                               flip_heads_count=flip_heads_count,
-                              prev_optional_done=prev_optional_done)
+                              prev_optional_done=prev_optional_done, mode=mode)
         finally:
             self._in_effect = False
         if need is not None:
@@ -2979,6 +3243,10 @@ class GameEngine:
             opp_active = self.state.players[1 - pc.player].active
             attacks = opp_active.current.card.attacks if opp_active else ()
             return [attacks[i].name for i in choices if i < len(attacks)]
+        if pc.mode_options:
+            # 模式二选一（task 139 choose_mode）：choices = 冻结模式池内下标，
+            # 解析为模式名（决策聚合数据源）
+            return [pc.mode_options[i] for i in choices if i < len(pc.mode_options)]
         names: dict[int, str] = {}
         for p in self.state.players:
             for c in (*p.deck, *p.hand, *p.discard, *p.prizes):
@@ -3009,6 +3277,19 @@ class GameEngine:
                    pool=pc.pool, chosen=list(action.choices),
                    chosen_names=self._resolve_choose_names(pc, action.choices))
         self.state = self.state.model_copy(update={"pending_choice": None})
+        # 模式二选一（task 139 choose_mode）：模式选择挂起的 pc.mode 为 None
+        # （挂起时未选定）——按冻结池下标解析出模式名穿透进恢复帧；模式内
+        # 节点挂起的 pc.mode 已冻结选定名，原样穿透（同 flip 口径）
+        mode = pc.mode
+        if mode is None and pc.mode_options:
+            if len(action.choices) != 1 or not (
+                0 <= action.choices[0] < len(pc.mode_options)
+            ):
+                raise DslError(
+                    f"模式选择恢复需要恰好 1 个合法池内下标（收到 {action.choices!r}，"
+                    f"池 {pc.mode_options!r}；不猜）"
+                )
+            mode = pc.mode_options[action.choices[0]]
         self._run_or_suspend(player, pc.source, pc.effect_index,
                              start=pc.cursor, choice=action.choices,
                              carry=pc.payload, completion=pc.completion,
@@ -3020,7 +3301,8 @@ class GameEngine:
                              flip_heads_count=pc.flip_heads_count,
                              prev_optional_done=pc.prev_optional_done,
                              outer_carry=pc.outer_carry,
-                             copy_stack=pc.copy_stack, copy_chain=pc.copy_chain)
+                             copy_stack=pc.copy_stack, copy_chain=pc.copy_chain,
+                             mode=mode)
 
     def _begin_turn(self, player: int, first_turn: bool = False) -> None:
         """回合开始：重置回合标记 → 抽牌（牌库空判负，规则书·胜负判定）。

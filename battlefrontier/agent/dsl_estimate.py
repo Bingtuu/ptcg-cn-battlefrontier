@@ -131,6 +131,9 @@ def _visible_counter(
         return len(opp.active.attached_energy) if opp.active else 0
     if word == "bench_count_both":
         return len(own.bench) + len(opp.bench)
+    if word == "bench_count_own":
+        # task 138（太乐巴戈斯ex 同盟打击）：己方备战数量（己方场上全可见）
+        return len(own.bench)
     if word == "opponent_taken_prizes":
         return 6 - opp.prizes_count
     if word == "opponent_remaining_prizes":

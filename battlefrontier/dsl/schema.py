@@ -54,6 +54,11 @@ class Effect(FrozenModel):
     （loader 层校验，task 038）；绑定名须命中卡面招式名（闸 1 --db 校验）。
     event：仅 trigger_on_event 使用（task 026 WP2），值 = events 词表事件词；
     其余触发器须为 None（loader 层校验）。
+    usage_gate：仅 on_attack 使用的招式使用门（task 138 太乐巴戈斯ex 同盟打击
+    「后攻玩家的最初回合无法使用」，D-138-1）——值 = usage_gates 词表禁用条件
+    词，求值真 → 该招式在行动枚举点不可宣言（区别于 effect.condition 的
+    「招式失败」语义：禁用时攻击机会不消耗）；其余触发器须为 None（loader 层
+    校验）；枚举与执行共用求值点（core._usage_gate_banned）。
     """
 
     trigger: str
@@ -61,6 +66,7 @@ class Effect(FrozenModel):
     event: str | None = None
     condition: str | None = None
     limit: str | None = None
+    usage_gate: str | None = None
     cost: tuple[ActionNode, ...] = ()
     actions: tuple[ActionNode, ...]
     observe: tuple[str, ...] = ()

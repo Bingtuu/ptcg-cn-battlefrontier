@@ -86,5 +86,12 @@ def carddef_from_db(card) -> tuple[CardDef, list[str]]:
         labels=tuple(getattr(getattr(card, "effect_tags", None), "labels", None) or ()),
         # 特性存在标记（task 026 WP7）：db abilities 非空即 True（列表/None 两形态都吃）
         has_ability=bool(getattr(card, "abilities", None)),
+        # 特性名投影（task 139）：db abilities[].name——「除『X特性』外」式
+        # 消除声明的数据底座（无 abilities 即空组）；引擎不解析特性内容。
+        # dict/对象两形态都吃（对齐 has_ability 口径，stub 测试卡兼容）
+        ability_names=tuple(
+            (a.get("name") if isinstance(a, dict) else a.name)
+            for a in (getattr(card, "abilities", None) or ())
+        ),
     )
     return card_def, warnings

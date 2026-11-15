@@ -104,6 +104,14 @@ def _validate_vocab(doc: CardEffectDoc, vocab: Vocabulary, source: str) -> None:
             )
         if effect.limit is not None:
             vocab.check("limits", effect.limit, source)
+        # usage_gate 仅 on_attack 使用（task 138，D-138-1）；词查 usage_gates 段
+        if effect.usage_gate is not None:
+            if effect.trigger != "on_attack":
+                raise DslError(
+                    f"{source}: usage_gate 字段仅 on_attack 可用"
+                    f"（trigger={effect.trigger}）"
+                )
+            vocab.check("usage_gates", effect.usage_gate, source)
         for node in (*effect.cost, *effect.actions):
             _check_action(node, vocab, source)
 

@@ -1,0 +1,20 @@
+# 城镇百货（CSV5C-128，竞技场）
+# text_raw 原文：「双方玩家，每次在自己的回合有1次机会，可选择自己牌库中的1张
+# 「宝可梦道具」，在给对手看过之后，加入手牌。并重洗牌库。」
+# stadium_grant = 双方各每回合 1 次的授予行动（引擎 use_stadium 骨架，task 017，
+# 深钵镇先例）；「宝可梦道具」= trainer_tool 卡维度过滤器（chooser 注册词）；
+# 「在给对手看过之后」= 检索后 reveal own_hand（task 132 斗子 D-WP3-4 口径）；
+# 「每次在自己的回合有1次机会」= stadium_used_this_turn（引擎强制，DSL 不重复声明）。
+card:
+  name_group: 城镇百货
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-15）：G 标 3 印刷全收，
+  # 均在当前 standard 快照（standard-2026-09-16）合法集内
+  card_ids: [CSV5C-128, CSVM1aC-031, CSVM1cC-027]
+effects:
+  - trigger: stadium_grant
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [trainer_tool], choose: 1, destination: hand}
+      - {action: reveal, selector: own_hand, filters: [trainer_tool]}
+      - {action: shuffle_deck}

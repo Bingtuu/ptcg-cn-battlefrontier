@@ -531,16 +531,18 @@ def test_ace_lock_condition_false_then_true_dynamic():
     assert_all_ace_free(e)
 
 
-def test_lock_play_passive_static_item_category_dsl_error():
-    """passive_static 挂载的 lock_play 仅支持 category=ace_spec
-    （item 锁走 on_attack 解释执行，D-029-3；误挂 = DslError 不猜）。"""
+def test_lock_play_passive_static_unknown_category_dsl_error():
+    """passive_static 挂载的 lock_play 的 category 值域 = ace_spec/item/tool
+    （D-136-1 广义化：item/tool 门类随胖嘟嘟ex 海之咒术开放，item 常驻锁仍可用
+    on_attack 回合标记形态；未知值 = DslError 不猜——本测随 D-136-1 修订，
+    原 item 拒收断言由 test_primitives_t136 的生效语义测试接替）。"""
     bad = parse_card_doc("""
 card:
   name_group: 坏锁兽
 effects:
   - trigger: passive_static
     actions:
-      - {action: lock_play, args: {category: item}}
+      - {action: lock_play, args: {category: spell}}
 """)
     e = board_engine(
         p0_hand=(inst(50, ACE_ITEM),),

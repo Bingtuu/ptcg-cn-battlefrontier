@@ -1029,6 +1029,28 @@ class HeuristicAgent:
                 amount = node.args.get("amount")
                 if isinstance(amount, int) and not isinstance(amount, bool):
                     hp += amount
+        # ② 场上竞技场（task 139 重力山镜像）：passive_static modify_hp +
+        # args.target_filters 场上维度过滤——与引擎 _effective_hp 同口径
+        # （condition 带词不猜跳过；HP 类过滤器按卡面 HP，同引擎防递归口径）
+        if view.stadium is not None and self.card_effects is not None:
+            sdoc = doc_for(self.card_effects, view.stadium.card)
+            if sdoc is not None:
+                for effect in sdoc.effects:
+                    if effect.trigger != "passive_static":
+                        continue
+                    nodes = [n for n in effect.actions if n.action == "modify_hp"]
+                    if not nodes:
+                        continue
+                    if effect.condition is not None:
+                        continue  # 不猜（同 _modify_hp_applies 口径）
+                    for node in nodes:
+                        amount = node.args.get("amount")
+                        if not (isinstance(amount, int) and not isinstance(amount, bool)):
+                            continue
+                        filters = tuple(node.args.get("target_filters", ()))
+                        if filters and not matches_in_play(mon, filters):
+                            continue
+                        hp += amount
         return hp
 
     def _modify_hp_applies(self, condition: str | None, mon: InPlayPokemon) -> bool:

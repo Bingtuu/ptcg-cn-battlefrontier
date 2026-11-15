@@ -31,7 +31,7 @@
 
 ## 结果与遗留
 
-（2026-11-15 收官，闸 3 人工核销待 Owner）
+（2026-11-15 收官；闸 3 已核销同日——主会话逐条 text_raw 对照，Owner 指令代核，4 行全 ✅，零改动）
 
 ### 三扩展清单（红→绿 TDD；既有测试零改动）
 
@@ -56,10 +56,10 @@
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 【无】【无】 同盟打击 30× | on_attack 同盟打击 + damage count=bench_count_own args={op:×, per:30} | D-138-2 计数词；招式绑定名命中卡面；伤害由 DSL 结算（AttackDef.damage 不重复结算） | ☐ |
-| 这个招式，在后攻玩家的最初回合无法使用。 | usage_gate: second_player_first_turn | D-138-1 枚举点使用门——禁用时不可宣言、攻击机会不消耗（区别于古月鸟「招式失败」；附录 A 已登记 🔲 待核，Owner 若裁失败语义改挂 condition 即可，两路径引擎并存） | ☐ |
-| 【草】【水】【雷】 皇冠蛋白石 180 | damage amount=180 | 招式绑定名命中卡面 | ☐ |
-| 在下一个对手的回合，这只宝可梦不会受到【基础】宝可梦（除【无】宝可梦外）的招式的伤害。 | prevent_attack_damage selector=self args={timing: opponent_next_turn, attacker_stage: basic, except_attacker_type: 无} | D-138-3 时效减伤：窗口精确 = 下一个对手的回合（(player,turn) 对唯一）；仅「招式的伤害」——招式附加效果/伤害指示物不免疫（卡面仅「伤害」，比 protection 窄）；战斗场/备战同守（「这只宝可梦」不限位置） | ☐ |
+| 【无】【无】 同盟打击 30× | on_attack 同盟打击 + damage count=bench_count_own args={op:×, per:30} | D-138-2 计数词；招式绑定名命中卡面；伤害由 DSL 结算（AttackDef.damage 不重复结算） | ✅ |
+| 这个招式，在后攻玩家的最初回合无法使用。 | usage_gate: second_player_first_turn | D-138-1 枚举点使用门——禁用时不可宣言、攻击机会不消耗（区别于古月鸟「招式失败」；附录 A 已登记 🔲 待核，Owner 若裁失败语义改挂 condition 即可，两路径引擎并存） | ✅ |
+| 【草】【水】【雷】 皇冠蛋白石 180 | damage amount=180 | 招式绑定名命中卡面 | ✅ |
+| 在下一个对手的回合，这只宝可梦不会受到【基础】宝可梦（除【无】宝可梦外）的招式的伤害。 | prevent_attack_damage selector=self args={timing: opponent_next_turn, attacker_stage: basic, except_attacker_type: 无} | D-138-3 时效减伤：窗口精确 = 下一个对手的回合（(player,turn) 对唯一）；仅「招式的伤害」——招式附加效果/伤害指示物不免疫（卡面仅「伤害」，比 protection 窄）；战斗场/备战同守（「这只宝可梦」不限位置） | ✅ |
 
 ### gate 收口
 
@@ -70,13 +70,15 @@
 - 份数：cards/ 实测 155（基线 154 → +1）；
 - 存量零改动证明：未改任何既有测试文件（git diff tests/ 仅含 task 139 先行改动，本批只新增 2 个测试文件）；
 - 全量 pytest / ruff：全量 **1949 passed in 779.59s**（exit 0；跑批期间仅两处等价 ruff 改写——core `_attack_damage_shielded` SIM103 与 primitives `_holder` 哑变量——这两个 hunks 在跑批启动后落地，其行为等价性由跑后终态代码的定向复跑覆盖：t138 原语 20/20 + 单卡 8/8 + coverage gate 11/11 全部在终态代码上重跑通过）；ruff check . 零告警；
-- 一次通过率：原语扩展 + 卡档闸 1+2 首次提交即过（测试侧构造笔误 3 处——KO 后 active 为 None、p1 行动未置 current=1、朴素 dict 按卡名键——均测试侧修正，非实现返工）；**first_pass=true**；人工修改量待闸 3 核销（当前 human_edit_lines=null）。
+- 一次通过率：原语扩展 + 卡档闸 1+2 首次提交即过（测试侧构造笔误 3 处——KO 后 active 为 None、p1 行动未置 current=1、朴素 dict 按卡名键——均测试侧修正，非实现返工）；**first_pass=true**；人工修改量已核销落账（2026-11-15：human_edit_lines=0，零改动核销）。
 
 ### authoring-log 行（交主会话集中落账）
 
 ```json
 {"date":"2026-11-15","card":"太乐巴戈斯ex","card_id":"CSV9C-175","author":"llm","batch":138,"gate1":true,"gate2":true,"gate3":false,"first_pass":true,"human_edit_lines":null,"notes":"task 138 引擎扩展批核销（task 132 blocked）：usage_gate=second_player_first_turn（D-138-1）+ bench_count_own（D-138-2）+ prevent_attack_damage 时效减伤（D-138-3）；7 印刷等价类；gate 收口"}
 ```
+
+> 注：以上 JSON 为交付快照；正式日志已由主会话落账并置 gate3=true（2026-11-15 核销，human_edit_lines=0）。
 
 ### 遗留
 

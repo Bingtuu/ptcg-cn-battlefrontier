@@ -31,7 +31,7 @@
 
 ## 结果与遗留
 
-（2026-11-15 闸 1+2 过，闸 3 人工核销待 Owner）
+（2026-11-15 闸 1+2 过；闸 3 已核销 2026-11-15——主会话逐条 text_raw 对照，Owner 指令代核，见核销清单裁定栏）
 
 ### 处置结论（前置分支：逐卡等价类比对）
 
@@ -62,39 +62,39 @@
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 【超】 大海之影 20 | on_attack 大海之影：damage 20 | 招式绑定名命中卡面 | ☐ |
-| 在下一个对手的回合，对手无法从手牌使出物品。 | lock_play category=item | 含羞苞 痒痒花粉先例（D-029-3）：受击方玩家侧回合标记，其自己回合结束解除 | ☐ |
+| 【超】 大海之影 20 | on_attack 大海之影：damage 20 | 招式绑定名命中卡面 | ✅ |
+| 在下一个对手的回合，对手无法从手牌使出物品。 | lock_play category=item | 含羞苞 痒痒花粉先例（D-029-3）：受击方玩家侧回合标记，其自己回合结束解除 | ✅ |
 
 **胖嘟嘟ex（CSV10.6C-042 档，3 印刷）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 只要这只宝可梦在战斗场上，对手无法从手牌使出「物品」 | passive_static lock_play item + condition holder_is_active | D-136-1 新门类；实时扫场，退备战区/被消除即解锁 | ☐ |
-| 也无法使出「宝可梦道具」放于宝可梦身上 | passive_static lock_play tool + condition holder_is_active | D-136-1；只锁 attach_tool 枚举，已附着道具效果不受影响 | ☐ |
-| 【超】【无】 力量压制 80+ | damage 80 无条件节点 | 基准伤害 | ☐ |
-| 如果身上附着的能量比使用这个招式所需能量多2个的话，则追加造成80伤害。 | damage 80 + condition if_attached_energy_ge:4 | N=费用2+2=4 编写期推导；追加仅触发一次；两段节点各吃一次 modify_damage（嫉妒业火同口径，已知近似） | ☐ |
+| 只要这只宝可梦在战斗场上，对手无法从手牌使出「物品」 | passive_static lock_play item + condition holder_is_active | D-136-1 新门类；实时扫场，退备战区/被消除即解锁 | ✅ |
+| 也无法使出「宝可梦道具」放于宝可梦身上 | passive_static lock_play tool + condition holder_is_active | D-136-1；只锁 attach_tool 枚举，已附着道具效果不受影响 | ✅ |
+| 【超】【无】 力量压制 80+ | damage 80 无条件节点 | 基准伤害 | ✅ |
+| 如果身上附着的能量比使用这个招式所需能量多2个的话，则追加造成80伤害。 | damage 80 + condition if_attached_energy_ge:4 | N=费用2+2=4 编写期推导；追加仅触发一次；两段节点各吃一次 modify_damage（嫉妒业火同口径，已知近似） | ✅ |
 
 **能量回收-10.6（CSV10.6C-079 档，异文本拆分）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 选择自己弃牌区中最多2张基本能量，在给对手看过之后加入手牌。 | recover_from_discard own_discard basic_energy choose=2 up_to + reveal own_hand basic_energy | 与主类语义逐字相同（仅差一个逗号的异文本）；observe key_search 锚点同主类 | ☐ |
+| 选择自己弃牌区中最多2张基本能量，在给对手看过之后加入手牌。 | recover_from_discard own_discard basic_energy choose=2 up_to + reveal own_hand basic_energy | 与主类语义逐字相同（仅差一个逗号的异文本）；observe key_search 锚点同主类 | ✅ |
 
 **道具拆除器（CSV10.6C-080 档，2 印刷）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 选择放于双方场上的宝可梦身上最多2张「宝可梦道具」，放于弃牌区。 | discard tools_attached_both choose=2 up_to | D-136-3 新选择器；各道具进其持有者弃牌区；双方无道具不可打出 | ☐ |
+| 选择放于双方场上的宝可梦身上最多2张「宝可梦道具」，放于弃牌区。 | discard tools_attached_both choose=2 up_to | D-136-3 新选择器；各道具进其持有者弃牌区；双方无道具不可打出 | ✅ |
 
 **英勇手镯（CSV10.6C-082 档）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 身上放有这张卡牌的宝可梦（除「拥有规则的宝可梦」外）所使用的招式给对手战斗场上的「宝可梦【ex】」造成的伤害「+30」。 | passive_static modify_damage amount=30 target_rule_box=ex | 极限腰带先例；「除拥有规则的宝可梦外」= 附着限制见遗留① | ☐ |
+| 身上放有这张卡牌的宝可梦（除「拥有规则的宝可梦」外）所使用的招式给对手战斗场上的「宝可梦【ex】」造成的伤害「+30」。 | passive_static modify_damage amount=30 target_rule_box=ex | 极限腰带先例；「除拥有规则的宝可梦外」= 附着限制见遗留① | ✅ |
 
 4. **份数**：cards/ 实测 143（基线 138 → +5）。
 5. **全量 pytest / ruff**：见下（收官回填）。
-6. **一次通过率**：5 卡闸 1+2 首次提交即过、零重写（**5/5 first_pass=true**）；引擎扩展 TDD 一稿过（唯一测试断言笔误 = 打物品不结束回合，测试侧修正，非实现返工）；人工修改量待闸 3 核销后填（当前 human_edit_lines=null）。
+6. **一次通过率**：5 卡闸 1+2 首次提交即过、零重写（**5/5 first_pass=true**）；引擎扩展 TDD 一稿过（唯一测试断言笔误 = 打物品不结束回合，测试侧修正，非实现返工）；人工修改量已核销落账（2026-11-15：5 卡均 human_edit_lines=0，零改动核销）。
 7. **authoring-log 行**（交主会话集中落账）：
 
 ```json
@@ -104,6 +104,8 @@
 {"date":"2026-11-15","card":"道具拆除器","card_id":"CSV10.6C-080","author":"llm","batch":13,"gate1":true,"gate2":true,"gate3":false,"first_pass":true,"human_edit_lines":null,"notes":"task 136；tools_attached_both（D-136-3 引擎扩展）；I 标 2 印刷"}
 {"date":"2026-11-15","card":"英勇手镯","card_id":"CSV10.6C-082","author":"llm","batch":13,"gate1":true,"gate2":true,"gate3":false,"first_pass":true,"human_edit_lines":null,"notes":"task 136；modify_damage +30 target_rule_box=ex（极限腰带先例）；附着限制见遗留"}
 ```
+
+> 注：以上 JSON 块为当初交付主会话的「待落账」快照（batch 字段笔误 13，实为 136）；正式日志已由主会话以 batch=136 落账并置 gate3=true（2026-11-15 核销）。
 
 ### 遗留
 

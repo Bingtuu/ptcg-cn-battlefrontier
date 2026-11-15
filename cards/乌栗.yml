@@ -4,13 +4,13 @@
 # ◆将自己的战斗宝可梦与备战宝可梦互换。
 #
 # ◆在这个回合，自己宝可梦所使用的招式，给对手战斗场上的「宝可梦【ex】・V」造成的伤害「+30」。」
-# 模式二选一（task 139，D-139-7）：choose_mode 原语 args.options 声明模式池，
+# 模式二选一（task 139，D-139-6）：choose_mode 原语 args.options 声明模式池，
 # 后续节点以节点条件 if_mode:<模式名> 挂分支——模式选择经 chooser 挂起/恢复
 # （不可行模式不进选择池：无备战宝可梦时仅「增伤」可选；全部模式不可行 →
 # 打出可行性门拦截）。模式选择随挂起冻结/恢复穿透（同 flip 六件套口径）。
 # 换位分支 = 宝可梦交替同款（switch own_bench choose=1；无备战不可行）。
 # 增伤分支 = 空手道王的修炼同款回合级标记（on_play modify_damage），
-# target_rule_box=[ex, v]（D-139-6 列表化：「宝可梦【ex】・V」= 规则盒 ex 或 v，
+# target_rule_box=[ex, v]（D-139-7 列表化：「宝可梦【ex】・V」= 规则盒 ex 或 v，
 # db rule_box_type 词表实测小写 v）——仅对对手战斗场招式伤害 +30，己方回合
 # 结束清除。
 card:

@@ -1,6 +1,6 @@
 # 重力山（CSV7C-201，竞技场）
 # text_raw 原文：「双方场上的所有【2阶进化】宝可梦的最大HP，各「-30」。」
-# modify_hp 竞技场来源（task 139，D-139-5）：passive_static 声明读点从道具扩到
+# modify_hp 竞技场来源（task 139，D-139-8）：passive_static 声明读点从道具扩到
 # 场上竞技场——args.amount=-30（负修正）+ args.target_filters=[stage2_pokemon]
 # （场上维度过滤器词表，开放字符串进 chooser 求值）——双方场上【2阶进化】
 # 有效 HP -30；基础/1 阶不受影响。有效 HP 动态求值：场被顶/被弃即恢复

@@ -25,7 +25,7 @@
 
 ## 结果与遗留
 
-（2026-11-15 收官，闸 3 人工核销待 Owner）
+（2026-11-15 收官；闸 3 已核销同日——主会话逐条 text_raw 对照，Owner 指令代核，全行 ✅；核销注释修正 5 处 D 编号（桃歹郎ex×2/钥圈儿×1/乌栗×2/重力山×1/雪童子×1））
 
 ### 重要过程事项：并行双代理撞车与收敛
 
@@ -75,39 +75,39 @@ exclude_abilities）与乌栗模式构造（Effect.modes ↔ choose_mode+if_mode
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 只要这只宝可梦在战斗场上，双方场上【基础】宝可梦的特性（除「恶作剧之锁」外），全部消除。 | passive_static condition holder_is_active + suppress_ability args.stage=basic args.except_ability=恶作剧之锁 | D-139-3/4；消除落点=_ability_suppressed 统一守卫清单（监视塔 D-029-1 全落点）；具名豁免防自我封存；E/B/H 标异文本类（解锁/金属音/开锁抽取）不挂 | ☐ |
-| 【无】 狙落 10 | damage amount=10 | 招式绑定名命中卡面 | ☐ |
-| 在造成伤害前，将放于对手战斗宝可梦身上的「宝可梦道具」放于弃牌区。 | discard selector=opponent_active_tool（节点序在 damage 前） | D-139-5；无道具 no-op；进对手弃牌区 + discard_tool 事件；受 protection 守卫（D-WP6-7 落点新增，与 devolve 同口径） | ☐ |
+| 只要这只宝可梦在战斗场上，双方场上【基础】宝可梦的特性（除「恶作剧之锁」外），全部消除。 | passive_static condition holder_is_active + suppress_ability args.stage=basic args.except_ability=恶作剧之锁 | D-139-3/4；消除落点=_ability_suppressed 统一守卫清单（监视塔 D-029-1 全落点）；具名豁免防自我封存；E/B/H 标异文本类（解锁/金属音/开锁抽取）不挂 | ✅ |
+| 【无】 狙落 10 | damage amount=10 | 招式绑定名命中卡面 | ✅ |
+| 在造成伤害前，将放于对手战斗宝可梦身上的「宝可梦道具」放于弃牌区。 | discard selector=opponent_active_tool（节点序在 damage 前） | D-139-5；无道具 no-op；进对手弃牌区 + discard_tool 事件；受 protection 守卫（D-WP6-7 落点新增，与 devolve 同口径） | ✅ |
 
 **桃歹郎ex（CSV8C-136 档，7 印刷）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 在自己的回合可以使用1次。 | ability_manual limit once_per_turn_shared | 「使用了其他的『支配锁链』」=同名共享锁（大比鸟ex 音速搜索先例，按卡名键控，本卡唯一持有者等价） | ☐ |
-| 选择自己备战区中的1只【恶】宝可梦（除「桃歹郎【ex】」外），将其与战斗宝可梦互换。 | switch own_bench choose=1 filters=[pokemon_恶, not_name:桃歹郎ex] | D-139-2/3；过滤后无目标特性不枚举 | ☐ |
-| 然后，令新的战斗宝可梦陷入【中毒】状态。 | apply_status own_active status=poisoned | D-139-1；节点序在 switch 后即「然后」 | ☐ |
-| 造成对手已经获得的奖赏卡张数×60伤害。 | damage count=opponent_taken_prizes args={op:"×",per:60} | 存量计数词（月月熊 老练招式同口径 =6−对手剩余） | ☐ |
+| 在自己的回合可以使用1次。 | ability_manual limit once_per_turn_shared | 「使用了其他的『支配锁链』」=同名共享锁（大比鸟ex 音速搜索先例，按卡名键控，本卡唯一持有者等价） | ✅ |
+| 选择自己备战区中的1只【恶】宝可梦（除「桃歹郎【ex】」外），将其与战斗宝可梦互换。 | switch own_bench choose=1 filters=[pokemon_恶, not_name:桃歹郎ex] | D-139-2/3；过滤后无目标特性不枚举 | ✅ |
+| 然后，令新的战斗宝可梦陷入【中毒】状态。 | apply_status own_active status=poisoned | D-139-1；节点序在 switch 后即「然后」 | ✅ |
+| 造成对手已经获得的奖赏卡张数×60伤害。 | damage count=opponent_taken_prizes args={op:"×",per:60} | 存量计数词（月月熊 老练招式同口径 =6−对手剩余） | ✅ |
 
 **乌栗（CSV8C-198 档，7 印刷）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 这张卡牌，从2个效果中选择1个使用。 | choose_mode args.options=[换位,增伤] + 分支节点 if_mode 条件 | D-139-6 新构造；不可行模式不进选择池（无备战时换位不可达）；恰一可行自动选定；选择随挂起冻结穿透 | ☐ |
-| ◆将自己的战斗宝可梦与备战宝可梦互换。 | switch own_bench choose=1（if_mode:换位 门控） | 宝可梦交替同款；分支内二次选择正常挂起/恢复 | ☐ |
-| ◆在这个回合，自己宝可梦所使用的招式，给对手战斗场上的「宝可梦【ex】・V」造成的伤害「+30」。 | modify_damage amount=30 target_rule_box=[ex,v]（if_mode:增伤 门控） | D-139-7；回合级标记（空手道王的修炼机制，回合结束清除）；db rule_box_type 实测小写 v | ☐ |
+| 这张卡牌，从2个效果中选择1个使用。 | choose_mode args.options=[换位,增伤] + 分支节点 if_mode 条件 | D-139-6 新构造；不可行模式不进选择池（无备战时换位不可达）；恰一可行自动选定；选择随挂起冻结穿透 | ✅ |
+| ◆将自己的战斗宝可梦与备战宝可梦互换。 | switch own_bench choose=1（if_mode:换位 门控） | 宝可梦交替同款；分支内二次选择正常挂起/恢复 | ✅ |
+| ◆在这个回合，自己宝可梦所使用的招式，给对手战斗场上的「宝可梦【ex】・V」造成的伤害「+30」。 | modify_damage amount=30 target_rule_box=[ex,v]（if_mode:增伤 门控） | D-139-7；回合级标记（空手道王的修炼机制，回合结束清除）；db rule_box_type 实测小写 v | ✅ |
 
 **重力山（CSV7C-201 档，2 印刷）**
 
 | text_raw 原文 | DSL 落点 | 说明 | 人工裁定 |
 |---|---|---|---|
-| 双方场上的所有【2阶进化】宝可梦的最大HP，各「-30」。 | passive_static modify_hp args.amount=-30 args.target_filters=[stage2_pokemon] | D-139-8 竞技场来源声明；动态求值场被顶即恢复；伤害≥新有效 HP（剩余 HP≤0）昏厥走 _do_play_stadium 打出后检查触点（rules-manual §8，同阻碍之塔 D-029-2 口径） | ☐ |
+| 双方场上的所有【2阶进化】宝可梦的最大HP，各「-30」。 | passive_static modify_hp args.amount=-30 args.target_filters=[stage2_pokemon] | D-139-8 竞技场来源声明；动态求值场被顶即恢复；伤害≥新有效 HP（剩余 HP≤0）昏厥走 _do_play_stadium 打出后检查触点（rules-manual §8，同阻碍之塔 D-029-2 口径） | ✅ |
 
 **侧 quest 拆分档**
 
 | 卡 | text_raw 要点 | DSL 落点 | 人工裁定 |
 |---|---|---|---|
-| 索财灵-小使者（CSV9C-096 档 2 印刷） | 选择自己牌库中最多2张基本能量，在给对手看过之后，加入手牌。并重洗牌库。 | search_deck choose=2（up-to 口径）+ reveal own_hand basic_energy + shuffle_deck | ☐ |
-| 雪童子-冰砾（CSV6C-032 档 2 印刷） | 【水】冰砾 10+；对手的战斗宝可梦为【斗】则追加30。 | damage 10 + damage 30 condition=if_opponent_active_type:斗 | ☐（两段式各吃一次攻方 modify_damage，与力量压制遗留②同口径） |
+| 索财灵-小使者（CSV9C-096 档 2 印刷） | 选择自己牌库中最多2张基本能量，在给对手看过之后，加入手牌。并重洗牌库。 | search_deck choose=2（up-to 口径）+ reveal own_hand basic_energy + shuffle_deck | ✅ |
+| 雪童子-冰砾（CSV6C-032 档 2 印刷） | 【水】冰砾 10+；对手的战斗宝可梦为【斗】则追加30。 | damage 10 + damage 30 condition=if_opponent_active_type:斗 | ✅（两段式各吃一次攻方 modify_damage，与力量压制遗留②同口径） |
 
 ### 印刷补挂处置（task 134 管线）
 
@@ -133,7 +133,8 @@ CSV9C-175 无文档」，即 task 138 范围（本批验收允许残留项，138
 
 4+2 卡闸 1+2：桃歹郎ex/重力山/索财灵-小使者/雪童子-冰砾 first_pass=true；钥圈儿/
 乌栗 first_pass=false（并行双代理设计撞车重统一，非实现返工）；human_edit_lines
-待闸 3 核销（当前 null）。
+已核销落账（2026-11-15：钥圈儿 1 / 桃歹郎ex 2 / 乌栗 2 / 重力山 1 / 雪童子 1，均为
+D 编号注释修正；其余 0）。
 
 ### 遗留
 
@@ -155,7 +156,7 @@ CSV9C-175 无文档」，即 task 138 范围（本批验收允许残留项，138
   任务书曾禁碰 helpers.py——此追加为纯增量注册（不弱化任何断言），且为全量绿硬指标
   所必需；主会话如要代管，回退该行后需同步处理 test_ability 等 7 个消费文件的断言。
 - **附录 A**：2026-11-15 七行决议（D-139-1/2/3/5/6/7/8/9）已落 `docs/rules-reference.md`，
-  全部 🔲 待核，供 Owner 闸 3 一并核销。
+  闸 3 已核销（2026-11-15 ✅，交叉引用 D 号已对齐本表；另有 task 138 三行 D-138-1/2/3 一并核销）。
 - **记账去重**：authoring-log batch=139 六行与 CHANGELOG 单条已去重（并行双方各写一份，
   保留会话 A 版本）。
 - **state.py 字段去重**：CardDef.ability_names 与 PendingChoice.mode/mode_options

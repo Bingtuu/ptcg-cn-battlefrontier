@@ -15,7 +15,7 @@
 # 宝可梦来源扩展：condition 对声明持有者求值，退备战区/被消除即解锁）。
 # 消除落点 = 既有 _ability_suppressed 统一守卫清单（ability_manual 枚举门 +
 # 宝可梦卡来源被动 aura + trigger_on_event 分发），双方场上全生效。
-# 狙落（D-139-2）：discard selector=opponent_active_tool——对手战斗宝可梦身上
+# 狙落（D-139-5）：discard selector=opponent_active_tool——对手战斗宝可梦身上
 # 道具自动弃置（无选择、无道具时空结算 no-op），节点序在 damage 之前即
 # 「在造成伤害前」；道具进对手弃牌区 + discard_tool 事件（道具拆除器同口径）。
 card:

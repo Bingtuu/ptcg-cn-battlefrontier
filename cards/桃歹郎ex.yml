@@ -7,9 +7,9 @@
 # 支配锁链（task 139）：ability_manual + limit once_per_turn_shared——「使用了
 # 其他的「支配锁链」」= 同名共享锁（大比鸟ex 音速搜索先例：按卡名键控，本卡为
 # 该能力名唯一持有者，键控口径等价）。switch selector=own_bench choose=1 +
-# filters=[pokemon_恶, not_name:桃歹郎ex]（D-139-3：备战池属性过滤 + 具名排除，
+# filters=[pokemon_恶, not_name:桃歹郎ex]（D-139-2：备战池属性过滤 + 具名排除，
 # 过滤后无目标 → 特性不枚举）；apply_status selector=own_active status=poisoned
-# （D-139-4：新战斗宝可梦中毒——节点序在 switch 后即「然后」）。换位回备战区的
+# （D-139-1：新战斗宝可梦中毒——节点序在 switch 后即「然后」）。换位回备战区的
 # 原战斗宝可梦特殊状态清除（rules-manual §7.1，switch 原语口径）。
 # 焦躁爆破：damage count=opponent_taken_prizes（=6−对手剩余奖赏，月月熊
 # 老练招式同计数词）per=60 op="×"；对手未拿奖赏 = 0 伤害（攻击照常消耗）。

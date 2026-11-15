@@ -16,7 +16,8 @@ QUALIFIER_HEADER = (
     "限定语：\n"
     "  · 来源 sim 的 matchup 格 = 同模拟器内对比，不构成真实胜率预测\n"
     "  · 来源 intl 的 matchup 格 = 国际线上周赛 meta 弱参照（≠ 简中官方环境）\n"
-    "  · low_confidence 格（无真实/模拟数据）按 50% 计，仅作占位"
+    "  · low_confidence 格（无真实/模拟数据）按 50% 计，仅作占位\n"
+    "  · 登顶率 = 当前矩阵与场占率扰动下的排序稳定性，非比赛夺冠概率"
 )
 
 MISSING_WR = 0.5  # 缺格占位胜率（不猜方向）

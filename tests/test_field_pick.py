@@ -89,6 +89,7 @@ def test_format_含限定语与排序():
     text = format_field_pick(rep)
     assert text.startswith(QUALIFIER_HEADER[:20])
     assert "同模拟器内" in text and "弱参照" in text
+    assert "非比赛夺冠概率" in text  # task 140：登顶率边界钉进头注
     data_rows = [l for l in text.splitlines() if " | " in l and "卡组" not in l]
     assert data_rows[0].startswith("A |")  # 排序第一
     assert "真实格贡献" in text

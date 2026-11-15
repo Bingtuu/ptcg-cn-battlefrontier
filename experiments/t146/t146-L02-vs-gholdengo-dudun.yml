@@ -1,0 +1,10 @@
+# task 146 组合标签集 L02 vs gholdengo-dudun（2,000 局，种子与 task 141 基线同域配对）
+name: t146-L02-vs-gholdengo-dudun
+games: 2000
+seed_start: 630000
+decks:
+  a: {source: file, path: experiments/t146/decks/L02.txt}
+  b: {source: db, deck_id: "mik_moe:711850"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

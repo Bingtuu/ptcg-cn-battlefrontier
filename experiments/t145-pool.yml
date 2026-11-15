@@ -1,0 +1,23 @@
+# task 145 迷你池：沙奈朵备赛 5 套（教师锚点 v2.x 采集专用）
+# 选池理由 = PRD v0.4 激活门槛判别底板的四对手 + 目标卡组本身；
+# 快照同时服务门槛条款 2（教师证据链）与资产冒烟（v2.x 行为验证）。
+version: 2
+locked_at: "2026-11-16"
+query:
+  granularity: archetype
+  window: "2026-11-01..2026-11-14"
+  division: master
+  basis: cn
+  min_n: 5
+  n_tournaments: 5
+  mapping_status: full
+  snapshot: standard-2026-09-16
+  name_group_rules_hash: f2c86aa8f7e3
+  legality_constraint: "与 target-pool.v2.yml 同口径（引用其代表卡组）"
+  substitution: "无（5 套全部取自 config/target-pool.v2.yml）"
+decks:
+  - {archetype: 多龙巴鲁托 黑夜魔灵, en_archetype: Dragapult Dusknoir, wur: 0.2390, n: 70, deck_id: "mik_moe:676344", note: "field 头部对手"}
+  - {archetype: 电电虫Box, en_archetype: Joltik Box, wur: 0.1243, n: 28, deck_id: "mik_moe:677291", note: "field 对手"}
+  - {archetype: 玛俐的长毛巨魔 雪妖女, en_archetype: Grimmsnarl Froslass, wur: 0.1163, n: 33, deck_id: "mik_moe:711855", note: "field 对手"}
+  - {archetype: 赛富豪 土龙节节, en_archetype: Gholdengo Dudunsparce, wur: 0.0962, n: 26, deck_id: "mik_moe:711850", note: "field 对手"}
+  - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.0930, n: 40, deck_id: "mik_moe:711854", note: "目标卡组（task 141 底板）"}

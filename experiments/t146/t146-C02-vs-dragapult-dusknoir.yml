@@ -1,0 +1,10 @@
+# task 146 挑战批 C02 vs dragapult-dusknoir（2,000 局，种子同域配对）
+name: t146-C02-vs-dragapult-dusknoir
+games: 2000
+seed_start: 600000
+decks:
+  a: {source: file, path: experiments/t146/decks/C02.txt}
+  b: {source: db, deck_id: "mik_moe:676344"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

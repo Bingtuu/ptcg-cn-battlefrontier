@@ -17,6 +17,36 @@ from battlefrontier.runner.experiment import (
 from battlefrontier.runner.results_db import ResultsDB
 
 
+def _cmd_swap_search(args: argparse.Namespace) -> int:
+    """task 130：换卡搜索器（单卡替换扫描 + 筛选→确认两阶段 + 排序输出）。
+
+    方法论设计文档 docs/digs/2026-11-14-deck-swap-search-design.md；
+    输出带「自对局先验」限定语头注；零 Agent/DSL/引擎行为变更。
+    """
+    from battlefrontier.report.swap_search import (
+        format_swap_search,
+        run_swap_search,
+    )
+
+    db_path = args.db or load_db_path()
+    stem = (f"swap-search-{args.deck.split(':')[-1]}"
+            f"-vs-{args.vs_deck.split(':')[-1]}")
+    results = args.results or str(Path("results") / f"{stem}.db")
+    try:
+        rep = run_swap_search(
+            deck_id=args.deck, vs_id=args.vs_deck, budget=args.budget,
+            db_path=db_path, results_path=results,
+            seed_start=args.seed_start, confirm_top=args.confirm_top,
+            screen_games=args.screen_games, confirm_games=args.confirm_games,
+            top_n=args.top_n, include=tuple(args.include),
+            workers=args.workers, cards_dir=args.cards_dir)
+    except ValueError as e:
+        print(f"[swap-search 失败] {e}")
+        return 1
+    print(format_swap_search(rep))
+    return 0
+
+
 def _cmd_check_deck(args: argparse.Namespace) -> int:
     """task 119：卡表预检（跑前体检，零跑批）。错误打印并退出码 1。"""
     from battlefrontier.runner.deck_check import check_decklist, format_deck_check
@@ -953,6 +983,28 @@ def main(argv: list[str] | None = None) -> int:
     chk_deck_p.add_argument("--db", default=None,
                             help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     chk_deck_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    ss_p = sub.add_parser("swap-search",
+                          help="换卡搜索器（task 130）：单卡替换扫描 + 筛选→确认两阶段 + 排序输出")
+    ss_p.add_argument("--deck", required=True, help="被优化卡组 deck_id（换出侧）")
+    ss_p.add_argument("--vs", dest="vs_deck", required=True, help="对手卡组 deck_id")
+    ss_p.add_argument("--budget", type=int, required=True,
+                      help="总预算（局）：60%% 筛选档 + 40%% 确认档（设计文档 §3.1）")
+    ss_p.add_argument("--confirm-top", type=int, default=3, help="确认档候选数（默认 3）")
+    ss_p.add_argument("--screen-games", type=int, default=None,
+                      help="筛选档局数/格（缺省按预算推导，下限 60）")
+    ss_p.add_argument("--confirm-games", type=int, default=None,
+                      help="确认档局数/格（缺省按预算推导，下限 100；正式档 2000）")
+    ss_p.add_argument("--top-n", type=int, default=12,
+                      help="候选源：同 archetype 邻近卡组高频单卡 top-N（默认 12）")
+    ss_p.add_argument("--include", action="append", default=[],
+                      help="额外换入候选「卡名 [card_id]」可多次（败因触发件手填）")
+    ss_p.add_argument("--seed-start", type=int, default=470000, help="种子锚点（筛选档）")
+    ss_p.add_argument("--results", default=None,
+                      help="结果库路径（默认 results/swap-search-<deck>-<vs>.db）")
+    ss_p.add_argument("--db", default=None,
+                      help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    ss_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    ss_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
     fp_p = sub.add_parser("field-pick", help="选卡参考：field 分布 × matchup 矩阵（task 123，四期 M14）")
     fp_p.add_argument("--field", required=True, help="field 快照 JSON（CN 使用率，ptcgdb stats usage 出口）")
     fp_p.add_argument("--pool", required=True, help="卡池 YAML（CN↔en 名映射源）")
@@ -1175,6 +1227,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "check-deck":
         return _cmd_check_deck(args)
+    if args.cmd == "swap-search":
+        return _cmd_swap_search(args)
     if args.cmd == "field-pick":
         return _cmd_field_pick(args)
     if args.cmd == "matchup-snap":

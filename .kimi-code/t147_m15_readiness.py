@@ -1,7 +1,9 @@
 # task 147 数据级 M15 readiness 验证（本机执行；仓库级断言见 tests/test_m15_readiness.py）
 # 判定：组合标签集完整（40 格 × 2000 局零失败）+ 标签 CSV 落盘 + L01 阳性锚同向
 #      + t145 教师快照 10 份落盘 → 全部满足才 exit 0。
-import sqlite3, sys, csv
+import csv
+import sqlite3
+import sys
 from math import erf, sqrt
 from pathlib import Path
 

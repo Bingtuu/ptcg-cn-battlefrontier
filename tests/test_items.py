@@ -253,7 +253,10 @@ def test_card_library_seventeen() -> None:
         assert docs.by_name(name), f"{name} 不在定义库"
     # 定义库总数断言由最新入库任务的测试持有（当前 test_tools::test_card_library_tools）
     assert doc_of(docs, "秘密箱").effects[0].cost[0].choose == 3
-    assert doc_of(docs, "反击捕捉器").effects[0].condition == "own_prizes_more_than_opponent"
+    catcher_docs = docs.by_name("反击捕捉器")
+    assert len(catcher_docs) == 2  # 主类 12 印刷 / M1D 词序变体拆分档（task 143）
+    assert all(d.effects[0].condition == "own_prizes_more_than_opponent"
+               for d in catcher_docs)
     move_docs = docs.by_name("能量转移")
     assert len(move_docs) == 2  # 主类 / H6 异文本类拆分档（task 134）
     assert all(d.effects[0].actions[0].action == "move_energy" for d in move_docs)

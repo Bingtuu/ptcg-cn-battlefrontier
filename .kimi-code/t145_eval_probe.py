@@ -30,8 +30,6 @@ MATCHUPS = {
 
 
 def sample_states(deck_a_id, deck_b_id, seeds):
-    deck_a = [c for c in load_deck(DB, deck_a_id).cards for _ in range(1)]
-    # load_deck 已按张数展开（cards 为逐张列表）——直接核对长度
     da = load_deck(DB, deck_a_id).cards
     db_ = load_deck(DB, deck_b_id).cards
     samples = []  # (score_for_p0, p0_won)
@@ -87,7 +85,7 @@ results = {}
 for tag, (a_id, b_id) in MATCHUPS.items():
     samples = sample_states(a_id, b_id, [SEED0 + i for i in range(N_GAMES)])
     scores = [s for s, _ in samples]
-    finite = all(isinstance(s, float) and s == s and abs(s) < 1e9 for s in scores)
+    finite = all(isinstance(s, float) and abs(s) < 1e9 for s in scores)
     var = max(scores) - min(scores) if scores else 0.0
     a = auc(samples)
     results[tag] = a

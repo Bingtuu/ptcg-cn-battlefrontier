@@ -7,6 +7,11 @@
 
 ### Added
 
+- v2.x 矩阵与选卡器快照刷新（task 137）：45 无向对 × 500 局 = 22,500 局零失败（`experiments/t1115-v2x-matrix.example.yml`，种子锚 400000）；`matchup-snap-2026-11-15.json`（90 格 / 0 low_confidence）+ `field-snap-2026-11.json`（2026-11-01..14 窗，10 池覆盖 85.25%）
+- 太乐巴戈斯ex DSL 档（task 138，CSV9C-175 档 7 印刷等价类，`cards/太乐巴戈斯ex.yml`，库 154→155）：同盟打击 usage_gate=second_player_first_turn（D-138-1，枚举点使用门，「无法使用」≠「招式失败」）+ bench_count_own 计数词（D-138-2）；皇冠蛋白石 prevent_attack_damage 时效减伤（D-138-3，timing=opponent_next_turn + attacker_stage=basic + except_attacker_type=无，「下一个对手的回合」窗口精确圈定、对手回合结束清除，仅免疫招式伤害）；新词表段 usage_gates + actions/counters 各一词；附录 A 三行 🔲 待核
+- 池阻断卡引擎扩展批（task 139）：钥圈儿 / 桃歹郎ex / 乌栗 / 重力山 4 卡 DSL 过闸（各等价类全印刷挂载）+ 侧 quest 异文本拆分档 索财灵-小使者（CSV9C-096 档）/ 雪童子-冰砾（CSV6C-032 档）；引擎扩展九件——apply_status selector=own_active（D-139-1）、switch filters 透传 + 特性可行性门分支（D-139-2）、suppress_ability 广义化 args.stage=basic 阶段过滤 + args.except_ability 具名豁免 + 宝可梦来源 effect.condition（D-139-3/4，数据底座 CardDef.ability_names ← db abilities[].name）、discard selector=opponent_active_tool（D-139-5，接 protection 守卫）、choose_mode 模式二选一原语 + if_mode 节点条件（D-139-6，不可行模式预筛不进池、恰一可行自动选定、选择随挂起冻结穿透）、modify_damage args.target_rule_box 列表（D-139-7，乌栗「宝可梦【ex】・V」）、modify_hp 竞技场来源 + args.target_filters（D-139-8，重力山）、节点条件 if_opponent_active_type:<属性>（D-139-9，雪童子-冰砾）
+- 换卡搜索器原型（task 130）：`bfsim swap-search --deck <id> --vs <id> --budget <n>`——单卡替换候选扫描（槽位分类 + 邻近卡组 top-N/手填候选源 + DSL→赛制→结构过滤链）+ 筛选→确认两阶段（CRN 成对、换种子重验）+ ΔWR/Bonferroni/BH 排序输出；方法论设计文档 `docs/digs/2026-11-14-deck-swap-search-design.md`（四问定案 + 预注册判据）
+- I 标渗透件 DSL 批（task 136）：轻飘飘 / 胖嘟嘟ex / 能量回收-10.6（I 标异文本拆分档）/ 道具拆除器 / 英勇手镯 5 新档（库 138→143）；引擎扩展三件——passive_static `lock_play` 广义门类（category=item/tool，D-136-1）、节点条件 `if_attached_energy_ge:N`（D-136-2）、`discard selector=tools_attached_both`（D-136-3）
 - 换卡敏感性首个正式资产（task 113）：多龙黑夜魔灵 1×3 扫描，预注册 5 门（含阴性对照 CI 覆盖 0）；`experiments/v2-swap-dragapult-dusknoir.example.yml`
 - swap `in_id` 印刷级换卡支持（task 115）：`SwapCfg.in_id` 可选字段 + 存在性/同名校验，换入卡印刷可控、防 vanilla 静默退化；覆盖印刷重跑实验定义 `experiments/v2-swap-dragapult-dusknoir-printswap.example.yml`
 - 对齐窗判决值守线（task 112）：WAIT 态周期维护 + 触线按 task 105 §2 出判决
@@ -14,6 +19,7 @@
 
 ### Changed
 
+- 卡池 v2.x 定向修订（task 135，依据 task 133 dig 建议档）：6 套高漂移表刷新为近窗（2026-11-01..14）冠军表 + 赛富豪土龙节节第 10 套入池；`config/target-pool.v2.yml` 修订（version 保持 2 + revised_at，task 068 原始锁定段保留为注释事实源）；近窗覆盖 85.25%
 - `format_sensitivity` 末行补 `SIM_INTERPRETATION_NOTE`（task 114）：敏感性输出纳入 claims register 守则 1
 - task 102 文档勘误（task 111）：「无向 36 对」预检点估计口径未存档不可复现，权威口径 = 有向 72 格 + `results/t102-calibration.json`
 - 报告层/校准输出内嵌 sim 解释限定语（task 106）；事件序观感债修复——昏厥/拿奖事件滞后到招式效果链收尾（task 108）

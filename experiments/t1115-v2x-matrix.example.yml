@@ -1,0 +1,12 @@
+# v2.x 矩阵：10 套池 45 无向配对 × 500 局 = 22,500 局（task 137，池为 task 135 v2.x 修订）
+# 卡组只来自池内 deck_id；种子锚与 v2 矩阵（200000）不重叠（CRN 纪律）。
+# bfsim run experiments/t1115-v2x-matrix.yml --workers 16 --results results/t1115-v2x-matrix.db
+# bfsim matchup-snap --matrix <本实验结果库> --out results/matchup-snap-2026-11-15.json（task 125 纪律）
+name: t1115-v2x-matrix
+seed_start: 400000
+matrix:
+  pool: config/target-pool.v2.yml
+  games_per_pair: 500
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

@@ -1,0 +1,10 @@
+# task 141 沙奈朵备赛核验：深挖格 vs gholdengo-dudun（2,000 局 CRN）
+name: t141-gard-vs-gholdengo-dudun
+games: 2000
+seed_start: 630000
+decks:
+  a: {source: db, deck_id: "mik_moe:711854"}
+  b: {source: db, deck_id: "mik_moe:711850"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

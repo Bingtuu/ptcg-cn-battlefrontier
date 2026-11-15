@@ -1,0 +1,10 @@
+# task 141 改表对照核验：合并两 ★ 刀 vs gholdengo-dudun（2,000 局，种子与基线深挖格同域配对）
+name: t141m-gard-vs-gholdengo-dudun
+games: 2000
+seed_start: 630000
+decks:
+  a: {source: file, path: experiments/t141-gardevoir-modified.deck.txt}
+  b: {source: db, deck_id: "mik_moe:711850"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

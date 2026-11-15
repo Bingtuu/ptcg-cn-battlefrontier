@@ -8,7 +8,7 @@
 # 白板伤害按梦幻属性结算弱点抗性。
 card:
   name_group: 梦幻ex
-  card_ids: [151C-151]
+  card_ids: [151C-151, 151C-185, 151C-188, 151C-191, 151C-192, CSVE1C-056, CSVL2C-029, CSVL2C-127, CSVM1bC-004, CSVM2cC-003, SVP-003]
 effects:
   - trigger: ability_manual
     limit: once_per_turn

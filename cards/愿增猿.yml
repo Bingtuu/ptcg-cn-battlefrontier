@@ -9,7 +9,7 @@
 # rules-reference 附录 A 决议，task 017）。
 card:
   name_group: 愿增猿
-  card_ids: [CSV8C-094]
+  card_ids: [CSV8C-094, CBB6C-2701, CBB6C-2702, CBB6C-2703, CBB6C-2704, CBB6C-2705, CBB6C-2706, CBB6C-2707, CSV9.5C-082, CSVM2bC-002, CSVM2cC-005, CSVNC-019, SVP-414]
 effects:
   - trigger: ability_manual
     limit: once_per_turn

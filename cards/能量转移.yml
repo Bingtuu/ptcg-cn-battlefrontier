@@ -3,7 +3,7 @@
 # 两段式：先选能量（own_attached_energy），再选目标（排除来源宝可梦 = 「其他」）。
 card:
   name_group: 能量转移
-  card_ids: [CSVH1aC-008]
+  card_ids: [CSVH1aC-008, CSVE1C-106, CSVE2C-138, CSVH2C-038, CSVH3aC-009, CSVH5C-035, CSVM2aC-014, SVP-293]
 effects:
   - trigger: on_play
     actions:

@@ -209,6 +209,13 @@ bfsim field-pick --field results/field-snap-2026-10.json \
 
 输出含 9 池排序、期望胜率分布（钉种子蒙特卡洛 Dirichlet 抖动）、每行「真实格贡献%」来源构成、n<20 经验贝叶斯收缩、field 快照与 intl 窗错位 >28 天告警，以及限定语头注。定位 = 「给定 field 分布的卡组选择参考」，不是胜率预测。
 
+matchup 快照可一键导出并回喂（task 125，格值与内联装配逐格一致）：
+
+```bash
+bfsim matchup-snap --pool config/target-pool.v2.yml --intl-db <db> --from 2026-09-16 --to 2026-11-14 --out snap.json
+bfsim field-pick --field <snap.json> --pool config/target-pool.v2.yml --matrix-snap snap.json
+```
+
 ## 评估与验证方法
 
 一次完整的「评估/测试」工作流（备赛研究实证口径，2026-11-14）：

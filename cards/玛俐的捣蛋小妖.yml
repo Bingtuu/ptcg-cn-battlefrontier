@@ -7,7 +7,7 @@
 # 推打 10 无效果文，由引擎白板伤害结算，无需 DSL 绑定。
 card:
   name_group: 玛俐的捣蛋小妖
-  card_ids: [CSV10C-146]
+  card_ids: [CSV10C-146, SVP-395]
 effects:
   - trigger: on_attack
     attack: 骗取

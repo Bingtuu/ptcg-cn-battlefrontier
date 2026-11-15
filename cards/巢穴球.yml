@@ -2,7 +2,7 @@
 # text_raw 原文：「选择自己牌库中的1张【基础】宝可梦，放于备战区。并重洗牌库。」
 card:
   name_group: 巢穴球
-  card_ids: [CSVH1C-043]
+  card_ids: [CSVH1C-043, CBB3C-1902, CSV2C-110, CSV4C-163, CSVE1C-117, CSVE1pC-020, CSVE2C-153, CSVH2C-043, CSVH3C-042, CSVH4C-036, CSVH5C-041, CSVH6C-034, CSVM1aC-014, CSVM1bC-019, CSVM1cC-012, CSVM2aC-018, CSVM2bC-014, CSVM2cC-015, SVP-216, SVP-230]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：检索选牌为关键决策点

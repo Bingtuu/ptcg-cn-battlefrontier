@@ -7,7 +7,7 @@
 # （D-WP7-5 指示物不受保护）。
 card:
   name_group: 火箭队的惊吓炸弹
-  card_ids: [CSV10C-198]
+  card_ids: [CSV10C-198, CSVH6aC-012]
 effects:
   - trigger: on_play
     actions:

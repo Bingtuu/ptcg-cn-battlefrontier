@@ -3,7 +3,7 @@
 # 选择自己牌库中的1张宝可梦，在给对手看过之后，加入手牌。并重洗牌库。」
 card:
   name_group: 高级球
-  card_ids: [CSV1C-112]
+  card_ids: [CSV1C-112, CBB1C-1703, CSVE2C-154, CSVE2pC-022, CSVH1C-044, CSVH2C-044, CSVH3C-044, CSVH4C-037, CSVH5C-042, CSVM1aC-015, CSVM1bC-020, CSVM1cC-013, CSVM2aC-019, CSVM2bC-015, CSVM2cC-016, SVP-217, SVP-358, SVP-NaN52, SVP-NaN53, SVP-NaN54, SVP-NaN55, SVP-NaN56]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：检索选牌为关键决策点

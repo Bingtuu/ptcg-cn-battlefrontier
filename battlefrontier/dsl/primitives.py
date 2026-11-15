@@ -81,6 +81,7 @@ PRIMITIVE_ARGS: dict[str, frozenset[str]] = {
     "modify_attack_cost": frozenset({"attack", "types", "value"}),
     "bench_size": frozenset({"value"}),
     "protection": frozenset({"scope", "target_filters"}),
+    "status_immunity": frozenset({"status"}),
     "provide_energy": frozenset({"count", "types"}),
     "suppress_ability": frozenset({"types", "with_primitive"}),
     "suppress_tool": frozenset(),
@@ -1487,6 +1488,10 @@ def _apply_status(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ..
         # 闪焰之幕（task 026 WP6，D-WP6-7）：对手招式施加的特殊状态不适用
         # （伤害本体不免疫——damage 节点不经本判定；训练家卡效果不受保护）
         return {"applied": None, "reason": "protected"}
+    if engine._status_immunity(d.active, defender_idx, status_word):
+        # 不眠（task 134）：目标宝可梦卡声明 status_immunity（args.status 匹配）
+        # ——「不会陷入【某】状态」任何来源施加均不适用（含对手招式/训练家卡效果）
+        return {"applied": None, "reason": "status_immunity"}
     # 麻痹施加标记（task 026 WP7，D-WP7-2）=（施加时 turn, 施加方）：检查阶段
     # 据此判定「持有者下一个自己回合结束才恢复」（施加当回合不恢复）
     mark = (

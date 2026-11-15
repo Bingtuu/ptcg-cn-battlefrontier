@@ -15,7 +15,7 @@
 card:
   name_group: 月月熊 赫月ex
   # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 8 印刷
-  card_ids: [CSV8C-172, CSV8C-231, CSV8C-251, CSV8C-258, CSV9.5C-154, CSV9.5C-247, CSVM2bC-009, CSVNC-031]
+  card_ids: [CSV8C-172, CSV8C-231, CSV8C-251, CSV8C-258, CSV9.5C-154, CSV9.5C-247, CSVM2bC-009, CSVNC-031, SVP-445]
 effects:
   - trigger: passive_static
     actions:

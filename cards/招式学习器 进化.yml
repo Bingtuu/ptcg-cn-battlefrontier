@@ -9,7 +9,7 @@
 # 牌库非公开可以不找）；检索后必洗牌（shuffle_deck 节点，DSL 编写纪律）。
 card:
   name_group: 招式学习器 进化
-  card_ids: [CSV5C-119]
+  card_ids: [CSV5C-119, CSV9.5C-180, CSVH6aC-017, CSVM1bC-025, CSVM2bC-022, CSVM2cC-023, SVP-350]
 effects:
   - trigger: passive_static
     actions:

@@ -11,7 +11,7 @@ card:
              CSV4C-161, CSVE1C-162, CSVE1C-163, CSVE1pC-022, CSVE2C-192,
              CSVH1aC-023, CSVH2aC-023, CSVH3aC-022, CSVH4aC-022, CSVH5aC-022,
              CSVM1aC-029, CSVM1bC-030, CSVM1cC-026, CSVM2aC-029, CSVM2bC-030,
-             CSVM2cC-029, CSVSC-066, CSXC-019, CSZC-053, SVP-219]
+             CSVM2cC-029, CSVSC-066, CSXC-019, CSZC-053, SVP-219, CSVH6aC-022, SVP-361]
 effects:
   - trigger: on_play
     actions:

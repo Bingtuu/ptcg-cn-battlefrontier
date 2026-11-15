@@ -7,7 +7,7 @@
 card:
   name_group: 水莲的照顾
   # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全 H 标 7 印刷
-  card_ids: [CSV7C-193, CSV7C-230, CSV7C-246, CSV9.5C-189, CSVH4C-049, CSVM2cC-025, SVP-199]
+  card_ids: [CSV7C-193, CSV7C-230, CSV7C-246, CSV9.5C-189, CSVH4C-049, CSVM2cC-025, SVP-199, CSVH6C-043]
 effects:
   - trigger: on_play
     actions:

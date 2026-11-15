@@ -7,7 +7,7 @@
 # 招式「奇迹之力」原文：「将这只宝可梦的特殊状态，全部恢复。」（190 伤 + 清自身状态）
 card:
   name_group: 沙奈朵ex
-  card_ids: [CSV2C-055]
+  card_ids: [CSV2C-055, CBB3C-0607, CSV2C-140, CSV2C-155, CSVE1pC-017, CSVL1C-026, CSVL1C-115, CSVL1C-122, CSVM1bC-007]
 effects:
   - trigger: ability_manual
     limit: unlimited

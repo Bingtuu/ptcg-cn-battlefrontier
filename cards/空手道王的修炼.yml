@@ -8,7 +8,7 @@ card:
   name_group: 空手道王的修炼
   # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：全 7 印刷
   card_ids: [CSV9.5C-188, CSVH4eC-044, CSVH4eC-045, CSVH4eC-046, CSVH5eC-044,
-             CSVH5eC-045, CSVH5eC-046]
+             CSVH5eC-045, CSVH5eC-046, CSVH6eC-044, CSVH6eC-045, CSVH6eC-046]
 effects:
   - trigger: on_play
     actions:

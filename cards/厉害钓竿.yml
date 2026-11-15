@@ -3,7 +3,7 @@
 # 在给对手看过之后，放回牌库并重洗牌库。」
 card:
   name_group: 厉害钓竿
-  card_ids: [CSV1C-109]
+  card_ids: [CSV1C-109, CBB3C-1901, CSV1C-166, CSVE1C-112, CSVE2C-146, CSVH2C-041, CSVH3C-041, CSVH4C-033, CSVH5C-040, CSVH6C-032, CSVM1aC-012, CSVM1bC-016, CSVM1cC-011, SVP-151]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：回收选牌为关键决策点

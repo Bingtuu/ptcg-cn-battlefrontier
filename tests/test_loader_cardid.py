@@ -444,8 +444,13 @@ def test_prepare_experiment_真实卡组_按_card_id_挂载(tmp_path):
         encoding="utf-8")
     prep = prepare_experiment(load_experiment(exp), str(DB_PATH), cards_dir="cards")
     assert isinstance(prep.card_effects, CardLibrary)
-    used = {c.card_id for c in (*prep.deck_a, *prep.deck_b)}
-    assert set(prep.card_effects) <= used  # 按 card_id 过滤，不多挂
+    # task 134：文档按同文本等价类全量并挂，kept 文档携带等价类全部印刷键
+    # （超出本卡组 used 集合属预期）。「按 card_id 过滤」有效性 = 装配库为全库
+    # 真子集（非全库直挂）；used 侧覆盖由本文件覆盖回归测试与 task 131 门槛持有
+    # （基本能量不经 DSL 库，天然不在 used→keys 方向内）。
+    full = load_card_dir(CARDS_DIR)
+    keys = set(prep.card_effects)
+    assert keys <= set(full) and len(keys) < len(full)
     ub = next(c for c in prep.deck_a if c.name == "高级球")
     assert ub.card_id in prep.card_effects  # 池内印刷精确挂载
     gardevoir = next(c for c in prep.deck_a if c.name == "沙奈朵ex")

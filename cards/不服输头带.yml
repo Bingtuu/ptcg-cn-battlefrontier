@@ -8,7 +8,7 @@
 # CSVH1aC-016 为「宝可梦使用的招式」（无「所」字）异文本类，已剔除（非池内使用）。
 card:
   name_group: 不服输头带
-  card_ids: [CSV1C-117, CSV5C-164, CSVE2C-169, CSVH2aC-016, CSVH3C-048, CSVH3aC-015, CSVH4C-045, CSVM1aC-021, CSVM2bC-021]
+  card_ids: [CSV1C-117, CSV5C-164, CSVE2C-169, CSVH2aC-016, CSVH3C-048, CSVH3aC-015, CSVH4C-045, CSVM1aC-021, CSVM2bC-021, CSVH6aC-015, SVP-417]
 effects:
   - trigger: passive_static
     condition: own_prizes_more_than_opponent

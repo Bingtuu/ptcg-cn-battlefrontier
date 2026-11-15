@@ -6,7 +6,7 @@
 # 「每次在自己的回合有1次机会」= stadium_used_this_turn（引擎强制，DSL 不重复声明 limit）。
 card:
   name_group: 深钵镇
-  card_ids: [CSV2C-127]
+  card_ids: [CSV2C-127, CSV2C-163, CSVE2C-200, CSVM1aC-032, CSVM1bC-033, CSVM2bC-031, CSVM2cC-031]
 effects:
   - trigger: stadium_grant
     actions:

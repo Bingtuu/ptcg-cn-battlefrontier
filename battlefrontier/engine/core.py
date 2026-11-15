@@ -1986,6 +1986,41 @@ class GameEngine:
                 return True
         return False
 
+    def _status_immunity(self, mon: InPlayPokemon, owner: int,
+                         status_word: str) -> bool:
+        """特殊状态免疫声明判定（task 134 咕咕 不眠）：宝可梦卡自身 passive_static
+        的 status_immunity 声明（args.status 对齐 SpecialCondition 词，未知词
+        DslError 不猜）——「不会陷入【某】状态」= 任何来源的对应状态施加在落点
+        均不适用（对手招式 / 训练家卡效果同守，与 protection 的招式限定不同）。
+        特性消除（task 029 监视塔，D-029-1）时声明失效；仅自身卡文档（附着能量
+        不授予）；condition 在求值点判定。接入点 = apply_status 原语落点。
+        """
+        from battlefrontier.dsl.chooser import condition_met
+
+        if self._ability_suppressed(mon):
+            return False
+        doc = self._effect_doc(mon.current.card)
+        if doc is None:
+            return False
+        for effect in doc.effects:
+            if effect.trigger != "passive_static":
+                continue
+            for node in effect.actions:
+                if node.action != "status_immunity":
+                    continue
+                word = node.args.get("status")
+                try:
+                    SpecialCondition(word)
+                except ValueError:
+                    raise DslError(
+                        f"status_immunity 的 status 未知 {word!r}"
+                        f"（对齐 SpecialCondition 枚举；不猜）")
+                if word != status_word:
+                    continue
+                if condition_met(effect.condition, self, owner, mon):
+                    return True
+        return False
+
     def _protected_bench_from_attack_damage(self, mon: InPlayPokemon, owner: int) -> bool:
         """备战伤害免疫判定（task 026 WP7 谢米，D-WP7-5，🔲 待核）：「对手的招式
         对自己备战区宝可梦的伤害」免疫。

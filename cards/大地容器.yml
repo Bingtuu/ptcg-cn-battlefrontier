@@ -3,7 +3,7 @@
 # 选择自己牌库中最多2张基本能量，在给对手看过之后，加入手牌。并重洗牌库。」
 card:
   name_group: 大地容器
-  card_ids: [CSV6C-115]
+  card_ids: [CSV6C-115, CSV7C-257, CSV9.5C-162, CSVH4C-034, CSVM1bC-017, CSVM2aC-017, CSVM2bC-012, CSVM2cC-013, SVP-152]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：检索选牌为关键决策点

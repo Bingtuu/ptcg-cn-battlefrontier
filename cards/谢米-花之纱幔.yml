@@ -13,7 +13,7 @@
 card:
   name_group: 谢米
   # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-20）：I 标 2 印刷
-  card_ids: [CSV10C-007, SVP-343]
+  card_ids: [CSV10C-007, SVP-343, CBB7C-1701, CBB7C-1702, CBB7C-1703, CBB7C-1704, CBB7C-1705, CBB7C-1706, CBB7C-1707]
 effects:
   - trigger: passive_static
     actions:

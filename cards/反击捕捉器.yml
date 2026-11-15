@@ -4,7 +4,7 @@
 # condition 落在条件门（不满足不枚举）；被换下回备战区的宝可梦特殊状态清除（§4）。
 card:
   name_group: 反击捕捉器
-  card_ids: [CSV6C-114]
+  card_ids: [CSV6C-114, CSV6C-162, CSV9.5C-159, CSVH4aC-008, CSVH5aC-009, CSVH6aC-009, CSVM1aC-011, CSVM1bC-015, CSVM2aC-015, CSVM2bC-011, CSVM2cC-011, SVP-406]
 effects:
   - trigger: on_play
     condition: own_prizes_more_than_opponent

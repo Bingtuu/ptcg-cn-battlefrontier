@@ -49,6 +49,7 @@ actions:
   - lock_play               # 打出锁（task 029 含羞苞 痒痒花粉：on_attack，args.category=item——受击方下个自己回合无法从手牌使出物品；玩家侧回合标记 + turn 戳，对齐 lock_retreat 结构；task 069 WP5 盖诺赛克特：可挂 passive_static + category=ace_spec——对手无法从手牌使出 ACE SPEC，广义五门类，引擎 _ace_spec_play_locked 实时扫场读声明）
   - modify_evolution        # 声明式：进化加宽（task 069 WP1 伊布ex 虹色因子：手牌中 rule_box 匹配且 evolves_from==args.match_evolves_from 的卡可进化到声明持有者；引擎 _main_actions 读声明，解释器不执行）
   - prevent_ko              # 声明式：满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心：持有者卡 passive_static，引擎 _survival_cap 读声明，解释器不执行；args.remaining_hp=免死后剩余 HP / args.when=full_hp；仅截招式伤害，指示物/效果伤害/自伤不经守卫）
+  - status_immunity         # 声明式：特殊状态免疫（task 134 咕咕 不眠：args.status=asleep 不会陷入睡眠，任何来源施加均在落点不适用；引擎 apply_status 落点守卫读声明，解释器不执行）
 
 # 选择器（作用对象）
 selectors:

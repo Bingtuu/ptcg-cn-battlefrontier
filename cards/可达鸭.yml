@@ -7,7 +7,7 @@
 # 来源被监视塔按属性消除时，抑制同步失效。冲撞 20 无附加效果，白板结算。
 card:
   name_group: 可达鸭
-  card_ids: [CSV10C-043]
+  card_ids: [CSV10C-043, CBB7C-0301, CBB7C-0302, CBB7C-0303, CBB7C-0304, CBB7C-0305, CBB7C-0306, CBB7C-0307, SVP-479]
 effects:
   - trigger: passive_static
     actions:

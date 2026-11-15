@@ -4,7 +4,7 @@
 # condition holder_is_basic 判定持有者当前栈顶是否为基础（进化后即失效）。
 card:
   name_group: 勇气护符
-  card_ids: [CSV1C-118]
+  card_ids: [CSV1C-118, CSV8C-260, CSVE2C-170, CSVE2pC-010, CSVH1aC-017, CSVH3C-049, CSVH4aC-014, CSVH5aC-016, CSVM1bC-024, CSVM1cC-021, CSVM2aC-024, SVP-295]
 effects:
   - trigger: passive_static
     condition: holder_is_basic

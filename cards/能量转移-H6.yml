@@ -1,0 +1,14 @@
+# 能量转移（CSVH6C-031，物品）——H6 异文本类
+# （同名多文本拆分：本印刷 text_raw 多两个「的」——「选择自己场上的宝可梦…
+# 转附于自己的其他宝可梦身上」，与主类 能量转移.yml 归一化文本不一致，
+# 按（卡名+文本）等价类严格拆分独立成档，task 026/task 134 决议）
+# text_raw 原文：「选择自己场上的宝可梦身上附着的1个基本能量，转附于自己的其他宝可梦身上。」
+# 效果语义与主类一致：两段式——先选能量（own_attached_energy），再选目标
+# （排除来源宝可梦 = 「其他」）。
+card:
+  name_group: 能量转移
+  card_ids: [CSVH6C-031]
+effects:
+  - trigger: on_play
+    actions:
+      - {action: move_energy, selector: own_attached_energy, filters: [basic_energy], choose: 1}

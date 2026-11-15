@@ -10,7 +10,7 @@
 # 选 0 张或身上 0 张不重洗、不打备战。备战伤害不吃弱点抗性（引擎既有口径）。
 card:
   name_group: 厄诡椪 水井面具ex
-  card_ids: [CSV8C-067, CSV8C-220, CSV8C-245, CSV9.5C-056, CSV9.5C-229, CSVNC-017]
+  card_ids: [CSV8C-067, CSV8C-220, CSV8C-245, CSV9.5C-056, CSV9.5C-229, CSVNC-017, SVP-462]
 effects:
   - trigger: on_attack
     attack: 啜泣

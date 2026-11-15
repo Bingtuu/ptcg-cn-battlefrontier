@@ -9,7 +9,7 @@
 # 备战不计算弱点抗性是贯穿规则（rules-manual §6），引擎骨架已保证，DSL 无需特判。
 card:
   name_group: 吉雉鸡ex
-  card_ids: [CSV8C-135]
+  card_ids: [CSV8C-135, CSV8C-226, CSV8C-249, CSVM2aC-006, CSVM2bC-004, CSVM2cC-006, CSVNC-027]
 effects:
   - trigger: ability_manual
     limit: once_per_turn_shared

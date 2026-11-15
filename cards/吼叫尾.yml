@@ -4,7 +4,7 @@
 # 「巴掌」（超×1，30 伤）为白板固定伤害招式，无需 DSL。
 card:
   name_group: 吼叫尾
-  card_ids: [CSV6C-065]
+  card_ids: [CSV6C-065, CSV9.5C-078, CSVL2C-104, CSVM1bC-011]
 effects:
   - trigger: on_attack
     attack: 凶暴吼叫

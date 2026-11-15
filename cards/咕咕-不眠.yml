@@ -1,0 +1,17 @@
+# 咕咕（CSV9.5C-141，基础）——「不眠」H 标文本类
+# （同名多文本拆分：寂静之翼 = 咕咕.yml；三刺击 = 咕咕-三刺击.yml，task 026 决议）
+# text_raw 原文：「特性: 不眠
+# 这只宝可梦不会陷入【睡眠】状态。
+#
+# 【无】【无】 撞击 20」
+# 不眠（task 134）：status_immunity 声明式（args.status=asleep）——引擎在
+# apply_status 落点守卫（任何来源的睡眠施加均不适用，与 protection 的招式限定
+# 不同）；特性消除（监视塔，D-029-1）时声明失效。撞击 20 无效果文，引擎白板
+# 伤害结算，无需 DSL 绑定。
+card:
+  name_group: 咕咕
+  card_ids: [CSV9.5C-141]
+effects:
+  - trigger: passive_static
+    actions:
+      - {action: status_immunity, args: {status: asleep}}

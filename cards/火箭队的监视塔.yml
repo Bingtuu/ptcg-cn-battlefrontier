@@ -8,7 +8,7 @@
 card:
   name_group: 火箭队的监视塔
   # 全库 1 印刷单类（I 标）
-  card_ids: [CSV10C-219]
+  card_ids: [CSV10C-219, SVP-478]
 effects:
   - trigger: passive_static
     actions:

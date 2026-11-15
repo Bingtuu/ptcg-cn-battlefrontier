@@ -7,7 +7,7 @@
 # 时为弱点赋予）。弱点抗性仍仅战斗场结算（rules-manual §6 贯穿规则不变）。
 card:
   name_group: 莉莉艾的皮皮ex
-  card_ids: [CSV10C-082]
+  card_ids: [CSV10C-082, CSV10C-238, CSV10C-267]
 effects:
   - trigger: passive_static
     actions:

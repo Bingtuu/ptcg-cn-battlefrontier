@@ -5,7 +5,7 @@
 # 记录入手的卡（回放/人工 check 保真）；检索后必洗牌（shuffle_deck 节点纪律）。
 card:
   name_group: 派帕
-  card_ids: [CSV1C-123]
+  card_ids: [CSV1C-123, CBB3C-1904, CSV1C-150, CSV1C-161, CSVE1C-161, CSVE2C-191, CSVE2pC-023, CSVH2C-057, CSVH3C-057, CSVM1aC-028, CSVM1bC-029, CSVM1cC-025, CSVM2bC-029, CSVM2cC-028, SVP-207, SVP-218]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：检索选牌为关键决策点

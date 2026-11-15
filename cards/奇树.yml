@@ -5,7 +5,7 @@
 # （draw 计数表达式）；「反面朝上重洗」= rng.shuffle 手牌后放库底（单一随机源）。
 card:
   name_group: 奇树
-  card_ids: [CSV3C-123]
+  card_ids: [CSV3C-123, CSV3C-149, CSV3C-160, CSVE2C-188, CSVE2C-208, CSVE2pC-011, CSVH2aC-021, CSVH3aC-021, CSVH4aC-021, CSVH5aC-021, CSVH6aC-020, CSVM1aC-025, CSVM1bC-026, CSVM1cC-023, CSVM2aC-028, CSVM2bC-026, CSVM2cC-026, SVP-087, SVP-154, SVP-205]
 effects:
   - trigger: on_play
     actions:

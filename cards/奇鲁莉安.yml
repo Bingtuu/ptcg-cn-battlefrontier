@@ -3,7 +3,7 @@
 # 「魔法射击」（超+无，30 伤）为白板固定伤害招式，无需 DSL。
 card:
   name_group: 奇鲁莉安
-  card_ids: [CSV2C-054]
+  card_ids: [CSV2C-054, CSV2C-133, CSVL1C-025, CSVL1C-067]
 effects:
   - trigger: on_attack
     attack: 精神强念

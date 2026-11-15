@@ -3,7 +3,7 @@
 # 「起风」（无×2，10 伤）为白板固定伤害招式，无需 DSL。
 card:
   name_group: 飘飘球
-  card_ids: [CSV2C-060]
+  card_ids: [CSV2C-060, CSVL2C-031, CSVL2C-074, CSVM1bC-008]
 effects:
   - trigger: on_attack
     attack: 气球炸弹

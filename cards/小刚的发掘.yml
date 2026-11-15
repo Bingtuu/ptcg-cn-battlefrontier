@@ -7,7 +7,7 @@
 card:
   name_group: 小刚的发掘
   # 同文本等价类（db 归一化 text_raw 实测一致，2026-09-14）：全赛制合法 5 印刷
-  card_ids: [CSVM2bC-025, SVP-351, CSV10C-207, CSV10C-255, CSV10C-276]
+  card_ids: [CSVM2bC-025, SVP-351, CSV10C-207, CSV10C-255, CSV10C-276, 30thDC-038, CSVH6aC-019]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：检索选牌为关键决策点

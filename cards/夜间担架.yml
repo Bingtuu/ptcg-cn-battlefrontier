@@ -2,7 +2,7 @@
 # text_raw 原文：「选择自己弃牌区中的1张宝可梦或1张基本能量，在给对手看过之后，加入手牌。」
 card:
   name_group: 夜间担架
-  card_ids: [CSV8C-183]
+  card_ids: [CSV8C-183, CSV9.5C-171, CSV9C-263, CSVH4aC-012, CSVH5aC-012, CSVH6aC-011, CSVM2aC-023, CSVM2bC-018, CSVM2cC-021, SVP-284]
 effects:
   - trigger: on_play
     # 决策聚合锚点（task 022）：回收选牌为关键决策点

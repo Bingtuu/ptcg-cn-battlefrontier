@@ -38,10 +38,11 @@ def _sim_cells():
 def test_expected_winrate_手算复现():
     matrix = assemble_matrix([], _sim_cells(), POOL)
     field = {"A": 0.5, "B": 0.3, "C": 0.2}
-    # A: .5*镜像(不计) 跳过 → .3*.6 + .2*.7 = .32
-    assert expected_winrate("A", field, matrix) == pytest.approx(0.32)
-    # B: .5*.4 + .2*.5 = .30
-    assert expected_winrate("B", field, matrix) == pytest.approx(0.30)
+    # v0.3 口径：源缺镜像按 50% 默认计入
+    # A: .5*.5(镜像默认) + .3*.6 + .2*.7 = .57
+    assert expected_winrate("A", field, matrix) == pytest.approx(0.57)
+    # B: .3*.5(镜像默认) + .5*.4 + .2*.5 = .45
+    assert expected_winrate("B", field, matrix) == pytest.approx(0.45)
 
 
 def test_field_distribution_归一化(tmp_path):
@@ -117,12 +118,54 @@ def test_intl_成对一致_覆盖_sim_反向():
 
 
 def test_镜像纳入_期望胜率():
-    """镜像格（源提供）纳入期望；无镜像格自然剔除。"""
+    """镜像格（源提供）纳入期望，且源数据优先于 50% 默认。"""
     cells = _sim_cells() + [MatchupCell("A", "A", 0.55, n=500, source="sim")]
     matrix = assemble_matrix([], cells, POOL)
     field = {"A": 0.5, "B": 0.3, "C": 0.2}
-    # A: .5*.55(镜像) + .3*.6 + .2*.7 = .595
+    # A: .5*.55(源镜像) + .3*.6 + .2*.7 = .595
     assert expected_winrate("A", field, matrix) == pytest.approx(0.595)
+
+
+# ── task 140（v0.3 口径：源缺镜像按 50% 默认计入）────────────
+
+def test_镜像默认50pct_补格与源优先():
+    """源缺对角 → (d,d)=0.5 source='mirror'；源提供对角 → 源数据优先。"""
+    matrix = assemble_matrix([], _sim_cells(), POOL)
+    for d in POOL:
+        cell = matrix[(d, d)]
+        assert cell.wr_a == 0.5 and cell.source == "mirror" and cell.n == 0
+    # 源提供对角（如未来 sim 偏差包含镜像格）不被默认覆盖
+    cells = _sim_cells() + [MatchupCell("B", "B", 0.62, n=500, source="sim")]
+    matrix2 = assemble_matrix([], cells, POOL)
+    assert matrix2[("B", "B")].wr_a == 0.62 and matrix2[("B", "B")].source == "sim"
+
+
+def test_镜像默认_高份额构筑受益回归():
+    """Owner gate review 裁决机制固化：高份额构筑的镜像 50% 不再被丢弃。
+
+    field A=.7 B=.3。剔除口径下 A 期望仅 .3×.40=.12（七成份额被丢弃）；
+    默认 50% 后 A 期望 = .7×.5 + .3×.40 = .47——+.35 镜像项回正即机制锚点。
+    """
+    sim = [MatchupCell("A", "B", 0.40, n=500, source="sim"),
+           MatchupCell("B", "A", 0.60, n=500, source="sim")]
+    matrix = assemble_matrix([], sim, ["A", "B"])
+    field = {"A": 0.7, "B": 0.3}
+    exp_a = expected_winrate("A", field, matrix)
+    exp_b = expected_winrate("B", field, matrix)
+    assert exp_a == pytest.approx(0.7 * 0.5 + 0.3 * 0.40)
+    assert exp_b == pytest.approx(0.3 * 0.5 + 0.7 * 0.60)
+    assert exp_a - 0.3 * 0.40 == pytest.approx(0.35)  # 镜像项在场
+
+
+def test_镜像默认_不污染来源构成():
+    """source='mirror' 不计入真实格贡献 / 缺格 share / 缺格格数。"""
+    matrix = assemble_matrix([], _sim_cells(), POOL)
+    rep = field_pick({"A": 0.5, "B": 0.3, "C": 0.2}, matrix, POOL, n_sim=20)
+    assert rep.n_low_conf_cells == 0
+    for r in rep.rows:
+        assert r["low_conf_cells"] == 0 and not r["data_poor"]
+        # 真实格贡献：全 sim 场为 0（镜像格不混入）
+        assert r["intl_value_share"] == 0.0
 
 
 def test_来源构成与数据不足标注():

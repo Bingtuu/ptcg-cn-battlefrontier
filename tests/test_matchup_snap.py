@@ -198,7 +198,7 @@ def test_matchup_snap_CLI_落盘(tmp_path, capsys):
     snap = json.loads(out.read_text(encoding="utf-8"))
     assert snap["meta"]["date_from"] == DATE_FROM
     assert snap["meta"]["data_version"] == 9  # 池版本进 meta
-    assert len(snap["cells"]) == 6  # 3 池全有向格
+    assert len(snap["cells"]) == 9  # 3 池：3×2 非镜像全有向格 + 3 镜像默认格（v0.3/task 140）
 
 
 def test_field_pick_matrix_snap_回喂与内联一致(tmp_path, capsys):

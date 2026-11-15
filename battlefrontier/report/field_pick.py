@@ -26,10 +26,11 @@ _SHRINK_K = 20.0  # 经验贝叶斯收缩强度（n<PAIR_MIN_N 的真实格向 5
 
 @dataclass(frozen=True)
 class MatchupCell:
-    """有向格：a 对 b 的胜率（a 视角）。source = intl|sim|missing。
+    """有向格：a 对 b 的胜率（a 视角）。source = intl|sim|missing|mirror。
 
     task 123 修订（M14 review）：shrunk=True = 真实格因 n<PAIR_MIN_N
     已向 50% 收缩（小样本噪声不入矩阵）；镜像格同对与主格同 source。
+    task 140（v0.3）：source="mirror" = 源缺对角时的 50% 默认格（非缺格占位）。
     """
     a: str
     b: str
@@ -80,7 +81,8 @@ def assemble_matrix(intl_cells: list[MatchupCell],
                     sim_cells: list[MatchupCell],
                     pool_names: list[str]) -> dict[tuple[str, str], MatchupCell]:
     """三层合成矩阵（有向）。修订：来源**成对一致**——intl 格的主格与镜像格
-    同为 intl（覆盖 sim）；小样本真实格先收缩再入矩阵；缺格按 50% 占位。
+    同为 intl（覆盖 sim）；小样本真实格先收缩再入矩阵；非镜像缺格按 50% 占位；
+    镜像缺格按 50% 默认计入（PRD v0.3 / task 140，source="mirror"）。
     """
     matrix: dict[tuple[str, str], MatchupCell] = {}
     for cell in sim_cells:
@@ -100,11 +102,17 @@ def assemble_matrix(intl_cells: list[MatchupCell],
         if (b, a) not in matrix:
             matrix[(b, a)] = MatchupCell(b, a, 1.0 - cell.wr_a, n=cell.n,
                                          source=cell.source)
-    # 缺格占位（不含镜像——镜像按口径由源提供或剔除）
+    # 缺格占位（非镜像——镜像单独处理）
     for a in pool_names:
         for b in pool_names:
             if a != b and (a, b) not in matrix:
                 matrix[(a, b)] = MatchupCell(a, b, MISSING_WR, source="missing")
+    # 镜像缺格默认 50%（PRD v0.3 / task 140）：源缺镜像由「自然剔除」改为按 50%
+    # 计入——自然剔除对高份额构筑系统性不利（份额越大丢的镜像 50% 越多）；
+    # 源提供对角格时源数据优先（如未来 sim 偏差包含镜像格）。
+    for d in pool_names:
+        if (d, d) not in matrix:
+            matrix[(d, d)] = MatchupCell(d, d, MISSING_WR, n=0, source="mirror")
     return matrix
 
 
@@ -112,8 +120,9 @@ def expected_winrate(deck: str, field_share: dict[str, float],
                      matrix: dict[tuple[str, str], MatchupCell]) -> float:
     """deck 对 field 的期望胜率 = Σ share × wr(deck vs f)。
 
-    口径（task 123 修订）：镜像局（f == deck）**纳入**——真实赛场高使用率卡组
-    大量打镜像；镜像格用源数据（sim 偏差包含镜像格），源缺镜像时自然剔除。
+    口径（PRD v0.3 / task 140）：镜像局（f == deck）**纳入**——真实赛场高使用率卡组
+    大量打镜像；镜像格用源数据（源提供时优先），源缺镜像按 50% 默认计入
+    （v0.2 的「自然剔除」对高份额构筑系统性不利，已修订）。
     """
     return sum(share * matrix[(deck, f)].wr_a
                for f, share in field_share.items()

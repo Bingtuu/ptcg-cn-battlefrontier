@@ -19,6 +19,7 @@
 
 ### Changed
 
+- 镜像局口径 v0.3（task 140，M14 gate review 裁决）：源缺镜像由「自然剔除」改为按 50% 默认计入——自然剔除对高份额构筑系统性不利；`assemble_matrix` 补 source="mirror" 对角格（源提供对角时源数据优先），快照自包含 100 格；复跑 field-pick 与 Owner 手算交叉对上（62.1/58.3/55.1 vs 62/58/55）
 - 卡池 v2.x 定向修订（task 135，依据 task 133 dig 建议档）：6 套高漂移表刷新为近窗（2026-11-01..14）冠军表 + 赛富豪土龙节节第 10 套入池；`config/target-pool.v2.yml` 修订（version 保持 2 + revised_at，task 068 原始锁定段保留为注释事实源）；近窗覆盖 85.25%
 - `format_sensitivity` 末行补 `SIM_INTERPRETATION_NOTE`（task 114）：敏感性输出纳入 claims register 守则 1
 - task 102 文档勘误（task 111）：「无向 36 对」预检点估计口径未存档不可复现，权威口径 = 有向 72 格 + `results/t102-calibration.json`

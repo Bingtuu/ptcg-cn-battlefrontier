@@ -81,7 +81,7 @@ def effects_by_name(library) -> dict:
     task 134：能量转移（主类 / H6 异文本类）。
     task 139：索财灵（连掷硬币 / 小使者）/ 雪童子（惊吓 / 冰砾）。
     """
-    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙", "高级球", "裁判", "咕咕", "能量转移", "能量回收", "气球", "索财灵", "雪童子"}
+    KNOWN_MULTI_TEXT_GROUPS = {"火恐龙", "高级球", "裁判", "咕咕", "能量转移", "能量回收", "气球", "索财灵", "雪童子", "反击捕捉器"}
     docs = list({id(d): d for d in library.values()}.values())
     names = [d.card.name_group for d in docs]
     dupes = {n for n in names if names.count(n) > 1}

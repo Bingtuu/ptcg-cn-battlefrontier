@@ -244,6 +244,56 @@ def intl_cells_from_contrast(contrast) -> list[MatchupCell]:
                         source="intl") for c in contrast.cells]
 
 
+def intl_cells_from_db(intl_db, en_names: list[str], date_from: str,
+                       date_to: str, basis: str = "intl_aligned",
+                       division: str = "master") -> list[MatchupCell]:
+    """task 125：intl 格装配共享函数——field-pick 与 matchup-snap 同源调用
+    （不再各自内联 pairing_contrast）。"""
+    from battlefrontier.data.pairings import pairing_contrast
+
+    contrast = pairing_contrast(intl_db, en_names, date_from=date_from,
+                                date_to=date_to, basis=basis, division=division)
+    return intl_cells_from_contrast(contrast)
+
+
+# ── task 125：matchup 快照导出/回读（bfsim matchup-snap）────
+
+SNAPSHOT_SCHEMA_VERSION = 1
+
+
+def export_matchup_snapshot(intl_cells: list[MatchupCell],
+                            sim_cells: list[MatchupCell],
+                            pool_names: list[str],
+                            meta: dict) -> dict:
+    """三层合成矩阵 → 快照 dict（格值逐格 = assemble_matrix 输出）。
+
+    meta 由调用方带窗口/数据版本/限定语头注；low_confidence = 缺格占位。
+    """
+    matrix = assemble_matrix(intl_cells, sim_cells, pool_names)
+    cells = [
+        {"a": c.a, "b": c.b, "winrate": c.wr_a, "n": c.n, "source": c.source,
+         "low_confidence": c.source == "missing", "shrunk": c.shrunk}
+        for (a, b), c in sorted(matrix.items())
+    ]
+    return {"schema_version": SNAPSHOT_SCHEMA_VERSION, "meta": meta,
+            "cells": cells}
+
+
+def load_matrix_snapshot(path: str | Path) -> tuple[list[MatchupCell], dict]:
+    """快照回读 → (MatchupCell 列表, meta)。格已含收缩/成对一致/缺格占位，
+    回喂 assemble_matrix 时走 sim 层（不再二次收缩）。"""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    meta = data.get("meta", {}) if isinstance(data, dict) else {}
+    cells = []
+    for c in data["cells"]:
+        source = c.get("source") or (
+            "missing" if c.get("low_confidence") else "intl")
+        cells.append(MatchupCell(c["a"], c["b"], float(c["winrate"]),
+                                 n=int(c.get("n", 0)), source=source,
+                                 shrunk=bool(c.get("shrunk", False))))
+    return cells, meta
+
+
 def sim_cells_from_pack(cells: list[dict],
                         cn_to_en: dict[str, str] | None = None) -> list[MatchupCell]:
     """偏差包 cells → MatchupCell（en 名空间）；无 sim_wr 的格跳过。

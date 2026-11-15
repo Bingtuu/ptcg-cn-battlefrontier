@@ -36,18 +36,19 @@ def _cmd_field_pick(args: argparse.Namespace) -> int:
 
     field 快照（CN 使用率）× matchup 三层矩阵（intl 真实 / sim 同口径 / 缺格
     占位）→ 期望胜率排序 + 蒙特卡洛排序稳定性。全程限定语头注。
+    task 125：intl 格装配下沉共享函数；--matrix-snap 直接读快照格。
     """
     import json as _json
 
-    from battlefrontier.data.pairings import pairing_contrast
     from battlefrontier.data.pool import load_target_pool
     from battlefrontier.report.field_pick import (
         adapt_field_share,
         assemble_matrix,
         field_pick,
         format_field_pick,
-        intl_cells_from_contrast,
+        intl_cells_from_db,
         load_field_snapshot,
+        load_matrix_snapshot,
         pool_name_maps,
         sim_cells_from_pack,
         window_gap_days,
@@ -58,26 +59,77 @@ def _cmd_field_pick(args: argparse.Namespace) -> int:
     share_raw, snap_meta = load_field_snapshot(args.field)
     share = adapt_field_share(share_raw, cn_to_en)
 
+    if args.matrix_snap and (args.intl_db or args.sim_pack):
+        print("[输入冲突] --matrix-snap 与 --intl-db/--sim-pack 互斥"
+              "（快照格即最终矩阵，不二次装配）")
+        return 1
+
     intl_cells = []
     intl_meta: dict = {}
-    if args.intl_db:
-        contrast = pairing_contrast(
-            args.intl_db, en_names, date_from=args.from_date,
-            date_to=args.to_date, basis="intl_aligned", division="master")
-        intl_cells = intl_cells_from_contrast(contrast)
-        intl_meta = {"date_from": args.from_date, "date_to": args.to_date}
-    sim_cells = []
-    if args.sim_pack:
-        pack = _json.loads(Path(args.sim_pack).read_text(encoding="utf-8"))
-        sim_cells = sim_cells_from_pack(pack.get("cells", []), cn_to_en)
+    if args.matrix_snap:
+        snap_cells, snap_cells_meta = load_matrix_snapshot(args.matrix_snap)
+        # 快照格走 sim 层入矩阵：收缩/成对一致/缺格占位导出时已定稿，
+        # assemble_matrix 对 sim 层不二次收缩
+        matrix = assemble_matrix([], snap_cells, en_names)
+        intl_meta = {"date_from": snap_cells_meta.get("date_from"),
+                     "date_to": snap_cells_meta.get("date_to")}
+    else:
+        if args.intl_db:
+            intl_cells = intl_cells_from_db(args.intl_db, en_names,
+                                            args.from_date, args.to_date)
+            intl_meta = {"date_from": args.from_date,
+                         "date_to": args.to_date}
+        sim_cells = []
+        if args.sim_pack:
+            pack = _json.loads(Path(args.sim_pack).read_text(encoding="utf-8"))
+            sim_cells = sim_cells_from_pack(pack.get("cells", []), cn_to_en)
+        matrix = assemble_matrix(intl_cells, sim_cells, en_names)
 
-    matrix = assemble_matrix(intl_cells, sim_cells, en_names)
     rep = field_pick(share, matrix, en_names, n_sim=args.n_sim, seed=args.seed)
     gap = window_gap_days(snap_meta, intl_meta) if intl_meta else None
     if gap is not None and gap > 28:
         print(f"[告警] field 快照与 intl matchup 窗口错位 {gap} 天（>28），"
               "meta 漂移可能使排序失真——建议对齐窗口或下调结论强度")
     print(format_field_pick(rep))
+    return 0
+
+
+def _cmd_matchup_snap(args: argparse.Namespace) -> int:
+    """task 125：导出 field-pick 可读的 matchup 矩阵快照 JSON（M14 gate 操作包）。
+
+    intl 真实格（n 门槛收缩 + low_confidence 标注）+ 窗口时点元数据 +
+    限定语头注；格值与 assemble_matrix 逐格一致（共享装配函数）。
+    """
+    import json as _json
+
+    from battlefrontier.data.pool import load_target_pool
+    from battlefrontier.report.field_pick import (
+        QUALIFIER_HEADER,
+        export_matchup_snapshot,
+        intl_cells_from_db,
+        pool_name_maps,
+        sim_cells_from_pack,
+    )
+
+    pool = load_target_pool(args.pool)
+    cn_to_en, en_names = pool_name_maps(pool)
+    intl_cells = intl_cells_from_db(args.intl_db, en_names,
+                                    args.from_date, args.to_date)
+    sim_cells = []
+    if args.sim_pack:
+        pack = _json.loads(Path(args.sim_pack).read_text(encoding="utf-8"))
+        sim_cells = sim_cells_from_pack(pack.get("cells", []), cn_to_en)
+    snap = export_matchup_snapshot(
+        intl_cells, sim_cells, en_names,
+        {"date_from": args.from_date, "date_to": args.to_date,
+         "basis": "intl_aligned", "division": "master",
+         "data_version": pool.version, "qualifier": QUALIFIER_HEADER})
+    Path(args.out).write_text(
+        _json.dumps(snap, ensure_ascii=False, indent=2), encoding="utf-8")
+    n_low = sum(1 for c in snap["cells"] if c["low_confidence"])
+    print(f"快照 {args.out}：{len(snap['cells'])} 格"
+          f"（intl {len(intl_cells)} 对主格 / sim {len(sim_cells)} 格 / "
+          f"low_confidence {n_low} 格）；窗口 {args.from_date}..{args.to_date}")
     return 0
 
 
@@ -908,8 +960,18 @@ def main(argv: list[str] | None = None) -> int:
     fp_p.add_argument("--from", dest="from_date", default="2026-09-16", help="intl 窗起点")
     fp_p.add_argument("--to", dest="to_date", default="2026-11-14", help="intl 窗终点（含）")
     fp_p.add_argument("--sim-pack", default=None, help="偏差包 deviation.json（sim matchup 格来源）")
+    fp_p.add_argument("--matrix-snap", default=None,
+                      help="matchup 快照 JSON（task 125 matchup-snap 出口；与 --intl-db/--sim-pack 互斥）")
     fp_p.add_argument("--n-sim", type=int, default=1000, help="field 蒙特卡洛次数（默认 1000）")
     fp_p.add_argument("--seed", type=int, default=123, help="蒙特卡洛种子（默认 123）")
+    ms_p = sub.add_parser("matchup-snap",
+                          help="导出 field-pick 可读的 matchup 矩阵快照 JSON（task 125，M14 gate 操作包）")
+    ms_p.add_argument("--pool", required=True, help="卡池 YAML（CN↔en 名映射源 + data_version）")
+    ms_p.add_argument("--intl-db", required=True, help="上游 db 路径（intl matchup 格来源）")
+    ms_p.add_argument("--from", dest="from_date", default="2026-09-16", help="intl 窗起点")
+    ms_p.add_argument("--to", dest="to_date", default="2026-11-14", help="intl 窗终点（含）")
+    ms_p.add_argument("--sim-pack", default=None, help="偏差包 deviation.json（可选，sim 格一并入快照）")
+    ms_p.add_argument("--out", required=True, help="快照 JSON 输出路径")
     run_p = sub.add_parser("run", help="按实验定义 YAML 跑实验并落结果库")
     run_p.add_argument("experiment", help="实验定义 YAML 路径")
     run_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
@@ -1115,6 +1177,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_check_deck(args)
     if args.cmd == "field-pick":
         return _cmd_field_pick(args)
+    if args.cmd == "matchup-snap":
+        return _cmd_matchup_snap(args)
     if args.cmd == "run":
         return _cmd_run(args)
     if args.cmd == "report":

@@ -1,0 +1,1516 @@
+{
+ "as_of": "2026-11-15",
+ "targets": {
+  "沙奈朵": {
+   "n_candidates": 176,
+   "picked": {
+    "deck_id": "mik_moe:711854",
+    "date": "2026-11-08",
+    "tournament": "2026高级赛秋季场 - 公开组正赛",
+    "tournament_id": "mik_moe:3734",
+    "rank": 1,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:711854",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:688450",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 怪兽营地",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:693235",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 天轩卡牌包河店",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:695948",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:701338",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆东莞",
+     "rank": 1,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV1C-118",
+     "count": 2,
+     "raw_name": "勇气护符"
+    },
+    {
+     "card_id": "CSV1C-109",
+     "count": 1,
+     "raw_name": "厉害钓竿"
+    },
+    {
+     "card_id": "CSV6C-114",
+     "count": 2,
+     "raw_name": "反击捕捉器"
+    },
+    {
+     "card_id": "CSV8C-135",
+     "count": 1,
+     "raw_name": "吉雉鸡ex"
+    },
+    {
+     "card_id": "CSV6C-065",
+     "count": 1,
+     "raw_name": "吼叫尾"
+    },
+    {
+     "card_id": "CSVE1C-DAR",
+     "count": 4,
+     "raw_name": "基本恶能量"
+    },
+    {
+     "card_id": "CSVE1C-PSY",
+     "count": 7,
+     "raw_name": "基本超能量"
+    },
+    {
+     "card_id": "CSV8C-183",
+     "count": 2,
+     "raw_name": "夜间担架"
+    },
+    {
+     "card_id": "CSV6C-115",
+     "count": 3,
+     "raw_name": "大地容器"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 4,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "CSV2C-054",
+     "count": 1,
+     "raw_name": "奇鲁莉安"
+    },
+    {
+     "card_id": "CSVH1C-043",
+     "count": 2,
+     "raw_name": "巢穴球"
+    },
+    {
+     "card_id": "CSV6C-125",
+     "count": 1,
+     "raw_name": "弗图博士的剧本"
+    },
+    {
+     "card_id": "CSV8C-094",
+     "count": 4,
+     "raw_name": "愿增猿"
+    },
+    {
+     "card_id": "CSV9C-078",
+     "count": 1,
+     "raw_name": "拉帝亚斯ex"
+    },
+    {
+     "card_id": "CSV2C-053",
+     "count": 2,
+     "raw_name": "拉鲁拉丝"
+    },
+    {
+     "card_id": "151C-151",
+     "count": 1,
+     "raw_name": "梦幻ex"
+    },
+    {
+     "card_id": "CSV2C-055",
+     "count": 2,
+     "raw_name": "沙奈朵ex"
+    },
+    {
+     "card_id": "CSV1C-123",
+     "count": 1,
+     "raw_name": "派帕"
+    },
+    {
+     "card_id": "CSV2C-127",
+     "count": 2,
+     "raw_name": "深钵镇"
+    },
+    {
+     "card_id": "CSVH1C-045",
+     "count": 2,
+     "raw_name": "神奇糖果"
+    },
+    {
+     "card_id": "CSV8C-176",
+     "count": 1,
+     "raw_name": "秘密箱"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 1,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "CSV10.6C-042",
+     "count": 1,
+     "raw_name": "胖嘟嘟ex"
+    },
+    {
+     "card_id": "30thDC-040",
+     "count": 4,
+     "raw_name": "莉莉艾的决心"
+    },
+    {
+     "card_id": "CSV10C-082",
+     "count": 1,
+     "raw_name": "莉莉艾的皮皮ex"
+    },
+    {
+     "card_id": "CSV10.6C-041",
+     "count": 2,
+     "raw_name": "轻飘飘"
+    },
+    {
+     "card_id": "30thC-101",
+     "count": 4,
+     "raw_name": "高级球"
+    }
+   ]
+  },
+  "玛俐的长毛巨魔 雪妖女": {
+   "n_candidates": 158,
+   "picked": {
+    "deck_id": "mik_moe:711855",
+    "date": "2026-11-08",
+    "tournament": "2026高级赛秋季场 - 公开组正赛",
+    "tournament_id": "mik_moe:3734",
+    "rank": 1,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:711855",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:679165",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 天轩卡牌包河店",
+     "rank": 1,
+     "n_app_window": 2
+    },
+    {
+     "deck_id": "mik_moe:710504",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710594",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆东莞",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:711856",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 2,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV7C-177",
+     "count": 1,
+     "raw_name": "友好宝芬"
+    },
+    {
+     "card_id": "CSV6C-114",
+     "count": 2,
+     "raw_name": "反击捕捉器"
+    },
+    {
+     "card_id": "CSV9.5C-004",
+     "count": 1,
+     "raw_name": "含羞苞"
+    },
+    {
+     "card_id": "CSVE1C-DAR",
+     "count": 9,
+     "raw_name": "基本恶能量"
+    },
+    {
+     "card_id": "CSV8C-183",
+     "count": 3,
+     "raw_name": "夜间担架"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 3,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "30thC-102",
+     "count": 3,
+     "raw_name": "宝可平板"
+    },
+    {
+     "card_id": "CSV10C-216",
+     "count": 3,
+     "raw_name": "尖钉镇道馆"
+    },
+    {
+     "card_id": "CSV8C-094",
+     "count": 4,
+     "raw_name": "愿增猿"
+    },
+    {
+     "card_id": "CSV5C-119",
+     "count": 2,
+     "raw_name": "招式学习器 进化"
+    },
+    {
+     "card_id": "CSV5C-120",
+     "count": 1,
+     "raw_name": "招式学习器 退化"
+    },
+    {
+     "card_id": "CSV10.5C-082",
+     "count": 1,
+     "raw_name": "气球"
+    },
+    {
+     "card_id": "CSV1C-123",
+     "count": 4,
+     "raw_name": "派帕"
+    },
+    {
+     "card_id": "CSV10C-146",
+     "count": 3,
+     "raw_name": "玛俐的捣蛋小妖"
+    },
+    {
+     "card_id": "CSV10C-147",
+     "count": 2,
+     "raw_name": "玛俐的诈唬魔"
+    },
+    {
+     "card_id": "CSV10C-148",
+     "count": 2,
+     "raw_name": "玛俐的长毛巨魔ex"
+    },
+    {
+     "card_id": "CSVH1C-045",
+     "count": 1,
+     "raw_name": "神奇糖果"
+    },
+    {
+     "card_id": "CSV8C-176",
+     "count": 1,
+     "raw_name": "秘密箱"
+    },
+    {
+     "card_id": "CSV8C-160",
+     "count": 1,
+     "raw_name": "米立龙"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 2,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "CSVH6C-031",
+     "count": 1,
+     "raw_name": "能量转移"
+    },
+    {
+     "card_id": "30thDC-040",
+     "count": 4,
+     "raw_name": "莉莉艾的决心"
+    },
+    {
+     "card_id": "CSV10C-007",
+     "count": 1,
+     "raw_name": "谢米"
+    },
+    {
+     "card_id": "CSV7C-059",
+     "count": 2,
+     "raw_name": "雪妖女"
+    },
+    {
+     "card_id": "CSV6C-032",
+     "count": 1,
+     "raw_name": "雪童子"
+    },
+    {
+     "card_id": "CSV7C-057",
+     "count": 2,
+     "raw_name": "雪童子"
+    }
+   ]
+  },
+  "猛雷鼓 厄诡椪": {
+   "n_candidates": 73,
+   "picked": {
+    "deck_id": "mik_moe:711852",
+    "date": "2026-11-08",
+    "tournament": "2026高级赛秋季场 - 公开组正赛",
+    "tournament_id": "mik_moe:3734",
+    "rank": 1,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:711852",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:695949",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:701342",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆东莞",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:702764",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 八零卡社",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:708327",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 怪兽营地",
+     "rank": 1,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV8C-028",
+     "count": 3,
+     "raw_name": "厄诡椪 碧草面具ex"
+    },
+    {
+     "card_id": "CSV8C-135",
+     "count": 1,
+     "raw_name": "吉雉鸡ex"
+    },
+    {
+     "card_id": "CSV9.5C-141",
+     "count": 1,
+     "raw_name": "咕咕"
+    },
+    {
+     "card_id": "CSV9C-154",
+     "count": 2,
+     "raw_name": "咕咕"
+    },
+    {
+     "card_id": "CSVE1C-FIG",
+     "count": 3,
+     "raw_name": "基本斗能量"
+    },
+    {
+     "card_id": "CSVE1C-GRA",
+     "count": 5,
+     "raw_name": "基本草能量"
+    },
+    {
+     "card_id": "CSVE1C-LIG",
+     "count": 3,
+     "raw_name": "基本雷能量"
+    },
+    {
+     "card_id": "CSV8C-183",
+     "count": 2,
+     "raw_name": "夜间担架"
+    },
+    {
+     "card_id": "CSV6C-115",
+     "count": 3,
+     "raw_name": "大地容器"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 1,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "CSV6C-121",
+     "count": 4,
+     "raw_name": "奥琳博士的气魄"
+    },
+    {
+     "card_id": "30thC-102",
+     "count": 2,
+     "raw_name": "宝可平板"
+    },
+    {
+     "card_id": "CSVH1C-043",
+     "count": 4,
+     "raw_name": "巢穴球"
+    },
+    {
+     "card_id": "CSV6C-125",
+     "count": 1,
+     "raw_name": "弗图博士的剧本"
+    },
+    {
+     "card_id": "CSV9C-078",
+     "count": 1,
+     "raw_name": "拉帝亚斯ex"
+    },
+    {
+     "card_id": "CSV9C-161",
+     "count": 2,
+     "raw_name": "旋转洛托姆"
+    },
+    {
+     "card_id": "CSV8C-172",
+     "count": 1,
+     "raw_name": "月月熊 赫月ex"
+    },
+    {
+     "card_id": "151C-151",
+     "count": 1,
+     "raw_name": "梦幻ex"
+    },
+    {
+     "card_id": "CSV6C-082",
+     "count": 1,
+     "raw_name": "爬地翅"
+    },
+    {
+     "card_id": "CSV8C-161",
+     "count": 1,
+     "raw_name": "猛雷鼓"
+    },
+    {
+     "card_id": "CSV7C-154",
+     "count": 2,
+     "raw_name": "猛雷鼓ex"
+    },
+    {
+     "card_id": "CSV9C-155",
+     "count": 3,
+     "raw_name": "猫头夜鹰"
+    },
+    {
+     "card_id": "CSV9C-178",
+     "count": 1,
+     "raw_name": "玻璃喇叭"
+    },
+    {
+     "card_id": "151C-132",
+     "count": 1,
+     "raw_name": "百变怪"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 2,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "CSVH6C-031",
+     "count": 1,
+     "raw_name": "能量转移"
+    },
+    {
+     "card_id": "CSV9C-196",
+     "count": 2,
+     "raw_name": "赤松"
+    },
+    {
+     "card_id": "CSV8C-203",
+     "count": 1,
+     "raw_name": "阻碍之塔"
+    },
+    {
+     "card_id": "CSV9C-207",
+     "count": 2,
+     "raw_name": "零之大空洞"
+    },
+    {
+     "card_id": "CSV7C-180",
+     "count": 1,
+     "raw_name": "顶尖捕捉器"
+    },
+    {
+     "card_id": "30thC-101",
+     "count": 2,
+     "raw_name": "高级球"
+    }
+   ]
+  },
+  "N的索罗亚克": {
+   "n_candidates": 39,
+   "picked": {
+    "deck_id": "mik_moe:697754",
+    "date": "2026-11-01",
+    "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+    "tournament_id": "mik_moe:3762",
+    "rank": 2,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:697754",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 2,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710914",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 八零卡社",
+     "rank": 2,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710596",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆东莞",
+     "rank": 3,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:711737",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 怪兽营地",
+     "rank": 6,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:711886",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 7,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV10C-190",
+     "count": 2,
+     "raw_name": "N的PP提升剂"
+    },
+    {
+     "card_id": "CSV10C-215",
+     "count": 2,
+     "raw_name": "N的城堡"
+    },
+    {
+     "card_id": "CSV10C-040",
+     "count": 2,
+     "raw_name": "N的火红不倒翁"
+    },
+    {
+     "card_id": "CSV10C-144",
+     "count": 4,
+     "raw_name": "N的索罗亚"
+    },
+    {
+     "card_id": "CSV10C-145",
+     "count": 4,
+     "raw_name": "N的索罗亚克ex"
+    },
+    {
+     "card_id": "CSV10C-166",
+     "count": 2,
+     "raw_name": "N的莱希拉姆"
+    },
+    {
+     "card_id": "CSV10C-041",
+     "count": 2,
+     "raw_name": "N的达摩狒狒"
+    },
+    {
+     "card_id": "CSV1C-117",
+     "count": 1,
+     "raw_name": "不服输头带"
+    },
+    {
+     "card_id": "CSV8C-188",
+     "count": 1,
+     "raw_name": "力之沙漏"
+    },
+    {
+     "card_id": "CSV1C-109",
+     "count": 1,
+     "raw_name": "厉害钓竿"
+    },
+    {
+     "card_id": "CSV7C-177",
+     "count": 3,
+     "raw_name": "友好宝芬"
+    },
+    {
+     "card_id": "CSV6C-114",
+     "count": 2,
+     "raw_name": "反击捕捉器"
+    },
+    {
+     "card_id": "CSV8C-135",
+     "count": 1,
+     "raw_name": "吉雉鸡ex"
+    },
+    {
+     "card_id": "CSV9.5C-004",
+     "count": 1,
+     "raw_name": "含羞苞"
+    },
+    {
+     "card_id": "CSVE1C-DAR",
+     "count": 7,
+     "raw_name": "基本恶能量"
+    },
+    {
+     "card_id": "CSV8C-183",
+     "count": 1,
+     "raw_name": "夜间担架"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 2,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "30thC-102",
+     "count": 2,
+     "raw_name": "宝可平板"
+    },
+    {
+     "card_id": "CSVH1C-043",
+     "count": 1,
+     "raw_name": "巢穴球"
+    },
+    {
+     "card_id": "CSV9C-198",
+     "count": 2,
+     "raw_name": "席蓝"
+    },
+    {
+     "card_id": "CSV6C-125",
+     "count": 1,
+     "raw_name": "弗图博士的剧本"
+    },
+    {
+     "card_id": "CSV8C-094",
+     "count": 2,
+     "raw_name": "愿增猿"
+    },
+    {
+     "card_id": "CSV8C-172",
+     "count": 1,
+     "raw_name": "月月熊 赫月ex"
+    },
+    {
+     "card_id": "CSV1C-111",
+     "count": 1,
+     "raw_name": "朋友手册"
+    },
+    {
+     "card_id": "CSV8C-136",
+     "count": 1,
+     "raw_name": "桃歹郎ex"
+    },
+    {
+     "card_id": "CSV2C-127",
+     "count": 1,
+     "raw_name": "深钵镇"
+    },
+    {
+     "card_id": "CSV8C-176",
+     "count": 1,
+     "raw_name": "秘密箱"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 2,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "CSVH6C-031",
+     "count": 1,
+     "raw_name": "能量转移"
+    },
+    {
+     "card_id": "30thDC-040",
+     "count": 4,
+     "raw_name": "莉莉艾的决心"
+    },
+    {
+     "card_id": "CSV2C-128",
+     "count": 2,
+     "raw_name": "逆转能量"
+    }
+   ]
+  },
+  "火伊布 猫头夜鹰": {
+   "n_candidates": 41,
+   "picked": {
+    "deck_id": "mik_moe:701074",
+    "date": "2026-11-01",
+    "tournament": "2026城市赛第四赛季 - 天轩卡牌包河店",
+    "tournament_id": "mik_moe:3761",
+    "rank": 1,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:701074",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 天轩卡牌包河店",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710395",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 天轩卡牌包河店",
+     "rank": 2,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:695866",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 3,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710398",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 天轩卡牌包河店",
+     "rank": 3,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:711874",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 5,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV8C-198",
+     "count": 1,
+     "raw_name": "乌栗"
+    },
+    {
+     "card_id": "CSV9C-090",
+     "count": 1,
+     "raw_name": "仙子伊布ex"
+    },
+    {
+     "card_id": "CSV9C-153",
+     "count": 1,
+     "raw_name": "伊布"
+    },
+    {
+     "card_id": "CSV9.5C-140",
+     "count": 2,
+     "raw_name": "伊布ex"
+    },
+    {
+     "card_id": "CSV6C-114",
+     "count": 1,
+     "raw_name": "反击捕捉器"
+    },
+    {
+     "card_id": "CSV9.5C-006",
+     "count": 1,
+     "raw_name": "叶伊布ex"
+    },
+    {
+     "card_id": "CSV1C-120",
+     "count": 1,
+     "raw_name": "吉尼亚"
+    },
+    {
+     "card_id": "CSV8C-135",
+     "count": 1,
+     "raw_name": "吉雉鸡ex"
+    },
+    {
+     "card_id": "CSV9C-154",
+     "count": 3,
+     "raw_name": "咕咕"
+    },
+    {
+     "card_id": "CSVE1C-WAT",
+     "count": 2,
+     "raw_name": "基本水能量"
+    },
+    {
+     "card_id": "CSVE1C-FIR",
+     "count": 2,
+     "raw_name": "基本火能量"
+    },
+    {
+     "card_id": "CSVE1C-GRA",
+     "count": 1,
+     "raw_name": "基本草能量"
+    },
+    {
+     "card_id": "CSVE1C-PSY",
+     "count": 1,
+     "raw_name": "基本超能量"
+    },
+    {
+     "card_id": "CSVE1C-LIG",
+     "count": 1,
+     "raw_name": "基本雷能量"
+    },
+    {
+     "card_id": "CSV1C-127",
+     "count": 1,
+     "raw_name": "夜光能量"
+    },
+    {
+     "card_id": "CSV8C-183",
+     "count": 2,
+     "raw_name": "夜间担架"
+    },
+    {
+     "card_id": "CSV4C-101",
+     "count": 2,
+     "raw_name": "大比鸟ex"
+    },
+    {
+     "card_id": "CSV9C-175",
+     "count": 1,
+     "raw_name": "太乐巴戈斯ex"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 1,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "30thC-102",
+     "count": 2,
+     "raw_name": "宝可平板"
+    },
+    {
+     "card_id": "30thC-103",
+     "count": 1,
+     "raw_name": "宝可梦交替"
+    },
+    {
+     "card_id": "CSVH1C-043",
+     "count": 2,
+     "raw_name": "巢穴球"
+    },
+    {
+     "card_id": "CSV9C-198",
+     "count": 1,
+     "raw_name": "席蓝"
+    },
+    {
+     "card_id": "CSV9C-078",
+     "count": 1,
+     "raw_name": "拉帝亚斯ex"
+    },
+    {
+     "card_id": "CSV9C-161",
+     "count": 2,
+     "raw_name": "旋转洛托姆"
+    },
+    {
+     "card_id": "CSV8C-172",
+     "count": 1,
+     "raw_name": "月月熊 赫月ex"
+    },
+    {
+     "card_id": "CSV1C-126",
+     "count": 1,
+     "raw_name": "桌台市"
+    },
+    {
+     "card_id": "151C-017",
+     "count": 1,
+     "raw_name": "比比鸟"
+    },
+    {
+     "card_id": "151C-016",
+     "count": 2,
+     "raw_name": "波波"
+    },
+    {
+     "card_id": "CSV9.5C-023",
+     "count": 2,
+     "raw_name": "火伊布ex"
+    },
+    {
+     "card_id": "CSV9C-155",
+     "count": 3,
+     "raw_name": "猫头夜鹰"
+    },
+    {
+     "card_id": "CSV9C-178",
+     "count": 1,
+     "raw_name": "玻璃喇叭"
+    },
+    {
+     "card_id": "CSV8C-186",
+     "count": 1,
+     "raw_name": "璀璨结晶"
+    },
+    {
+     "card_id": "CSV9C-202",
+     "count": 1,
+     "raw_name": "白蕾雅"
+    },
+    {
+     "card_id": "151C-132",
+     "count": 1,
+     "raw_name": "百变怪"
+    },
+    {
+     "card_id": "CSVH1C-045",
+     "count": 1,
+     "raw_name": "神奇糖果"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 2,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "CSV10C-082",
+     "count": 1,
+     "raw_name": "莉莉艾的皮皮ex"
+    },
+    {
+     "card_id": "CSV9C-196",
+     "count": 2,
+     "raw_name": "赤松"
+    },
+    {
+     "card_id": "CSV7C-201",
+     "count": 1,
+     "raw_name": "重力山"
+    },
+    {
+     "card_id": "CSV9C-207",
+     "count": 2,
+     "raw_name": "零之大空洞"
+    },
+    {
+     "card_id": "30thC-101",
+     "count": 2,
+     "raw_name": "高级球"
+    }
+   ]
+  },
+  "喷火龙 大比鸟": {
+   "n_candidates": 39,
+   "picked": {
+    "deck_id": "mik_moe:711853",
+    "date": "2026-11-08",
+    "tournament": "2026高级赛秋季场 - 公开组正赛",
+    "tournament_id": "mik_moe:3734",
+    "rank": 1,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:711853",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710503",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:711614",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 7Holic",
+     "rank": 2,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:711865",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 3,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:703503",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 3,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV1C-109",
+     "count": 2,
+     "raw_name": "厉害钓竿"
+    },
+    {
+     "card_id": "CSV7C-177",
+     "count": 4,
+     "raw_name": "友好宝芬"
+    },
+    {
+     "card_id": "CSV6C-114",
+     "count": 2,
+     "raw_name": "反击捕捉器"
+    },
+    {
+     "card_id": "CSV5C-022",
+     "count": 1,
+     "raw_name": "古玉鱼"
+    },
+    {
+     "card_id": "CSV1C-120",
+     "count": 1,
+     "raw_name": "吉尼亚"
+    },
+    {
+     "card_id": "CSV8C-135",
+     "count": 1,
+     "raw_name": "吉雉鸡ex"
+    },
+    {
+     "card_id": "CSV4C-129",
+     "count": 2,
+     "raw_name": "喷射能量"
+    },
+    {
+     "card_id": "CSV5C-075",
+     "count": 2,
+     "raw_name": "喷火龙ex"
+    },
+    {
+     "card_id": "CSV5C-128",
+     "count": 1,
+     "raw_name": "城镇百货"
+    },
+    {
+     "card_id": "CSVE1C-FIR",
+     "count": 5,
+     "raw_name": "基本火能量"
+    },
+    {
+     "card_id": "CSV8C-081",
+     "count": 2,
+     "raw_name": "夜巡灵"
+    },
+    {
+     "card_id": "CSV4C-101",
+     "count": 2,
+     "raw_name": "大比鸟ex"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 2,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "151C-004",
+     "count": 3,
+     "raw_name": "小火龙"
+    },
+    {
+     "card_id": "CSV6C-125",
+     "count": 1,
+     "raw_name": "弗图博士的剧本"
+    },
+    {
+     "card_id": "CSV8C-082",
+     "count": 1,
+     "raw_name": "彷徨夜灵"
+    },
+    {
+     "card_id": "CSV5C-119",
+     "count": 2,
+     "raw_name": "招式学习器 进化"
+    },
+    {
+     "card_id": "CSV7C-189",
+     "count": 1,
+     "raw_name": "极限腰带"
+    },
+    {
+     "card_id": "CSV4C-100",
+     "count": 1,
+     "raw_name": "比比鸟"
+    },
+    {
+     "card_id": "151C-016",
+     "count": 1,
+     "raw_name": "波波"
+    },
+    {
+     "card_id": "CSV4C-099",
+     "count": 1,
+     "raw_name": "波波"
+    },
+    {
+     "card_id": "CSV1C-123",
+     "count": 2,
+     "raw_name": "派帕"
+    },
+    {
+     "card_id": "CSV2C-127",
+     "count": 1,
+     "raw_name": "深钵镇"
+    },
+    {
+     "card_id": "151C-005",
+     "count": 1,
+     "raw_name": "火恐龙"
+    },
+    {
+     "card_id": "CSV5C-015",
+     "count": 1,
+     "raw_name": "火恐龙"
+    },
+    {
+     "card_id": "CSV9C-202",
+     "count": 1,
+     "raw_name": "白蕾雅"
+    },
+    {
+     "card_id": "CSVH1C-045",
+     "count": 3,
+     "raw_name": "神奇糖果"
+    },
+    {
+     "card_id": "CSV8C-160",
+     "count": 1,
+     "raw_name": "米立龙"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 2,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "30thDC-040",
+     "count": 4,
+     "raw_name": "莉莉艾的决心"
+    },
+    {
+     "card_id": "CSV7C-204",
+     "count": 1,
+     "raw_name": "薄雾能量"
+    },
+    {
+     "card_id": "CSV1C-060",
+     "count": 1,
+     "raw_name": "钥圈儿"
+    },
+    {
+     "card_id": "30thC-101",
+     "count": 3,
+     "raw_name": "高级球"
+    },
+    {
+     "card_id": "CSV8C-083",
+     "count": 1,
+     "raw_name": "黑夜魔灵"
+    }
+   ]
+  },
+  "赛富豪 土龙节节": {
+   "n_candidates": 62,
+   "picked": {
+    "deck_id": "mik_moe:711850",
+    "date": "2026-11-08",
+    "tournament": "2026高级赛秋季场 - 公开组正赛",
+    "tournament_id": "mik_moe:3734",
+    "rank": 1,
+    "n_app_window": 1
+   },
+   "top5": [
+    {
+     "deck_id": "mik_moe:711850",
+     "date": "2026-11-08",
+     "tournament": "2026高级赛秋季场 - 公开组正赛",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710911",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 八零卡社",
+     "rank": 1,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710212",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝卡游艺后海店",
+     "rank": 2,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710506",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆天津聒噪鸟",
+     "rank": 2,
+     "n_app_window": 1
+    },
+    {
+     "deck_id": "mik_moe:710595",
+     "date": "2026-11-01",
+     "tournament": "2026城市赛第四赛季 - 宝可梦官方卡牌道馆东莞",
+     "rank": 2,
+     "n_app_window": 1
+    }
+   ],
+   "legality": {
+    "ok": true,
+    "violations": [],
+    "n_cards": 60,
+    "n_unmapped_entries": 0
+   },
+   "cards": [
+    {
+     "card_id": "CSV7C-177",
+     "count": 4,
+     "raw_name": "友好宝芬"
+    },
+    {
+     "card_id": "CSV6C-114",
+     "count": 1,
+     "raw_name": "反击捕捉器"
+    },
+    {
+     "card_id": "CSV8C-135",
+     "count": 1,
+     "raw_name": "吉雉鸡ex"
+    },
+    {
+     "card_id": "CSV3C-098",
+     "count": 3,
+     "raw_name": "土龙弟弟"
+    },
+    {
+     "card_id": "CSV7C-162",
+     "count": 2,
+     "raw_name": "土龙节节"
+    },
+    {
+     "card_id": "CSVE1C-DAR",
+     "count": 2,
+     "raw_name": "基本恶能量"
+    },
+    {
+     "card_id": "CSVE1C-FIG",
+     "count": 1,
+     "raw_name": "基本斗能量"
+    },
+    {
+     "card_id": "CSVE1C-WAT",
+     "count": 1,
+     "raw_name": "基本水能量"
+    },
+    {
+     "card_id": "CSVE1C-FIR",
+     "count": 1,
+     "raw_name": "基本火能量"
+    },
+    {
+     "card_id": "CSVE1C-GRA",
+     "count": 1,
+     "raw_name": "基本草能量"
+    },
+    {
+     "card_id": "CSVE1C-PSY",
+     "count": 1,
+     "raw_name": "基本超能量"
+    },
+    {
+     "card_id": "CSVE1C-MET",
+     "count": 3,
+     "raw_name": "基本钢能量"
+    },
+    {
+     "card_id": "CSVE1C-LIG",
+     "count": 1,
+     "raw_name": "基本雷能量"
+    },
+    {
+     "card_id": "CSV8C-183",
+     "count": 1,
+     "raw_name": "夜间担架"
+    },
+    {
+     "card_id": "CSV6C-115",
+     "count": 1,
+     "raw_name": "大地容器"
+    },
+    {
+     "card_id": "CSV3C-123",
+     "count": 1,
+     "raw_name": "奇树"
+    },
+    {
+     "card_id": "30thC-102",
+     "count": 4,
+     "raw_name": "宝可平板"
+    },
+    {
+     "card_id": "CSV6C-125",
+     "count": 1,
+     "raw_name": "弗图博士的剧本"
+    },
+    {
+     "card_id": "CSV8C-094",
+     "count": 1,
+     "raw_name": "愿增猿"
+    },
+    {
+     "card_id": "CSV5C-119",
+     "count": 2,
+     "raw_name": "招式学习器 进化"
+    },
+    {
+     "card_id": "CSV9C-161",
+     "count": 1,
+     "raw_name": "旋转洛托姆"
+    },
+    {
+     "card_id": "CSV7C-191",
+     "count": 3,
+     "raw_name": "暗码迷的解读"
+    },
+    {
+     "card_id": "CSV10.5C-082",
+     "count": 1,
+     "raw_name": "气球"
+    },
+    {
+     "card_id": "CSV1C-123",
+     "count": 4,
+     "raw_name": "派帕"
+    },
+    {
+     "card_id": "CSV2C-127",
+     "count": 1,
+     "raw_name": "深钵镇"
+    },
+    {
+     "card_id": "CSV9C-096",
+     "count": 4,
+     "raw_name": "索财灵"
+    },
+    {
+     "card_id": "30thDC-039",
+     "count": 3,
+     "raw_name": "老大的指令"
+    },
+    {
+     "card_id": "CSV9C-176",
+     "count": 1,
+     "raw_name": "能量输送PRO"
+    },
+    {
+     "card_id": "CSV4C-089",
+     "count": 4,
+     "raw_name": "赛富豪ex"
+    },
+    {
+     "card_id": "CSV3C-115",
+     "count": 4,
+     "raw_name": "超级能量回收"
+    },
+    {
+     "card_id": "CSV10.6C-080",
+     "count": 1,
+     "raw_name": "道具拆除器"
+    }
+   ]
+  }
+ },
+ "snapshot": {
+  "snapshot_id": "standard-2026-09-16",
+  "effective_from": "2026-09-16"
+ }
+}

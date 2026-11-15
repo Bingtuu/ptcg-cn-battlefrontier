@@ -1,34 +1,67 @@
-# 目标卡组池 v2（2026-10-21 锁定，task 068）
+# 目标卡组池 v2（2026-10-21 锁定，task 068；2026-11-15 v2.x 修订，task 135）
 # 选取规则：WUR 排名驱动（D-068-1 用户拍板：只用 09-16 后窗口 46 场，与当前赛制快照
 # standard-2026-09-16（J 标）严格对齐）+ Top-9 全新排（D-068-2 用户拍板；
 # 苍响 0.55% / 赛富豪 2.0% / 多龙喷 0.97% 掉出，N的索罗亚克 / 火伊布猫头夜鹰 /
 # 电电虫Box 新入）。代表卡组 = 合法 full 卡组中窗口内最高名次（并列取日期近/出战多者；
-# limit=500 防截断）——9 套全部窗口内 rank 1、零 fallback（侦察 .kimi-code/t068-pool-v2-scout.md）。
-# 全窗口 WUR 合计覆盖 80.5%。本文件是 v2 覆盖验收与校准的卡池事实源；v1 封存不动。
-# en_archetype = db intl_aligned 段 archetype 名（校准对表键）：3 个新 archetype 在
-# EN 校准窗（2025-04-11..08-31，409 场）有大样本（Joltik Box n=2095 / Flareon Noctowl
-# n=1549 / N's Zoroark n=998）。
+# limit=500 防截断）——task 068 九套全部窗口内 rank 1、零 fallback。
+#
+# ── v2.x 修订（task 135，2026-11-15，依据 docs/digs/2026-11-15-pool-freshness-check.md §5 拍板）──
+# ① 池内漂移 ≥6 卡的 6 套代表表刷新为近窗（2026-11-01~14）冠军表：沙奈朵 / 玛俐的长毛巨魔
+#   雪妖女 / 猛雷鼓 厄诡椪 / N的索罗亚克 / 火伊布 猫头夜鹰 / 喷火龙 大比鸟；
+#   近零漂移 3 套（多龙黑夜 55/60、电电虫Box 59/60、多龙巴鲁托 57/60）原表不动。
+# ② 「赛富豪 土龙节节」作为第 10 套新入池（v2 池本无赛富豪，D-068-2 已排出；
+#   近窗 62 出场，池外最大漂移构筑）。
+# ③ wur / n 全部改用近窗（2026-11-01~14，division=master，合格赛事 5 场——近窗 11 场
+#   master 中团队赛 6 场按统计口径排除）canonical WUR 重算（as_of 2026-11-15，
+#   basis=cn，min_n=5，granularity=archetype）。
+#
+# 覆盖口径（并列注明两种口径）：
+#   · 锁定时口径（09-16 窗 46 场）：九套 WUR 合计 80.48%（task 068，见下方注释段原值）。
+#   · 近窗口径（11-01~14 窗 5 场合格赛事，canonical WUR）：九套 75.63%；v2.x 十套 85.25%。
+#     （task 133 dig §1 的 77.7% 为原始出场份额口径、非 WUR，并列于此备查。）
+#
+# 新表 DSL 依赖：沙奈朵 refresh 表引用的 I 标渗透件（轻飘飘/胖嘟嘟ex）与新第 10 套引用的
+# 道具拆除器等 5 件 I 标卡由 task 136 补 DSL（合入顺序纪律：136 先合、本文件后合）；
+# 新表另有 9 张超出 task 136 范围的无文档阻断卡（气球/桃歹郎ex/乌栗/太乐巴戈斯ex/桌台市/
+# 重力山/城镇百货/钥圈儿/土龙节节），详见 tasks/task 135.md「结果与遗留」。
+#
+# en_archetype = db intl_aligned 段 archetype 名（校准对表键）：第 10 套
+# Gholdengo Dudunsparce 在 intl_aligned 有 334 出场（校准窗 2025-04-11..08-31 内），无校准缺口。
 version: 2
 locked_at: "2026-10-21"
+revised_at: "2026-11-15"
 query:
   granularity: archetype
-  window: "2026-09-16..2026-10-21"
+  window: "2026-11-01..2026-11-14"
   division: master
   basis: cn
   min_n: 5
-  n_tournaments: 46
+  n_tournaments: 5
   mapping_status: full
   snapshot: standard-2026-09-16
   name_group_rules_hash: f2c86aa8f7e3
   legality_constraint: "代表卡组须通过 standard-2026-09-16 校验（当前环境口径）"
-  substitution: "无（9 套全部窗口内 rank 1 合法卡组，零替补）"
+  substitution: "无（10 套全部近窗合法 full 卡组；N的索罗亚克近窗最高名次为 rank 2，其余 9 套 rank 1，零替补）"
 decks:
-  - {archetype: 多龙巴鲁托 黑夜魔灵, en_archetype: Dragapult Dusknoir, wur: 0.2355, n: 664, deck_id: "mik_moe:676344", note: "rank 1，2026-10-18，52 次出战"}
-  - {archetype: 玛俐的长毛巨魔 雪妖女, en_archetype: Grimmsnarl Froslass, wur: 0.1849, n: 422, deck_id: "mik_moe:687339", note: "rank 1，2026-10-18，2 次出战"}
-  - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.1186, n: 351, deck_id: "mik_moe:678647", note: "rank 1，2026-10-18，86 次出战"}
-  - {archetype: 猛雷鼓 厄诡椪, en_archetype: Raging Bolt Ogerpon, wur: 0.0748, n: 225, deck_id: "mik_moe:676249", note: "rank 1，2026-10-18，5 次出战"}
-  - {archetype: N的索罗亚克, en_archetype: "N's Zoroark", wur: 0.0497, n: 145, deck_id: "mik_moe:690359", note: "rank 1，2026-10-18，2 次出战"}
-  - {archetype: 火伊布 猫头夜鹰, en_archetype: Flareon Noctowl, wur: 0.0458, n: 134, deck_id: "mik_moe:689871", note: "rank 1，2026-10-18，2 次出战"}
-  - {archetype: 电电虫Box, en_archetype: Joltik Box, wur: 0.0398, n: 109, deck_id: "mik_moe:677291", note: "rank 1，2026-10-18，11 次出战"}
-  - {archetype: 多龙巴鲁托, en_archetype: Dragapult, wur: 0.0288, n: 90, deck_id: "mik_moe:677868", note: "rank 1，2026-10-17，14 次出战"}
-  - {archetype: 喷火龙 大比鸟, en_archetype: Charizard Pidgeot, wur: 0.0268, n: 94, deck_id: "mik_moe:691096", note: "rank 1，2026-10-17，1 次出战"}
+  - {archetype: 多龙巴鲁托 黑夜魔灵, en_archetype: Dragapult Dusknoir, wur: 0.2390, n: 70, deck_id: "mik_moe:676344", note: "v2 原表保留（近零漂移 55/60），rank 1，2026-10-18"}
+  - {archetype: 电电虫Box, en_archetype: Joltik Box, wur: 0.1243, n: 28, deck_id: "mik_moe:677291", note: "v2 原表保留（近零漂移 59/60），rank 1，2026-10-18"}
+  - {archetype: 玛俐的长毛巨魔 雪妖女, en_archetype: Grimmsnarl Froslass, wur: 0.1163, n: 33, deck_id: "mik_moe:711855", note: "refresh（task 135），rank 1，2026-11-08，近窗出战 1 次"}
+  - {archetype: 赛富豪 土龙节节, en_archetype: Gholdengo Dudunsparce, wur: 0.0962, n: 26, deck_id: "mik_moe:711850", note: "第 10 套新入池（task 135），rank 1，2026-11-08，近窗出战 1 次"}
+  - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.0930, n: 40, deck_id: "mik_moe:711854", note: "refresh（task 135），rank 1，2026-11-08，近窗出战 1 次"}
+  - {archetype: 猛雷鼓 厄诡椪, en_archetype: Raging Bolt Ogerpon, wur: 0.0579, n: 20, deck_id: "mik_moe:711852", note: "refresh（task 135），rank 1，2026-11-08，近窗出战 1 次"}
+  - {archetype: 喷火龙 大比鸟, en_archetype: Charizard Pidgeot, wur: 0.0394, n: 6, deck_id: "mik_moe:711853", note: "refresh（task 135），rank 1，2026-11-08，近窗出战 1 次"}
+  - {archetype: N的索罗亚克, en_archetype: "N's Zoroark", wur: 0.0386, n: 12, deck_id: "mik_moe:697754", note: "refresh（task 135），rank 2（近窗最高名次），2026-11-01，近窗出战 1 次"}
+  - {archetype: 多龙巴鲁托, en_archetype: Dragapult, wur: 0.0281, n: 11, deck_id: "mik_moe:677868", note: "v2 原表保留（近零漂移 57/60），rank 1，2026-10-17"}
+  - {archetype: 火伊布 猫头夜鹰, en_archetype: Flareon Noctowl, wur: 0.0197, n: 8, deck_id: "mik_moe:701074", note: "refresh（task 135），rank 1，2026-11-01，近窗出战 1 次"}
+# ─────────────────────────────────────────────────────────────
+# task 068 原始锁定段（2026-10-21，事实源原样保留为注释；wur/n 为 09-16 窗 46 场口径）
+#   窗口: "2026-09-16..2026-10-21"，n_tournaments: 46，九套全窗口 WUR 合计覆盖 80.48%
+#   - {archetype: 多龙巴鲁托 黑夜魔灵, en_archetype: Dragapult Dusknoir, wur: 0.2355, n: 664, deck_id: "mik_moe:676344", note: "rank 1，2026-10-18，52 次出战"}
+#   - {archetype: 玛俐的长毛巨魔 雪妖女, en_archetype: Grimmsnarl Froslass, wur: 0.1849, n: 422, deck_id: "mik_moe:687339", note: "rank 1，2026-10-18，2 次出战"}
+#   - {archetype: 沙奈朵, en_archetype: Gardevoir, wur: 0.1186, n: 351, deck_id: "mik_moe:678647", note: "rank 1，2026-10-18，86 次出战"}
+#   - {archetype: 猛雷鼓 厄诡椪, en_archetype: Raging Bolt Ogerpon, wur: 0.0748, n: 225, deck_id: "mik_moe:676249", note: "rank 1，2026-10-18，5 次出战"}
+#   - {archetype: N的索罗亚克, en_archetype: "N's Zoroark", wur: 0.0497, n: 145, deck_id: "mik_moe:690359", note: "rank 1，2026-10-18，2 次出战"}
+#   - {archetype: 火伊布 猫头夜鹰, en_archetype: Flareon Noctowl, wur: 0.0458, n: 134, deck_id: "mik_moe:689871", note: "rank 1，2026-10-18，2 次出战"}
+#   - {archetype: 电电虫Box, en_archetype: Joltik Box, wur: 0.0398, n: 109, deck_id: "mik_moe:677291", note: "rank 1，2026-10-18，11 次出战"}
+#   - {archetype: 多龙巴鲁托, en_archetype: Dragapult, wur: 0.0288, n: 90, deck_id: "mik_moe:677868", note: "rank 1，2026-10-17，14 次出战"}
+#   - {archetype: 喷火龙 大比鸟, en_archetype: Charizard Pidgeot, wur: 0.0268, n: 94, deck_id: "mik_moe:691096", note: "rank 1，2026-10-17，1 次出战"}

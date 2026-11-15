@@ -386,7 +386,15 @@ def _resolve_decklist_entry(db, name: str, card_id: str | None):
     if not found:
         raise ValueError(f"decklist 卡名未命中（不猜）: {name}")
     card_id = found[0].card_id
-    return card_id, db.get_card(card_id)
+    rec = db.get_card(card_id)
+    # task 142：search 首命中可能解析到另一张卡（task 141 事故：「奇树」→
+    # 「奇树的大电海燕」，零告警静默错卡）——裸名解析结果必须与所请卡名
+    # 严格一致，否则显式报错要求 [card_id] 印刷级指定（不猜）。
+    if rec.name_full != name:
+        raise ValueError(
+            f"decklist 卡名「{name}」解析到异名卡「{rec.name_full}」（{card_id}）"
+            f"——同名歧义不猜，请用「N 卡名 [card_id]」印刷级指定")
+    return card_id, rec
 
 
 def _load_decklist_file(db, path: str) -> tuple[list[CardDef], list[str]]:

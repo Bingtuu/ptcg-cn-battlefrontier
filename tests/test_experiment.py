@@ -151,6 +151,32 @@ def test_load_decklist_file_印刷与卡名不一致_显式报错(tmp_path):
         _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量 [CSVH1C-043]"))
 
 
+# ── task 142：裸名解析防错卡（task 141 事故加固）─────────
+
+def test_load_decklist_file_裸名解析到异名卡_显式报错(tmp_path):
+    """task 141 事故：「奇树」被 search 首命中解析成「奇树的大电海燕」且零
+    告警——裸名解析结果 name_full 必须与所请卡名严格一致，否则报错并指引
+    [card_id] 印刷级指定（不猜）。"""
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db = _fake_db_t118({"CBB7C-2701": "奇树的大电海燕"})
+    # 模拟真实 db 的 name_group/首命中行为：查「奇树」返回同组另一张卡
+    db.search_cards = lambda name=None, limit=1: [
+        type("R", (), {"card_id": "CBB7C-2701"})()] if name == "奇树" else []
+    with pytest.raises(ValueError, match="异名卡"):
+        _load_decklist_file(db, _decklist_t118(tmp_path, "60 奇树"))
+
+
+def test_load_decklist_file_裸名同名命中_正常装载(tmp_path):
+    """正控：裸名解析到同名卡（含同名下其他印刷）不受影响。"""
+
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db = _fake_db_t118({"CSVE1C-PSY": "基本超能量", "30thC-PSY": "基本超能量"})
+    cards, _ = _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量"))
+    assert len(cards) == 60 and cards[0].card_id == "CSVE1C-PSY"
+
+
 # ── Agent 构建 ───────────────────────────────────────────
 
 def test_build_agents(tmp_path):

@@ -41,8 +41,10 @@ AGENT_TYPES = ("random", "heuristic", "mcts", "distilled")
 
 # task 034：mcts params 词表（worlds/iterations/rollout_turn_cap，D-034-6 迭代预算）；
 # task 052（D-M11-4）：eval_cutoff_turns + evaluator_path（rollout 浅截断评估器）
+# task 126（D-M15-1）：value_guide + value_guide_weight（UCT 子节点选择 value 项）
 MCTS_PARAMS = ("worlds", "iterations", "rollout_turn_cap",
-               "eval_cutoff_turns", "evaluator_path")
+               "eval_cutoff_turns", "evaluator_path",
+               "value_guide", "value_guide_weight")
 
 # task 059（D-M12-5）：distilled params 词表——仅 policy_path（bf-distilled-policy-v1
 # 模型资产 JSON 路径）；worker 内每局重建 Agent = 每局装载一次（与现状同例）

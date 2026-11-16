@@ -48,7 +48,7 @@ class _Node:
     展开按 legal_actions 序取首个未尝试行动（确定性，不消费随机源）。
     """
 
-    __slots__ = ("children", "player", "untried", "visits", "wins")
+    __slots__ = ("children", "player", "untried", "v_raw", "visits", "wins")
 
     def __init__(self, player: int, untried: list[Action]) -> None:
         self.player = player  # 本节点行动方
@@ -56,6 +56,8 @@ class _Node:
         self.children: dict[Action, _Node] = {}
         self.visits = 0
         self.wins = 0.0
+        # task 126（D-M15-1）：展开时刻缓存的评估器估值（root 视角，None = 未求值）
+        self.v_raw: float | None = None
 
 
 def _score(state: GameState, root_player: int) -> float:
@@ -99,6 +101,10 @@ class MCTSAgent:
     eval_cutoff_turns=K（task 052 WP3，D-M11-4）：rollout 浅截断——K>0 时
     rollout 行过 K 回合即返回评估器估值；默认 0 = 禁用（行为零变化）。
     evaluator_path：评估器模型资产 JSON 路径；K>0 必填，装载失败显式报错（不猜）。
+    value_guide（task 126，D-M15-1）：树内 value 引导——UCT 子节点选择加
+    value_guide_weight · V(child) 项；V = 展开时刻子节点状态评估器估值（root
+    视角缓存于 _Node.v_raw，对手节点翻边同 mean 口径）。true 必填 evaluator_path；
+    weight=0 = 永不触发路径（与关闭逐局等价，行为门钉零臂）；默认关。
     """
 
     def __init__(
@@ -111,6 +117,8 @@ class MCTSAgent:
         card_effects=None,
         eval_cutoff_turns: int = 0,
         evaluator_path: str | None = None,
+        value_guide: bool = False,
+        value_guide_weight: float = 0.5,
     ) -> None:
         if worlds < 1:
             raise ValueError(f"worlds 须 ≥1（收到 {worlds}）")
@@ -120,6 +128,9 @@ class MCTSAgent:
             raise ValueError(f"rollout_turn_cap 须 ≥1（收到 {rollout_turn_cap}）")
         if eval_cutoff_turns < 0:
             raise ValueError(f"eval_cutoff_turns 须 ≥0（收到 {eval_cutoff_turns}）")
+        if value_guide_weight < 0.0:
+            raise ValueError(
+                f"value_guide_weight 须 ≥0（收到 {value_guide_weight}）")
         self._evaluator: LinearModel | None = None
         if evaluator_path is not None:
             # 装载即校验（format / 特征清单 / 维度 / std，load_model 不猜纪律）
@@ -127,11 +138,16 @@ class MCTSAgent:
         if eval_cutoff_turns > 0 and self._evaluator is None:
             raise ValueError(
                 "eval_cutoff_turns>0 需要 evaluator_path 指定评估器资产（不猜）")
+        if value_guide and self._evaluator is None:
+            raise ValueError(
+                "value_guide=true 需要 evaluator_path 指定评估器资产（不猜）")
         self._rng = rng
         self.worlds = worlds
         self.iterations = iterations
         self.rollout_turn_cap = rollout_turn_cap
         self.eval_cutoff_turns = eval_cutoff_turns
+        self.value_guide = value_guide
+        self.value_guide_weight = value_guide_weight
         self._card_effects = card_effects
         self._engine: GameEngine | None = None
         self._rollout_agent: HeuristicAgent | None = None
@@ -206,6 +222,12 @@ class MCTSAgent:
                 work.apply(node.player, action)
                 player = work.state.current_player
                 child = _Node(player, work.legal_actions(player))
+                # task 126（D-M15-1）：展开时一次性求值缓存（root 视角）；
+                # weight=0 = 永不触发路径（与关闭完全同路径，行为门钉零臂）
+                if self.value_guide and self.value_guide_weight > 0.0:
+                    v = self._evaluator_predict(
+                        work.state.visible_state(player))
+                    child.v_raw = v if player == root_player else 1.0 - v
                 node.children[action] = child
                 path.append(child)
                 break  # 展开节点即进入 rollout
@@ -224,17 +246,34 @@ class MCTSAgent:
             n.visits += 1
             n.wins += result
 
-    @staticmethod
-    def _ucb_select(node: _Node, root_player: int) -> Action:
-        """UCB1（c=√2）选子节点；严格大于才更新 → 同分保留先展开者（确定性）。"""
+    def _evaluator_predict(self, view) -> float:
+        """评估器估值（纯函数包装，便于测试 spy；装载校验在 __init__ 完成）。"""
+        assert self._evaluator is not None  # 调用点已保证 guide 开启必有评估器
+        return predict(self._evaluator, view)
+
+    def _ucb_select(self, node: _Node, root_player: int) -> Action:
+        """UCB1（c=√2）+ value 项（task 126，D-M15-1）选子节点。
+
+        value 项 = value_guide_weight · V(child)，V 为展开时缓存的 root 视角估值；
+        对手节点（node.player ≠ root_player）翻边取 1−V（同 mean 口径——
+        对 root 坏的局面即对当前行动方好）。v_raw=None（guide 关闭段/未求值）
+        与 weight=0 均不进入 value 项。严格大于才更新 → 同分保留先展开者。
+        """
         log_n = math.log(node.visits)
+        flip = node.player != root_player
+        guide_on = self.value_guide and self.value_guide_weight > 0.0
         best_action: Action | None = None
         best_value = -math.inf
         for action, child in node.children.items():
             mean = child.wins / child.visits
-            if node.player != root_player:
+            if flip:
                 mean = 1.0 - mean  # 对手节点零和翻边
             value = mean + _UCB_C * math.sqrt(log_n / child.visits)
+            if guide_on and child.v_raw is not None:
+                guide = child.v_raw
+                if flip:
+                    guide = 1.0 - guide
+                value += self.value_guide_weight * guide
             if value > best_value:
                 best_value = value
                 best_action = action

@@ -1,0 +1,9 @@
+name: t126-smoke-on
+games: 1
+seed_start: 700000
+decks:
+  a: {source: db, deck_id: "mik_moe:711854"}
+  b: {source: db, deck_id: "mik_moe:676344"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50, value_guide: true, value_guide_weight: 0.5, evaluator_path: "models/eval-linear-v1.json"}}
+  b: {type: heuristic}

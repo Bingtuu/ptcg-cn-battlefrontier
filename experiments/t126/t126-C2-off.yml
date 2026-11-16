@@ -1,0 +1,10 @@
+# task 126 净效应门 C2（off 臂）——预注册：400 局 CRN，种子 700000..（与 t141/t146 域不重叠）
+name: t126-C2-off
+games: 400
+seed_start: 700000
+decks:
+  a: {source: db, deck_id: "mik_moe:711854"}
+  b: {source: db, deck_id: "mik_moe:677291"}
+agents:
+  a: {type: mcts, params: {worlds: 2, iterations: 50}}
+  b: {type: heuristic}

@@ -10,10 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DB = ROOT / "results" / "t126-net-effect.db"
 EXPS = [
-    ("t126-C1-on", "t126/C1-on"), ("t126-C1-off", "t126/C1-off"),
-    ("t126-C2-on", "t126/C2-on"), ("t126-C2-off", "t126/C2-off"),
-    ("t126-C3-on", "t126/C3-on"), ("t126-C3-off", "t126/C3-off"),
-    ("t126-C1deep-on", "t126/C1deep-on"), ("t126-C1deep-off", "t126/C1deep-off"),
+    ("t126-C1-on", "t126/t126-C1-on"), ("t126-C1-off", "t126/t126-C1-off"),
+    ("t126-C2-on", "t126/t126-C2-on"), ("t126-C2-off", "t126/t126-C2-off"),
+    ("t126-C3-on", "t126/t126-C3-on"), ("t126-C3-off", "t126/t126-C3-off"),
+    ("t126-C1deep-on", "t126/t126-C1deep-on"), ("t126-C1deep-off", "t126/t126-C1deep-off"),
 ]
 
 def main():

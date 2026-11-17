@@ -10,6 +10,7 @@
 - **开发段（commit `144b2f5`）**：MCTS value_guide（D-M15-1）——UCT 子节点选择加 `weight·V(child)` 项，V = 展开时刻一次性求值缓存（root 视角 `_Node.v_raw`，对手节点翻边同 mean 口径，选择/回传阶段零评估器调用）；`value_guide=true` 必填 `evaluator_path`；`weight=0` = 永不触发路径；默认关；mcts 词表 +2。**质量门**：15 新测绿（含行为门钉零臂：weight-0 vs off 逐局 events_hash 全等）+ 全量 1987 绿 + ruff 零告警 + CHANGELOG 记账；既有 MCTS 测试零改动。
 - **成本冒烟**：2×50 单局 9m43s（on）/ 12m48s（off，含并行争抢）——全 rollout 口径成本实锤（m11 先例快在 K=10 截断）；on/off ≈ 0.76，**×3 成本门预计 PASS**（正式判读以跑批计时为准）。
 - **在途跑批**（`.kimi-code/t126_run_acceptance.py 16` → `results/t126-net-effect.db`）：预注册 3 格（沙奈朵 vs 多龙黑夜/电电虫/玛俐，400 局 × on/off，种子 700000+）+ C1 深档 4×100（200 局 × on/off，种子 700500+）；判读脚本 `.kimi-code/t126_net_effect.py`（CRN 配对 + CI 下界 + McNemar）冻结待跑毕自动执行。已知折扣项：评估器 eval-linear-v1 v2.x 漂移（task 145）。
+- **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：
 
 - **task 148 门槛实验（零新局，纯冻结数据重分析 <2min）**：候选臂 = BT 评级（Bradley-Terry MLE）+ field 权重（field-snap-2026-11）推荐流程，地真值 = task 146 标签集（13 组合 × 4 格 × 2,000）+ task 141 基线格；naive 基线 = t141 过 Bonferroni 门单刀 ×2 的组合体 = L01（冻结 +4.6pp）。**判决：GATE PASS**——(a) 有害组合 C01 被拒（score −2.49pp vs BASE，与标签 −2.4pp 互证）；(b) top-1 = L01（+4.6pp ≥ +3.6pp 非劣门）；支撑 LOCO 4/4（C01 仅凭 3 胞信息即被拦截）+ held-out Spearman 4/4 正（0.57~0.87）+ 排名 Spearman 0.9986。报告 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`，可复放 `.kimi-code/t148_gate_experiment.py` → `results/t148-gate/verdict.json`。

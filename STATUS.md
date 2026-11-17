@@ -5,11 +5,11 @@
 
 ## 当前
 
-**当前焦点 = task 126（M15 价值网进搜索）开发段已交付，净效应门全量跑批在途（2026-11-16，ETA ~32h 后台无人值守）。**
+**当前焦点 = task 126（M15 价值网进搜索）净效应门判决：FAIL——按四期 PRD §3 条款 4 no-go 留档关闭（2026-11-17；dig `docs/digs/2026-11-17-t126-value-guide-net-effect.md`，8 实验全量零平局零失败）。**
 
-- **开发段（commit `144b2f5`）**：MCTS value_guide（D-M15-1）——UCT 子节点选择加 `weight·V(child)` 项，V = 展开时刻一次性求值缓存（root 视角 `_Node.v_raw`，对手节点翻边同 mean 口径，选择/回传阶段零评估器调用）；`value_guide=true` 必填 `evaluator_path`；`weight=0` = 永不触发路径；默认关；mcts 词表 +2。**质量门**：15 新测绿（含行为门钉零臂：weight-0 vs off 逐局 events_hash 全等）+ 全量 1987 绿 + ruff 零告警 + CHANGELOG 记账；既有 MCTS 测试零改动。
-- **成本冒烟**：2×50 单局 9m43s（on）/ 12m48s（off，含并行争抢）——全 rollout 口径成本实锤（m11 先例快在 K=10 截断）；on/off ≈ 0.76，**×3 成本门预计 PASS**（正式判读以跑批计时为准）。
-- **在途跑批**（`.kimi-code/t126_run_acceptance.py 16` → `results/t126-net-effect.db`）：预注册 3 格（沙奈朵 vs 多龙黑夜/电电虫/玛俐，400 局 × on/off，种子 700000+）+ C1 深档 4×100（200 局 × on/off，种子 700500+）；判读脚本 `.kimi-code/t126_net_effect.py`（CRN 配对 + CI 下界 + McNemar）冻结待跑毕自动执行。已知折扣项：评估器 eval-linear-v1 v2.x 漂移（task 145）。
+- **三门槛**：净效应门 **FAIL**（1/3 格：仅 C2 电电虫 +6.75pp CI95 [+1.68, +11.82]；C1 多龙黑夜 +1.25pp [−4.27, +6.77]；C3 玛俐 −1.0pp；深档 C1 4×100 加评 +4.0pp [−2.48, +10.48] 方向正不显著）∣ 成本门 PASS（墙钟比 1.31/1.03/0.99，深档 0.91，门 ≤×3）∣ 行为门 PASS（weight-0 臂 vs off 逐局 events_hash 全等，15 单测）。
+- **处置（条款 4）**：价值网路线留档关闭；**task 127 不激活**；value_guide 维持默认关（实现 `144b2f5` 保留）；B2 改以 BC 为主入口。
+- **限定语**：功效 ±5.5pp 半宽（不显著 ≠ 机制无效，C2 显著正向 = 评估器校准良好格内机制有真实信号）；评估器漂移折扣（task 145：eval-linear-v1 v2.x AUC 0.676）——FAIL 不可区分机制 vs 评估器；全部读数启发式自对局口径。留档：未来评估器 v2.x 重训后 value_guide 重验 = 低成本候选（换 evaluator_path），须重新预注册。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：
 

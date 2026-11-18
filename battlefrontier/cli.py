@@ -61,6 +61,36 @@ def _cmd_check_deck(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_league(args: argparse.Namespace) -> int:
+    """task 127：agent 种群联赛（BC 路线评估面前置）。
+
+    跑+报一体：`bfsim league <registry.yml> --results db [--workers N]`；
+    纯报告：`bfsim league --report <league名> --results db`。
+    评级主估计子 BT-MLE（task 148 教训：禁固定大步长顺序 Elo）。
+    """
+    from battlefrontier.report.league import league_report
+    from battlefrontier.runner.league import load_league, run_league
+
+    if args.report:
+        rep = league_report(args.results, args.report)
+        print(rep.format_text())
+        return 0
+    if not args.registry:
+        print("[league 失败] 缺注册表路径（或改用 --report <league名> 纯报告模式）")
+        return 1
+    lg = load_league(args.registry)
+    db_path = args.db or load_db_path()
+    try:
+        run_league(lg, db_path, args.results, workers=args.workers,
+                   cards_dir=args.cards_dir, registry_path=args.registry)
+        rep = league_report(args.results, lg.name)
+    except (ValueError, OSError) as e:
+        print(f"[league 失败] {e}")
+        return 1
+    print(rep.format_text())
+    return 0
+
+
 def _cmd_field_pick(args: argparse.Namespace) -> int:
     """task 123：metamages 式选卡器（四期 PRD M14）。
 
@@ -983,6 +1013,17 @@ def main(argv: list[str] | None = None) -> int:
     chk_deck_p.add_argument("--db", default=None,
                             help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     chk_deck_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    lg_p = sub.add_parser("league",
+                          help="agent 种群联赛（task 127）：CRN 双向配对 + BT-MLE 评级")
+    lg_p.add_argument("registry", nargs="?", default=None,
+                      help="联赛注册表 yml（纯报告模式可缺省）")
+    lg_p.add_argument("--report", default=None,
+                      help="纯报告模式：按联赛名从结果库回收已跑细胞出报告")
+    lg_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    lg_p.add_argument("--db", default=None,
+                      help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    lg_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    lg_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
     ss_p = sub.add_parser("swap-search",
                           help="换卡搜索器（task 130）：单卡替换扫描 + 筛选→确认两阶段 + 排序输出")
     ss_p.add_argument("--deck", required=True, help="被优化卡组 deck_id（换出侧）")
@@ -1227,6 +1268,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "check-deck":
         return _cmd_check_deck(args)
+    if args.cmd == "league":
+        return _cmd_league(args)
     if args.cmd == "swap-search":
         return _cmd_swap_search(args)
     if args.cmd == "field-pick":

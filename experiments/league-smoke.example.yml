@@ -1,0 +1,13 @@
+# task 127：agent 种群联赛冒烟注册表（BC 路线评估面前置）
+# 用法：bfsim league experiments/league-smoke.example.yml --workers 4 --results results/exp.db
+# 规模纪律：agents × decks × games_per_cell 全部钉死在本文件。
+name: league-smoke
+seed_start: 800000
+seed_stride: 1000
+games_per_cell: 20
+decks:
+  - {source: db, deck_id: "mik_moe:711854"}   # 沙奈朵（t141/t146 目标卡表）
+  - {source: db, deck_id: "mik_moe:676344"}   # 多龙黑夜（field 头部）
+agents:
+  - {id: heuristic-base, type: heuristic}
+  - {id: mcts-2x50, type: mcts, params: {worlds: 2, iterations: 50}}

@@ -5,10 +5,12 @@
 
 ## 当前
 
-**当前焦点 = PRD v0.5 修订 + BC 路线任务重规划落档（2026-11-18，task 126 no-go 后 review 三个硬冲突的处置）。**
+**当前焦点 = task 127 Elo 联赛基础设施开发段交付（2026-11-18，BC 路线 P0 首个开工项按 PRD v0.5 重新激活后 TDD 收官，待全量绿后归档）。**
 
-- **v0.5 三处置**：① task 127（Elo 联赛）**重新激活**为 BC 路线 P0 首个开工项——v0.4 条款 4「不激活」与 M16 提升门（联赛评测面）矛盾，重定义为「M16 评估面前置」，评级主估计子 = BT-MLE（task 148 教训：禁固定大步长顺序 Elo）；② **新增 BC 开工门 task 150（v2.x 评估器重训，AUC ≥ 0.90 预注册线）**——教师种群 {启发式, 价值网 MCTS, 蒸馏学生} 在 v2.x 两名成员折损（126 no-go + task 145 双 arm），task 151/152 不得在本门之前开工；③ 提升门基线修订 = 「纯 MCTS 2×50 教师中位 Elo」（原比较臂价值网 MCTS 已关闭）。
-- **任务重规划（排程序）**：task 127 联赛 → task 149 吞吐 spike（原 spec 预占 130 重编号；R2 实测 → R1 spike 6 周门 → 否则 M16 kill）→ task 150 评估器重训（开工门）→ task 151 自对弈飞轮（原 128）→ task 152 BC+RL（原 129）；task 153 对手建模可选；**task 154 v3 池评估并行线**（12 月初窗数据就绪后启动，含 task 133 三拍板项，151/152 开工前须完成池版本锁定）。151–153 任务书按惯例激活时落盘（规格文本在 PRD §4）。
+- **交付**：`bfsim league <registry.yml> --results db [--workers N]`（跑+报一体）+ `--report <league名>` 纯报告模式；注册表 yml 钉死规模（agents × decks × games_per_cell，白名单校验复用 AgentCfg）；CRN 双向配对（同无序对 ab/ba 共享种子区间、卡组 mirror）；**BT-MLE 评级主估计子**（task 148 教训：禁固定大步长顺序 Elo）；成对矩阵 + meta 回显 + 限定语头注；细胞全量复用 execute_experiment（并串一致/增量落库纪律继承）。31 新测含评级解析锚（双人 ln(s/(n−s)) 精确复现）+ 双跑/并串逐局一致硬验收；既有行为零变化（纯新增 runner/report/CLI 层）。
+- 产物：冒烟注册表 `experiments/league-smoke.example.yml`（启发式基线 vs MCTS 2×50 教师 × 沙奈朵/多龙黑夜 2 deck）。
+- 下一步（排程序，PRD v0.5）：task 149 吞吐 spike → task 150 v2.x 评估器重训（BC 开工门）→ task 151 飞轮 → task 152 BC+RL；task 154 v3 池评估并行线（12 月初窗）。
+- **v0.5 三处置（上一焦点）**：① task 127 重新激活为 M16 评估面前置（不挂 M15 gate）；② 新增 BC 开工门 task 150（v2.x 评估器重训 AUC ≥ 0.90 预注册线），151/152 不得在其前开工；③ 提升门基线修订 = 纯 MCTS 2×50 教师中位 Elo。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：
 

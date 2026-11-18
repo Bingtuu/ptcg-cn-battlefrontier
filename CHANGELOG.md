@@ -7,6 +7,7 @@
 
 ### Added
 
+- agent 种群联赛设施（task 127 / M15→BC 评估面前置，PRD v0.5）：`bfsim league <registry.yml> --results db [--workers N]`（跑+报一体）与 `--report <league名>` 纯报告模式——注册表 yml 钉死规模（agents[id+type/params 白名单复用] × decks × games_per_cell，seed_stride 防区间重叠）；CRN 双向配对（同无序对 ab/ba 共享种子区间、卡组 mirror，先手偏差聚合层对消）；**BT-MLE 评级主估计子**（Bradley-Terry MM 迭代，平局 0.5、零均值 log-strength + Elo 标度展示——task 148 教训：固定大步长顺序 Elo 未收敛、不交付）；成对胜率矩阵 + meta 回显（registry sha256/种子/代码+数据版本）+ 限定语头注；实验细胞复用 execute_experiment（并串逐局一致/增量落库/失败局落 error 纪律全继承）；31 新测（评级解析锚 ln(s/(n−s)) 精确复现/循环对称/结果取反对称/双跑与并串逐局一致）
 - MCTS value_guide 树内 value 引导（task 126 / M15，D-M15-1）：UCT 子节点选择加 `value_guide_weight · V(child)` 项——V = 展开时刻子节点状态评估器估值（root 视角缓存 `_Node.v_raw`，对手节点翻边同 mean 口径），选择/回传阶段零评估器调用；`value_guide=true` 必填 `evaluator_path`（复用 load_model 强校验），`value_guide_weight=0` = 永不触发路径（与关闭逐局等价 = 行为门钉零臂）；默认关（行为零变化纪律）；mcts params 词表 +2（`value_guide` / `value_guide_weight`）
 - v2.x 矩阵与选卡器快照刷新（task 137）：45 无向对 × 500 局 = 22,500 局零失败（`experiments/t1115-v2x-matrix.example.yml`，种子锚 400000）；`matchup-snap-2026-11-15.json`（90 格 / 0 low_confidence）+ `field-snap-2026-11.json`（2026-11-01..14 窗，10 池覆盖 85.25%）
 - 太乐巴戈斯ex DSL 档（task 138，CSV9C-175 档 7 印刷等价类，`cards/太乐巴戈斯ex.yml`，库 154→155）：同盟打击 usage_gate=second_player_first_turn（D-138-1，枚举点使用门，「无法使用」≠「招式失败」）+ bench_count_own 计数词（D-138-2）；皇冠蛋白石 prevent_attack_damage 时效减伤（D-138-3，timing=opponent_next_turn + attacker_stage=basic + except_attacker_type=无，「下一个对手的回合」窗口精确圈定、对手回合结束清除，仅免疫招式伤害）；新词表段 usage_gates + actions/counters 各一词；附录 A 三行 🔲 待核

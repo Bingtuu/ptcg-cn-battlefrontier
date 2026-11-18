@@ -178,7 +178,7 @@ def main():
 
     labels = {}
     for line in LABELS_CSV.read_text(encoding="utf-8").splitlines()[1:]:
-        combo, cell, wr, d, p, mean, label = line.split(",")
+        combo, cell, _wr, d, _p, mean, label = line.split(",")
         labels.setdefault(combo, {"cells": {}, "mean": float(mean), "label": label})
         labels[combo]["cells"][cell] = float(d)
 

@@ -53,6 +53,13 @@ _HEADER_FORMAT_V3 = "bf-collect-v3"
 
 _PATH_ILLEGAL = re.compile(r'[\\/:*?"<>|\s]+')
 
+# worker 回收常数（task 155 内存修复）：spawn worker 在大对象churn（v3 行
+# ≈20KB Python 对象 × 每局 ~76 决策点）下地址空间提交随局数棘轮增长，主进程
+# _handle_results 读结果缓冲的 MemoryError 为压垮点（results/t155-collect.log
+# 实证：39/45 对后挂死）。每 500 局回收 worker → 棘轮上限 ≈ 500 局 churn，
+# 回收成本（spawn ~数秒 × ~110 次）与计算重叠。产物与回收无关（任务自包含）。
+MAXTASKS_PER_CHILD = 500
+
 
 def collect_seed_range(pair_index: int, games_per_pair: int, seed_start: int) -> range:
     """pair i → [seed_start + i×games_per_pair, +games_per_pair)（matrix 惯例）。"""
@@ -197,7 +204,7 @@ def run_collect(prepared: list[PreparedPair] | tuple[PreparedPair, ...],
 
         if workers > 1:
             ctx = mp.get_context("spawn")
-            pool = ctx.Pool(workers)
+            pool = ctx.Pool(workers, maxtasksperchild=MAXTASKS_PER_CHILD)
             try:
                 for result in pool.imap(_run_one_collect, payloads):
                     _handle(result)

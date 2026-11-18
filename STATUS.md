@@ -5,12 +5,12 @@
 
 ## 当前
 
-**当前焦点 = task 149 吞吐 spike 收官：判决 R2 可行——M16 保持 Python 架构，R1/Rust spike 不立项（2026-11-18；dig `docs/digs/2026-11-18-t149-throughput-spike.md`）。**
+**当前焦点 = task 150 v2.x 评估器重训判读 FAIL（2026-11-18）——BC 开工门未过线，按预注册条款转 Owner 停损评审**（dig `docs/digs/2026-11-18-t150-eval-v2x-retrain.md`）。
 
-- **实测**（预注册判定门 ≥3M 决策点/天 且 ≥300k 局/天）：heuristic × 沙奈朵 711854 真实卡表 mirror（400 局 × 16 workers）= 60.4 局/s → **5,215,360 局/天**（17×）+ 141.4 决策点/局（串行采样精确计数）→ **7.37 亿决策点/天**（245×）→ decide_r2 = "r2"；policy 前向微基准 3.5 µs/打分/核（开销可忽略，引擎 step 主导）。
-- **处置**：M16 kill criteria 吞吐项解除；**BC 路线剩余 gate = task 150（v2.x 评估器重训 AUC ≥ 0.90）**——排程序下一项。distilled v2 词表锚定 v1 池（「轻飘飘 不在词表」装载即报错）在本 spike 再确认一次，归 task 150 供给面。
-- 探针：`bfsim probe-throughput`（9 新测，decide_r2 三态分支全覆盖）；零行为变更（纯测量，落临时库）。
-- 上一焦点 = task 127 Elo 联赛基础设施收官（`762eff4`）：注册表钉死规模 + CRN 双向配对 + BT-MLE 评级主估计子（task 148 教训）+ `bfsim league` 跑报一体；31 新测 + 全量 2017 绿。
+- **判读**：eval-linear-v2（v2.x 池 54,000 局 / 407 万行重训，训练健康 λ=100 / 验证 MSE 0.1995 vs 基线 0.2500）在 t145 同款探针 v2.x 对决 AUC = **0.6743**（门 0.90 → FAIL）；对照臂：v1 资产 0.6755（task 145 复现）、v2 资产 v1 对决 0.9659。**in-distribution 重训零提升 → 归因 = 30 维特征层对 v2.x 新机制失明**（非数据分布；设计段归因推断句被实验否定，已如实记录）。
+- **Owner 裁决项（三选，dig §处置）**：A 特征 v3 扩维立项（task 062 policy-v2 思路移植评估器，建议）→ 重训重判；B 教师去评估器化（不推荐）；C M16 延期。task 151/152 维持冻结至本门过线（或 Owner 选 B/C 解除）。
+- 资产 `models/eval-linear-v2.json` 如实入库（未过线但健康；v1 资产不动，v2.x 底板两资产均不可用、v1 底板继续 v1）。复放：collect-features → train-eval → `.kimi-code/t150_eval_gate.py`。
+- 上一焦点 = task 149 吞吐 spike 判决 R2 可行（`8850891`）：5.2M 局/天 + 7.4 亿决策点/天（门槛 17×/245×），Rust spike 不立项，M16 kill 吞吐项解除。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：
 

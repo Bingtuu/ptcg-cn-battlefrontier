@@ -694,14 +694,28 @@ def _cmd_collect_features(args: argparse.Namespace) -> int:
 
     落 <out>/pair-<index>-<名A>x<名B>.jsonl（不落结果库，D-T4 先例）；
     失败局剔除并计数上报。正式跑批口径：36 对 × 2800 局 @seed-start 300000。
+    task 155 WP2：--feature-set v3 走紧凑格式（文件首行 header 钉 feature_names、
+    数据行 features 为位置 list）；词表 = build_card_vocab(pool, db)（CLI 侧算好
+    透传，多进程确定性），词表长 + 首末词随 meta 打印落账；v3 必须显式 --db。
     """
     from battlefrontier.runner.collect import run_collect_pool
 
+    card_vocab: tuple[str, ...] | None = None
+    if args.feature_set == "v3":
+        if args.db is None:
+            print("错误：--feature-set v3 必须显式提供 --db（词表构建需要，不猜）")
+            return 1
+        from battlefrontier.agent.policy_features import build_card_vocab
+
+        card_vocab = build_card_vocab(args.pool, str(args.db))
+        print(f"特征集 v3：词表 {len(card_vocab)} 词"
+              f"（首 {card_vocab[0]!r} / 末 {card_vocab[-1]!r}）")
     db_path = args.db or load_db_path()
     summaries, warnings = run_collect_pool(
         args.pool, db_path, games_per_pair=args.games_per_pair,
         seed_start=args.seed_start, out_dir=args.out,
-        workers=args.workers, cards_dir=args.cards_dir)
+        workers=args.workers, cards_dir=args.cards_dir,
+        feature_set=args.feature_set, card_vocab=card_vocab)
     for w in warnings:
         print(f"[装载告警] {w}")
     total_rows = sum(s.rows for s in summaries)
@@ -710,7 +724,8 @@ def _cmd_collect_features(args: argparse.Namespace) -> int:
         print(f"[{s.pair_index:2d}] {s.archetype_a}×{s.archetype_b}：{s.filename} — "
               f"{s.games} 局 / {s.rows} 行 / 失败剔除 {s.failed}")
     print(f"采集完成：{len(summaries)} 个配对 × {args.games_per_pair} 局，"
-          f"共 {total_rows} 行，失败剔除 {total_failed} 局（目录 {args.out}）")
+          f"共 {total_rows} 行，失败剔除 {total_failed} 局"
+          f"（feature_set {args.feature_set}，目录 {args.out}）")
     return 0
 
 
@@ -1230,8 +1245,12 @@ def main(argv: list[str] | None = None) -> int:
     col_p.add_argument("--out", required=True, help="产物目录（pair-*.jsonl）")
     col_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
     col_p.add_argument("--db", default=None,
-                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml；"
+                            "--feature-set v3 时必填，词表构建用）")
     col_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
+    col_p.add_argument("--feature-set", choices=["v1", "v3"], default="v1",
+                       help="特征集（task 155 WP2）：v3 = header 钉清单 + 位置行紧凑"
+                            "格式（词表 = build_card_vocab(pool, db)）；缺省 v1 不变")
     te_p = sub.add_parser(
         "train-eval",
         help="M11 WP2（task 051，D-M11-3）：collect-features 产物训练线性评估器（岭回归闭式解）")

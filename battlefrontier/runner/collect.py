@@ -12,16 +12,24 @@
   路径非法字符），逐行 JSON（UTF-8 / ensure_ascii=False / sort_keys，复用
   tune.trajectory.TrajectoryWriter 惯例）；行内零非确定量（无墙钟/无时间戳）。
   数据不落结果库（D-T4 先例：JSONL 侧文件即锚点）。
+- **task 155 WP2 采集 v3**（``feature_set="v3"``）：文件首行写 header
+  ``{"type":"header","format":"bf-collect-v3","feature_names":[...]}``（名序 =
+  ``eval_v3_names(card_vocab)``，词表随池钉进文件自包含）；数据行 features
+  为位置对齐 float list。词表经 payload 透传 worker（多进程确定性）；
+  ``read_collect_v3`` 读取校验宽度，不符显式 ValueError（不猜）。缺省 v1 =
+  现状逐位不动（无 header、dict 行）。
 """
 
 from __future__ import annotations
 
+import json
 import multiprocessing as mp
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from battlefrontier.agent.collect import FeatureCollector
+from battlefrontier.agent.eval_features import eval_v3_names
 from battlefrontier.agent.heuristic import HeuristicAgent
 from battlefrontier.data.pool import TargetPool
 from battlefrontier.dsl import CardLibrary
@@ -37,8 +45,11 @@ __all__ = [
     "collect_seed_range",
     "pair_filename",
     "pool_assignments",
+    "read_collect_v3",
     "run_collect",
 ]
+
+_HEADER_FORMAT_V3 = "bf-collect-v3"
 
 _PATH_ILLEGAL = re.compile(r'[\\/:*?"<>|\s]+')
 
@@ -74,13 +85,20 @@ def _run_one_collect(payload: dict) -> tuple[int, int, list[dict] | None, str | 
             for d in payload["card_effects"])
         agents = [HeuristicAgent(card_effects=card_effects),
                   HeuristicAgent(card_effects=card_effects)]
+        # task 155 WP2：v3 词表随 payload 透传（spawn worker 内重建 collector，
+        # 多进程与串行同一条 worker 路径，词表序逐位一致）；缺省 = v1 现状。
+        if payload.get("feature_set") == "v3":
+            collector: FeatureCollector = FeatureCollector(
+                feature_set="v3", card_vocab=tuple(payload["card_vocab"]))
+        else:
+            collector = FeatureCollector()
         result = play_game(
             deck_a=[CardDef.model_validate(c) for c in payload["deck_a"]],
             deck_b=[CardDef.model_validate(c) for c in payload["deck_b"]],
             seed=payload["seed"],
             card_effects=card_effects,
             agents=agents,
-            collector=FeatureCollector(),
+            collector=collector,
         )
         rows = result.collected_rows
         assert rows is not None  # collector 非 None 则必有（可能为空列表）
@@ -105,13 +123,27 @@ class PairCollectSummary:
     failed: int
 
 
+def _validate_feature_set(feature_set: str, card_vocab: tuple[str, ...] | None) -> None:
+    """feature_set 词表校验（不猜纪律）：只认 v1/v3；v3 必须带词表。"""
+    if feature_set not in ("v1", "v3"):
+        raise ValueError(f"未知 feature_set={feature_set!r}（只支持 v1/v3，不猜）")
+    if feature_set == "v3" and card_vocab is None:
+        raise ValueError("feature_set='v3' 必须提供 card_vocab（不猜）")
+
+
 def run_collect(prepared: list[PreparedPair] | tuple[PreparedPair, ...],
                 games_per_pair: int, seed_start: int,
-                out_dir: str | Path, *, workers: int = 1) -> list[PairCollectSummary]:
+                out_dir: str | Path, *, workers: int = 1,
+                feature_set: str = "v1",
+                card_vocab: tuple[str, ...] | None = None) -> list[PairCollectSummary]:
     """全部配对 × 种子区间批量跑局并落 JSONL；返回各配对汇总。
 
     串行与多进程同走 ``_run_one_collect``（imap 保序回收），产物逐行一致。
+    task 155 WP2：feature_set="v3" 时文件首行写 header（名序 =
+    eval_v3_names(card_vocab) 钉进文件），数据行 features 为位置 list；
+    词表随 payload 透传 worker。缺省 v1 = 现状逐位不动（无 header、dict 行）。
     """
+    _validate_feature_set(feature_set, card_vocab)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     payloads: list[dict] = []
@@ -121,9 +153,14 @@ def run_collect(prepared: list[PreparedPair] | tuple[PreparedPair, ...],
         deck_a = [c.model_dump(mode="json") for c in pp.deck_a]
         deck_b = [c.model_dump(mode="json") for c in pp.deck_b]
         for seed in collect_seed_range(pp.assignment.index, games_per_pair, seed_start):
-            payloads.append({"deck_a": deck_a, "deck_b": deck_b,
+            payload: dict = {"deck_a": deck_a, "deck_b": deck_b,
                              "card_effects": card_effects,
-                             "seed": seed, "pair_index": pp.assignment.index})
+                             "seed": seed, "pair_index": pp.assignment.index}
+            if feature_set == "v3":
+                assert card_vocab is not None
+                payload["feature_set"] = "v3"
+                payload["card_vocab"] = list(card_vocab)
+            payloads.append(payload)
 
     results: list[tuple[int, int, list[dict] | None, str | None]] = []
     if workers > 1:
@@ -148,6 +185,11 @@ def run_collect(prepared: list[PreparedPair] | tuple[PreparedPair, ...],
         a = pp.assignment
         filename = pair_filename(a.index, a.archetype_a, a.archetype_b)
         with TrajectoryWriter(out / filename) as writer:
+            if feature_set == "v3":
+                assert card_vocab is not None
+                # header 钉清单：词表随池落进文件（自包含，读取端不依赖外部词表）
+                writer.append({"type": "header", "format": _HEADER_FORMAT_V3,
+                               "feature_names": list(eval_v3_names(card_vocab))})
             for row in rows_by_pair[a.index]:
                 writer.append(row)
         summaries.append(PairCollectSummary(
@@ -157,20 +199,54 @@ def run_collect(prepared: list[PreparedPair] | tuple[PreparedPair, ...],
     return summaries
 
 
+def read_collect_v3(path: str | Path) -> tuple[tuple[str, ...], list[dict]]:
+    """读出 v3 采集文件：首行 header 钉 feature_names，数据行 features 还原为
+    名→值 dict（位置对齐）。
+
+    task 155 WP2（不猜纪律）：首行非 bf-collect-v3 header、数据行 features
+    宽度 ≠ header 名数，一律显式 ValueError。
+    """
+    lines = [json.loads(line) for line in Path(path).read_text(encoding="utf-8")
+             .splitlines() if line.strip()]
+    if not lines:
+        raise ValueError(f"{path} 为空文件（无 header 行，不猜）")
+    header = lines[0]
+    if (not isinstance(header, dict)
+            or header.get("type") != "header"
+            or header.get("format") != _HEADER_FORMAT_V3):
+        raise ValueError(f"{path} 首行非 {_HEADER_FORMAT_V3} header（不猜）")
+    names = header["feature_names"]
+    rows = []
+    for row in lines[1:]:
+        features = row["features"]
+        if len(features) != len(names):
+            raise ValueError(
+                f"数据行 features 宽度 {len(features)} 与 header 名数 "
+                f"{len(names)} 不符（不猜）")
+        rows.append({**row, "features": dict(zip(names, features, strict=True))})
+    return tuple(names), rows
+
+
 def run_collect_pool(pool_path: str | Path, db_path: str | Path,
                      games_per_pair: int, seed_start: int,
                      out_dir: str | Path, *, workers: int = 1,
-                     cards_dir: str | Path = "cards") -> tuple[list[PairCollectSummary], list[str]]:
+                     cards_dir: str | Path = "cards",
+                     feature_set: str = "v1",
+                     card_vocab: tuple[str, ...] | None = None
+                     ) -> tuple[list[PairCollectSummary], list[str]]:
     """卡池装载（tune.fitness.prepare_pairs 复用）+ run_collect 一步走（CLI 入口用）。
 
-    返回 (各配对汇总, 装载告警列表)。
+    task 155 WP2：feature_set/card_vocab 透传 run_collect（v3 词表由 CLI 侧
+    ``build_card_vocab`` 算好传入，保多进程确定性）。返回 (各配对汇总, 装载告警列表)。
     """
     from battlefrontier.data.pool import load_target_pool
 
+    _validate_feature_set(feature_set, card_vocab)
     pool = load_target_pool(pool_path)
     prepared = prepare_pairs(pool_assignments(pool), str(db_path), cards_dir)
     warnings = [f"[{p.assignment.archetype_a}×{p.assignment.archetype_b}] {w}"
                 for p in prepared for w in p.warnings]
     summaries = run_collect(prepared, games_per_pair, seed_start, out_dir,
-                            workers=workers)
+                            workers=workers, feature_set=feature_set,
+                            card_vocab=card_vocab)
     return summaries, warnings

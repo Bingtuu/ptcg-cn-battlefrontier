@@ -5,11 +5,12 @@
 
 ## 当前
 
-**当前焦点 = task 150 v2.x 评估器重训判读 FAIL（2026-11-18）——BC 开工门未过线，按预注册条款转 Owner 停损评审**（dig `docs/digs/2026-11-18-t150-eval-v2x-retrain.md`）。
+**当前焦点 = task 155 评估器特征 v3 判读 FAIL（2026-11-19）——v2.x AUC 0.7571 < 0.90 主门，task 150 门仍未过，转 Owner 停损评审**（dig `docs/digs/2026-11-19-t155-eval-feature-v3.md`）。
 
-- **判读**：eval-linear-v2（v2.x 池 54,000 局 / 407 万行重训，训练健康 λ=100 / 验证 MSE 0.1995 vs 基线 0.2500）在 t145 同款探针 v2.x 对决 AUC = **0.6743**（门 0.90 → FAIL）；对照臂：v1 资产 0.6755（task 145 复现）、v2 资产 v1 对决 0.9659。**in-distribution 重训零提升 → 归因 = 30 维特征层对 v2.x 新机制失明**（非数据分布；设计段归因推断句被实验否定，已如实记录）。
-- **Owner 裁决项（三选，dig §处置）**：A 特征 v3 扩维立项（task 062 policy-v2 思路移植评估器，建议）→ 重训重判；B 教师去评估器化（不推荐）；C M16 延期。task 151/152 维持冻结至本门过线（或 Owner 选 B/C 解除）。
-- 资产 `models/eval-linear-v2.json` 如实入库（未过线但健康；v1 资产不动，v2.x 底板两资产均不可用、v1 底板继续 v1）。复放：collect-features → train-eval → `.kimi-code/t150_eval_gate.py`。
+- **判读**：eval-linear-v3（560 维 = 36 基座 + 4 区 × 131 词卡身份；54,000 局 / 4,073,978 行 / λ=10000 顶候选上限 / 验证 MSE 0.1758 vs 基线 0.2500）冻结探针 v2.x 对决 AUC = **0.7571**（0.6743 → +0.083，方向证实 task 150 特征层归因，距 0.90 门仍 0.14）；v1 对决对照臂不可比（v3 词表锚定 v2.x，跨池卡名按不猜纪律拦截，如实记录）。
+- **过程债修复（产线级）**：采集主进程全批结果累积顶穿内存（v3 行 ~20KB 对象 × 400 万行）→ 流式落盘 `58dfe5c` + worker 回收 `maxtasksperchild=500`；正式产线须 `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1`（worker 传递性载 numpy+OpenBLAS，默认 22 BLAS 线程 × 16 workers 顶穿 51GB 提交额度）。第六次采集 24.6 min 零失败。
+- **Owner 裁决项（三选，dig §判据）**：A' 非线性评估器（GBDT/小 MLP，线性天花板 0.7571 暗示交互项缺失）；B 教师去评估器化（task 150 dig 既有）；C M16 延期。task 151/152 维持冻结。
+- 资产 `models/eval-linear-v3.json` 如实入库（健康、相对 v2 +0.083 AUC，v2.x 底板未过门）；v1/v2 资产保持可装载。
 - 上一焦点 = task 149 吞吐 spike 判决 R2 可行（`8850891`）：5.2M 局/天 + 7.4 亿决策点/天（门槛 17×/245×），Rust spike 不立项，M16 kill 吞吐项解除。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：

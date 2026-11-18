@@ -1,6 +1,6 @@
 # task 155 · 评估器特征 v3（BC 开工门修复候选，v0.6 新增）
 
-- 状态：**进行中（2026-11-18 立项，Owner 裁决 task 150 停损评审选项 A）**
+- 状态：**已收官（2026-11-19）——主门 FAIL（v2.x AUC 0.7571 < 0.90），按预注册条款转 Owner 停损评审**；dig：`docs/digs/2026-11-19-t155-eval-feature-v3.md`
 - 关联：四期 PRD §4 v0.6 修订（task 155）；task 150（FAIL 归因 = 特征层失明，dig：`docs/digs/2026-11-18-t150-eval-v2x-retrain.md`）；task 062（policy-v2 +112 维卡身份特征把 use_ability 从 0.009% 救到 20.9%——本任务移植思路）；task 145/t150（探针协议与冻结 gate 脚本 `.kimi-code/t150_eval_gate.py`）；D-062-1（不动钉死清单、独立成册先例）
 
 ## 目标
@@ -40,4 +40,10 @@ task 150 已干净归因：v2.x 对决 AUC 0.6743 ≈ v1 资产 0.6755（in-dist
 
 ## 结果与遗留
 
-（待填）
+**判读（2026-11-19）**：eval-linear-v3（560 维 / 54,000 局 / 4,073,978 行 / λ=10000 顶候选上限 / 验证 MSE 0.1758 vs 基线 0.249985）冻结探针 v2.x 对决 AUC = **0.7571**（门 0.90 → FAIL；0.6743 → +0.083 方向证实特征层归因）。v1 对决对照臂不可比：v3 词表锚定 v2.x，v1 池卡名（'博士的研究'）触发词表外 ValueError（不猜纪律按设计拦截跨池预测；冻结脚本无防护，对照臂崩溃告终，如实记录）。
+
+**采集根因链（5 败 1 成）**：①+③ 全批结果主进程累积 ≈ 80GB → worker MemoryError（`concurrent send_bytes` 为清理期次生噪音）→ 流式落盘 `58dfe5c`；④ `_handle_results` 线程 MemoryError 静默死亡挂死 2h → `maxtasksperchild=500` 棘轮定界；⑤ OpenBLAS 默认 22 线程 × 16 workers 顶穿 51GB 提交额度 → `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1` + workers 12；⑥ 成功 24.6 min 零失败，行数与 task 150 v1 数据逐一相等（同局流铁证）。全程落 dig。
+
+**FAIL 处置（预注册条款）**：回 Owner 停损评审（决策输入：A' 非线性评估器 / B 教师去评估器化 / C 延期）；task 151/152 维持冻结；v1/v2/v3 三资产并存可装载（v1 底板继续 v1 资产；v3 相对 v2 +0.083 AUC 但 v2.x 底板未过门）。
+
+**遗留 Minor（复核记录，不阻塞）**：词表重名装载期不拦 / zones 查重 / feature_vector_v3 每调用 O(词表)（lru_cache 候选）/ train_v3 docstring 内存上界措辞 / 跨文件同局序无校验（生产不触发）/ pending_pool 身份盲区（v4 第一个候选增量）/ read_collect_v3 整读（训练侧已自建流式，无消费方）。

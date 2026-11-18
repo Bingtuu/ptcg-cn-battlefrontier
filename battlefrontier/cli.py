@@ -734,7 +734,12 @@ def _cmd_train_eval(args: argparse.Namespace) -> int:
 
     死维度警戒（设计文档 §5）：验证集 MSE 不优于常数基线 → 退出码 2（模型照常产出，
     如实落账不强行失败）；数据错误 → 退出码 1。
+    task 155 WP3：--feature-set v3 分派 learn.train_v3（分块两遍流式，λ 候选六档）；
+    缺省 v1 现状逐位不变。互斥校验（不猜）：v1 拒绝 v3 数据、v3 拒绝 v1 数据，
+    均显式 ValueError → 退出码 1。
     """
+    if args.feature_set == "v3":
+        return _cmd_train_eval_v3(args)
     from battlefrontier.learn import (
         DEFAULT_SPLIT_SEED,
         DEFAULT_SUBSAMPLE_SEED,
@@ -767,6 +772,55 @@ def _cmd_train_eval(args: argparse.Namespace) -> int:
           f"（种子区间 {m['seed_min']}..{m['seed_max']}，split_seed {m['split_seed']}，"
           f"训练 {m['train_games']} 局 / 验证 {m['val_games']} 局）")
     print(f"λ = {m['lambda']}（候选 {{0.1, 1, 10, 100}} 按验证集 MSE 选定）；"
+          f"训练 MSE {m['train_mse']:.6f} / 验证 MSE {m['val_mse']:.6f} / "
+          f"常数基线 MSE {m['baseline_mse']:.6f}")
+    print(f"模型资产: {args.out}")
+    if m["warning"]:
+        print(f"[死维度警戒] {m['warning']}")
+        return 2
+    return 0
+
+
+def _cmd_train_eval_v3(args: argparse.Namespace) -> int:
+    """task 155 WP3：v3 采集产物 → 分块两遍流式岭回归训练 → bf-linear-eval-v3 资产。
+
+    口径与 v1 逐字段对齐（按局划分 / split_seed / 按局抽样 / 死维度警戒），
+    λ 候选六档 {0.1, 1, 10, 100, 1000, 10000}（预注册：维数 30→560 改变
+    XᵀX 尺度）；退出码同 v1（数据错误 1 / 死维度警戒 2）。
+    """
+    from battlefrontier.learn import (
+        DEFAULT_SPLIT_SEED,
+        DEFAULT_SUBSAMPLE_SEED,
+        LAMBDAS_V3,
+        MODEL_FORMAT_V3,
+        save_model,
+        train_model_v3,
+    )
+
+    try:
+        model = train_model_v3(
+            args.data,
+            split_seed=args.split_seed if args.split_seed is not None
+            else DEFAULT_SPLIT_SEED,
+            code_version=args.code_version or _code_version(),
+            pool=args.pool,
+            max_rows_per_game=args.max_rows_per_game,
+            subsample_seed=args.subsample_seed if args.subsample_seed is not None
+            else DEFAULT_SUBSAMPLE_SEED)
+    except (ValueError, OSError) as e:
+        print(f"错误：{e}")
+        return 1
+    save_model(model, args.out, model_format=MODEL_FORMAT_V3)
+    m = model.meta
+    sample_note = (f"，按局抽样 ≤{m['max_rows_per_game']} 行（subsample_seed "
+                   f"{m['subsample_seed']}）" if m["max_rows_per_game"] is not None
+                   else "")
+    print(f"训练完成（feature_set v3，词表 {len(m['card_vocab'])} 词 / 区 "
+          f"{'、'.join(m['zones'])}）：{m['rows']} 行（总 {m['rows_total']} 行"
+          f"{sample_note}）/ {m['games']} 局 / {m['pairs']} 配对"
+          f"（种子区间 {m['seed_min']}..{m['seed_max']}，split_seed {m['split_seed']}，"
+          f"训练 {m['train_games']} 局 / 验证 {m['val_games']} 局）")
+    print(f"λ = {m['lambda']}（候选 {set(LAMBDAS_V3)} 按验证集 MSE 选定，并列取小 λ）；"
           f"训练 MSE {m['train_mse']:.6f} / 验证 MSE {m['val_mse']:.6f} / "
           f"常数基线 MSE {m['baseline_mse']:.6f}")
     print(f"模型资产: {args.out}")
@@ -1266,6 +1320,11 @@ def main(argv: list[str] | None = None) -> int:
                       help="按局抽样种子（缺省钉死 20261017，写进 meta）")
     te_p.add_argument("--code-version", default=None,
                       help="代码版本 meta 覆盖（缺省取 git short sha；测试注入用）")
+    te_p.add_argument("--feature-set", choices=["v1", "v3"], default="v1",
+                      help="特征集（task 155 WP3）：v3 = v3 采集产物（bf-collect-v3 "
+                           "header + 位置行）走分块两遍流式训练，λ 候选六档，资产 "
+                           "bf-linear-eval-v3；缺省 v1 不变。两者互斥（v1 拒 v3 "
+                           "数据、v3 拒 v1 数据，显式报错）")
     tp_p = sub.add_parser(
         "train-policy",
         help="M12 WP2（task 058，D-M12-3/4）：collect-snapshots 产物蒸馏训练策略打分机"

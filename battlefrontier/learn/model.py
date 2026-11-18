@@ -20,9 +20,13 @@ from pathlib import Path
 from battlefrontier.agent.features import FEATURE_NAMES, feature_vector
 from battlefrontier.engine.state import VisibleGameState
 
-__all__ = ["MODEL_FORMAT", "LinearModel", "load_model", "predict", "save_model"]
+__all__ = ["MODEL_FORMAT", "MODEL_FORMAT_V3", "LinearModel", "load_model",
+           "predict", "save_model"]
 
 MODEL_FORMAT = "bf-linear-eval-v1"
+# task 155 WP3：v3 训练产物 format（装载/预测分派在 WP4 才接——load_model 现状
+# 只认 v1，本常量当前仅供 save_model 写盘与 meta 锚点）。
+MODEL_FORMAT_V3 = "bf-linear-eval-v3"
 
 
 @dataclass(frozen=True)
@@ -36,10 +40,15 @@ class LinearModel:
     meta: dict
 
 
-def save_model(model: LinearModel, path: str | Path) -> None:
-    """模型资产落盘（UTF-8 / ensure_ascii=False / indent=2 / sort_keys，位级确定）。"""
+def save_model(model: LinearModel, path: str | Path, *,
+               model_format: str = MODEL_FORMAT) -> None:
+    """模型资产落盘（UTF-8 / ensure_ascii=False / indent=2 / sort_keys，位级确定）。
+
+    task 155 WP3：``model_format`` 可覆盖 format 字段（v3 产物写
+    ``MODEL_FORMAT_V3``——装载分派在 WP4）；缺省 = v1 旧行为逐位不变。
+    """
     payload = {
-        "format": MODEL_FORMAT,
+        "format": model_format,
         "feature_names": list(model.feature_names),
         "weights": list(model.weights),
         "standardize": {"mean": list(model.mean), "std": list(model.std)},

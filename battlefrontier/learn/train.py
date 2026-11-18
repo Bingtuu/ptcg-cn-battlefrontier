@@ -39,6 +39,9 @@ __all__ = [
     "train_model",
 ]
 
+# task 155 WP3：train_v3 流式复用的共用核心（划分/抽样语义单一来源）。
+__all__ += ["_split_train_ids", "_subsample_pick_indices"]
+
 LAMBDAS: tuple[float, ...] = (0.1, 1.0, 10.0, 100.0)
 TRAIN_RATIO = 0.8
 DEFAULT_SPLIT_SEED = 20261016
@@ -48,6 +51,9 @@ _REQUIRED_KEYS = {"pair_index", "seed", "features", "label"}
 
 
 def _validate_row(row: dict, source: str) -> None:
+    if row.get("type") == "header":
+        raise ValueError(f"{source}：v3 采集数据（bf-collect-v3 header 行）请用 "
+                         "train-eval --feature-set v3 训练（v1 拒绝 v3 数据，不猜）")
     missing = _REQUIRED_KEYS - row.keys()
     if missing:
         raise ValueError(f"{source}：数据行缺字段 {sorted(missing)}（不猜）")
@@ -83,19 +89,42 @@ def load_dataset(data_dir: str | Path) -> list[dict]:
     return rows
 
 
-def split_by_game(rows: list[dict], split_seed: int = DEFAULT_SPLIT_SEED,
-                  train_ratio: float = TRAIN_RATIO) -> tuple[list[dict], list[dict]]:
-    """按局 (pair_index, seed) 80/20 划分；同局样本不跨集。返回 (训练, 验证)。"""
-    game_ids = sorted({(r["pair_index"], r["seed"]) for r in rows})
+def _split_train_ids(
+        game_ids: list[tuple[int, int]], split_seed: int = DEFAULT_SPLIT_SEED,
+        train_ratio: float = TRAIN_RATIO) -> set[tuple[int, int]]:
+    """有序局 id 列表 → 训练局 id 集合（split_by_game 与 train_v3 流式共用核心，
+    划分语义单一来源；task 155 WP3）。"""
     if len(game_ids) < 2:
         raise ValueError(f"局数不足（{len(game_ids)} < 2）无法划分训练/验证集")
     shuffled = list(game_ids)
     random.Random(split_seed).shuffle(shuffled)
     n_train = max(1, min(len(game_ids) - 1, int(len(game_ids) * train_ratio)))
-    train_ids = set(shuffled[:n_train])
+    return set(shuffled[:n_train])
+
+
+def split_by_game(rows: list[dict], split_seed: int = DEFAULT_SPLIT_SEED,
+                  train_ratio: float = TRAIN_RATIO) -> tuple[list[dict], list[dict]]:
+    """按局 (pair_index, seed) 80/20 划分；同局样本不跨集。返回 (训练, 验证)。"""
+    game_ids = sorted({(r["pair_index"], r["seed"]) for r in rows})
+    train_ids = _split_train_ids(game_ids, split_seed, train_ratio)
     train = [r for r in rows if (r["pair_index"], r["seed"]) in train_ids]
     val = [r for r in rows if (r["pair_index"], r["seed"]) not in train_ids]
     return train, val
+
+
+def _subsample_pick_indices(n: int, pair_index: int, seed: int,
+                            max_rows_per_game: int,
+                            subsample_seed: int) -> list[int]:
+    """单局行索引选取（subsample_rows 与 train_v3 流式共用核心，抽样语义单一
+    来源；task 155 WP3）：n ≤ max 全留（原序 0..n-1）；否则
+    ``random.Random(pair_index×1_000_000+seed+subsample_seed)`` 对 range(n)
+    抽 max 个、升序返回。"""
+    if max_rows_per_game < 1:
+        raise ValueError(f"max_rows_per_game 须 ≥ 1：{max_rows_per_game}（不猜）")
+    if n <= max_rows_per_game:
+        return list(range(n))
+    rng = random.Random(pair_index * 1_000_000 + seed + subsample_seed)
+    return sorted(rng.sample(range(n), max_rows_per_game))
 
 
 def subsample_rows(rows: list[dict], max_rows_per_game: int,
@@ -103,7 +132,7 @@ def subsample_rows(rows: list[dict], max_rows_per_game: int,
     """按局行数上限确定性抽样：每局至多 N 行，选取后保文件内原顺序。
 
     行数 ≤ N 的局全留；否则 ``random.Random(pair_index×1_000_000 + seed +
-    subsample_seed)`` 对行索引 ``sorted(rng.sample(range(n), N))`` 选取。
+    subsample_seed)`` 对行索引选取（``_subsample_pick_indices``）。
     局集合不丢（每局至少抽到 min(n, N) ≥ 1 行）。
     """
     if max_rows_per_game < 1:
@@ -113,12 +142,8 @@ def subsample_rows(rows: list[dict], max_rows_per_game: int,
         groups.setdefault((r["pair_index"], r["seed"]), []).append(r)
     out: list[dict] = []
     for (pair_index, seed), game_rows in groups.items():
-        n = len(game_rows)
-        if n <= max_rows_per_game:
-            out.extend(game_rows)
-            continue
-        rng = random.Random(pair_index * 1_000_000 + seed + subsample_seed)
-        picked = sorted(rng.sample(range(n), max_rows_per_game))
+        picked = _subsample_pick_indices(len(game_rows), pair_index, seed,
+                                         max_rows_per_game, subsample_seed)
         out.extend(game_rows[i] for i in picked)
     return out
 

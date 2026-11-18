@@ -5,12 +5,12 @@
 
 ## 当前
 
-**当前焦点 = task 127 Elo 联赛基础设施开发段交付（2026-11-18，BC 路线 P0 首个开工项按 PRD v0.5 重新激活后 TDD 收官，待全量绿后归档）。**
+**当前焦点 = task 149 吞吐 spike 收官：判决 R2 可行——M16 保持 Python 架构，R1/Rust spike 不立项（2026-11-18；dig `docs/digs/2026-11-18-t149-throughput-spike.md`）。**
 
-- **交付**：`bfsim league <registry.yml> --results db [--workers N]`（跑+报一体）+ `--report <league名>` 纯报告模式；注册表 yml 钉死规模（agents × decks × games_per_cell，白名单校验复用 AgentCfg）；CRN 双向配对（同无序对 ab/ba 共享种子区间、卡组 mirror）；**BT-MLE 评级主估计子**（task 148 教训：禁固定大步长顺序 Elo）；成对矩阵 + meta 回显 + 限定语头注；细胞全量复用 execute_experiment（并串一致/增量落库纪律继承）。31 新测含评级解析锚（双人 ln(s/(n−s)) 精确复现）+ 双跑/并串逐局一致硬验收；既有行为零变化（纯新增 runner/report/CLI 层）。
-- 产物：冒烟注册表 `experiments/league-smoke.example.yml`（启发式基线 vs MCTS 2×50 教师 × 沙奈朵/多龙黑夜 2 deck）。
-- 下一步（排程序，PRD v0.5）：task 149 吞吐 spike → task 150 v2.x 评估器重训（BC 开工门）→ task 151 飞轮 → task 152 BC+RL；task 154 v3 池评估并行线（12 月初窗）。
-- **v0.5 三处置（上一焦点）**：① task 127 重新激活为 M16 评估面前置（不挂 M15 gate）；② 新增 BC 开工门 task 150（v2.x 评估器重训 AUC ≥ 0.90 预注册线），151/152 不得在其前开工；③ 提升门基线修订 = 纯 MCTS 2×50 教师中位 Elo。
+- **实测**（预注册判定门 ≥3M 决策点/天 且 ≥300k 局/天）：heuristic × 沙奈朵 711854 真实卡表 mirror（400 局 × 16 workers）= 60.4 局/s → **5,215,360 局/天**（17×）+ 141.4 决策点/局（串行采样精确计数）→ **7.37 亿决策点/天**（245×）→ decide_r2 = "r2"；policy 前向微基准 3.5 µs/打分/核（开销可忽略，引擎 step 主导）。
+- **处置**：M16 kill criteria 吞吐项解除；**BC 路线剩余 gate = task 150（v2.x 评估器重训 AUC ≥ 0.90）**——排程序下一项。distilled v2 词表锚定 v1 池（「轻飘飘 不在词表」装载即报错）在本 spike 再确认一次，归 task 150 供给面。
+- 探针：`bfsim probe-throughput`（9 新测，decide_r2 三态分支全覆盖）；零行为变更（纯测量，落临时库）。
+- 上一焦点 = task 127 Elo 联赛基础设施收官（`762eff4`）：注册表钉死规模 + CRN 双向配对 + BT-MLE 评级主估计子（task 148 教训）+ `bfsim league` 跑报一体；31 新测 + 全量 2017 绿。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：
 

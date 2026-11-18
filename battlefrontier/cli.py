@@ -61,6 +61,47 @@ def _cmd_check_deck(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_probe_throughput(args: argparse.Namespace) -> int:
+    """task 149：吞吐决策点 spike 探针（BC 训练最低需求 vs R2 实测产能）。
+
+    默认 stub 卡组零 db 冒烟；--deck-id 走真实装配（真实卡表口径）。
+    判定门槛预注册冻结（task 149 设计段）。
+    """
+    import tempfile
+
+    from battlefrontier.runner.throughput import (
+        BC_REQUIREMENT,
+        decide_r2,
+        format_probe,
+        probe_throughput,
+        stub_prep,
+    )
+
+    if args.deck_id:
+        from battlefrontier.runner.experiment import prepare_experiment
+        from battlefrontier.runner.throughput import probe_defn as _probe_defn
+        defn = _probe_defn(args.agent, games=args.games, seed_start=args.seed_start,
+                           policy_path=args.policy, deck_id=args.deck_id)
+        prep = prepare_experiment(defn, args.db or load_db_path())
+    else:
+        prep = stub_prep()
+    with tempfile.TemporaryDirectory() as td:
+        try:
+            result = probe_throughput(
+                args.agent, games=args.games, workers=args.workers,
+                seed_start=args.seed_start, prep=prep,
+                results_path=Path(td) / "probe.db", policy_path=args.policy)
+        except ValueError as e:
+            print(f"[probe 失败] {e}")
+            return 1
+    decision = decide_r2(result, BC_REQUIREMENT)
+    print(format_probe(result, decision))
+    if args.net_forward and args.policy:
+        from battlefrontier.runner.throughput import net_forward_probe
+        print(net_forward_probe(args.policy, n=args.net_forward))
+    return 0
+
+
 def _cmd_league(args: argparse.Namespace) -> int:
     """task 127：agent 种群联赛（BC 路线评估面前置）。
 
@@ -1024,6 +1065,20 @@ def main(argv: list[str] | None = None) -> int:
                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     lg_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
     lg_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
+    pt_p = sub.add_parser("probe-throughput",
+                          help="吞吐决策点 spike 探针（task 149）：BC 需求 vs R2 实测产能")
+    pt_p.add_argument("--agent", choices=["heuristic", "random", "distilled"],
+                      default="heuristic", help="对局 agent 类型（默认 heuristic）")
+    pt_p.add_argument("--games", type=int, default=200, help="计时局数（默认 200）")
+    pt_p.add_argument("--workers", type=int, default=16, help="并行 worker 数（默认 16）")
+    pt_p.add_argument("--seed-start", type=int, default=900000, help="种子起点")
+    pt_p.add_argument("--policy", default=None, help="distilled 资产路径（distilled 必填）")
+    pt_p.add_argument("--deck-id", default=None,
+                      help="真实卡组 deck_id（缺省 = 内置 stub 冒烟口径）")
+    pt_p.add_argument("--db", default=None,
+                      help="ptcg-cn.db 路径（--deck-id 真实装配时必需；缺省读 local.yml）")
+    pt_p.add_argument("--net-forward", type=int, default=0, metavar="N",
+                      help="附测 policy 纯 numpy 前向微基准 N 次（需 --policy）")
     ss_p = sub.add_parser("swap-search",
                           help="换卡搜索器（task 130）：单卡替换扫描 + 筛选→确认两阶段 + 排序输出")
     ss_p.add_argument("--deck", required=True, help="被优化卡组 deck_id（换出侧）")
@@ -1270,6 +1325,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_check_deck(args)
     if args.cmd == "league":
         return _cmd_league(args)
+    if args.cmd == "probe-throughput":
+        return _cmd_probe_throughput(args)
     if args.cmd == "swap-search":
         return _cmd_swap_search(args)
     if args.cmd == "field-pick":

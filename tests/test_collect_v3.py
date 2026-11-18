@@ -25,6 +25,7 @@ from battlefrontier.cli import main as cli_main
 from battlefrontier.engine.actions import Action
 from battlefrontier.runner.collect import (
     _run_one_collect,
+    pair_filename,
     read_collect_v3,
     run_collect,
 )
@@ -293,3 +294,55 @@ def test_cli_collect_features_v3端到端(tmp_path, capsys):
     assert total > 0
     printed = capsys.readouterr().out
     assert str(len(vocab)) in printed and vocab[0] in printed
+
+
+# ── task 155 流式落盘修订（主进程内存修复）────────────────────
+
+
+@pytest.mark.parametrize("feature_set", ["v1", "v3"])
+def test_run_collect_中途异常_已完成配对行已落盘(tmp_path, monkeypatch,
+                                                   feature_set):
+    """task 155 流式修订回归锚：worker 中途抛错时，先前完成局已逐条落盘
+    （旧累积版全批结束才写文件——中途异常不落任何字节）。
+
+    根因：v3 行 ≈ 20KB Python 对象内存/行，全批 ~400 万行主进程累积 ≈
+    80GB 量级 → worker MemoryError（results/t155-collect.log 两次实证，
+    清理期 terminate 竞态的 concurrent send_bytes 为次生噪音）。
+    """
+    prepared = [_stub_pair(0), _stub_pair(1)]
+    vocab = _STUB_VOCAB if feature_set == "v3" else None
+    names = eval_v3_names(vocab) if vocab is not None else FEATURE_NAMES
+
+    def _row(seed: int, pair_index: int) -> dict:
+        feats = ([0.0] * len(names) if feature_set == "v3"
+                 else {n: 0.0 for n in names})
+        return {"turn": 1, "player": 0, "features": feats,
+                "action": {"kind": "end_turn", "iid": None, "bench_index": None,
+                           "attack_index": None, "target_iid": None,
+                           "choices": []},
+                "label": 1.0, "seed": seed, "pair_index": pair_index}
+
+    def _stub(payload: dict):
+        if payload["seed"] == 310002:  # pair 1 首局：模拟 worker 中途崩溃
+            raise RuntimeError("模拟 worker 中途崩溃")
+        return (payload["seed"], payload["pair_index"],
+                [_row(payload["seed"], payload["pair_index"])], None)
+
+    monkeypatch.setattr("battlefrontier.runner.collect._run_one_collect", _stub)
+    kwargs = {"feature_set": feature_set}
+    if vocab is not None:
+        kwargs["card_vocab"] = vocab
+    with pytest.raises(RuntimeError, match="模拟"):
+        run_collect(prepared, games_per_pair=2, seed_start=310000,
+                    out_dir=tmp_path, workers=1, **kwargs)
+    # pair 0 两局在抛错前已回收 → 行已落盘；pair 1 首局即抛错 → 仅 header/空文件
+    lines0 = (tmp_path / pair_filename(0, "测试A0", "测试B0")).read_text(
+        encoding="utf-8").splitlines()
+    lines1 = (tmp_path / pair_filename(1, "测试A1", "测试B1")).read_text(
+        encoding="utf-8").splitlines()
+    if feature_set == "v3":
+        assert json.loads(lines0[0])["format"] == "bf-collect-v3"
+        assert json.loads(lines1[0])["format"] == "bf-collect-v3"
+        lines0, lines1 = lines0[1:], lines1[1:]
+    assert {json.loads(ln)["seed"] for ln in lines0} == {310000, 310001}
+    assert lines1 == []

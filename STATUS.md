@@ -5,12 +5,11 @@
 
 ## 当前
 
-**当前焦点 = task 155 评估器特征 v3 判读 FAIL（2026-11-19）——v2.x AUC 0.7571 < 0.90 主门，task 150 门仍未过，转 Owner 停损评审**（dig `docs/digs/2026-11-19-t155-eval-feature-v3.md`）。
+**当前焦点 = task 155a 天花板 spike 判决 gate_recalibration（2026-11-20）——线性 ≈ 非线性（0.7874 vs 0.7867），0.90 门实证为 v1 时代尺子，待 Owner 拍 gate 修订**（dig `docs/digs/2026-11-20-t155a-nl-eval-spike.md`）。
 
-- **判读**：eval-linear-v3（560 维 = 36 基座 + 4 区 × 131 词卡身份；54,000 局 / 4,073,978 行 / λ=10000 顶候选上限 / 验证 MSE 0.1758 vs 基线 0.2500）冻结探针 v2.x 对决 AUC = **0.7571**（0.6743 → +0.083，方向证实 task 150 特征层归因，距 0.90 门仍 0.14）；v1 对决对照臂不可比（v3 词表锚定 v2.x，跨池卡名按不猜纪律拦截，如实记录）。
-- **过程债修复（产线级）**：采集主进程全批结果累积顶穿内存（v3 行 ~20KB 对象 × 400 万行）→ 流式落盘 `58dfe5c` + worker 回收 `maxtasksperchild=500`；正式产线须 `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1`（worker 传递性载 numpy+OpenBLAS，默认 22 BLAS 线程 × 16 workers 顶穿 51GB 提交额度）。第六次采集 24.6 min 零失败。
-- **Owner 裁决项（三选，dig §判据）**：A' 非线性评估器（GBDT/小 MLP，线性天花板 0.7571 暗示交互项缺失）；B 教师去评估器化（task 150 dig 既有）；C M16 延期。task 151/152 维持冻结。
-- 资产 `models/eval-linear-v3.json` 如实入库（健康、相对 v2 +0.083 AUC，v2.x 底板未过门）；v1/v2 资产保持可装载。
+- **判决**：MLP（torch 560→128→64，复用 task 155 数据零新采集）60 局 v2.x 探针 AUC 0.7867；ridge v3 同探针 0.7874 逐位打平 → 模型类不是瓶颈，560 维特征集天花板 ≈ 0.79（不可约随机性：牌库顺序/对手手牌）。预注册规则触发 gate 校准修订案。
+- **Owner 待拍**：gate 主门从「绝对 AUC ≥ 0.90」修订为「≥ 天花板参考 MLP 的 95% + Δ≥+0.05 vs 30 维基线」——按此口径 ridge v3（0.7874 ≈ 99.9% 天花板，Δ=+0.11）立即过门，task 151/152（BC 飞轮/BC+RL）解冻。备选：降档绝对判据（≥0.75）。
+- **task 155 过程资产**：采集产线三次内存修复（流式落盘 + worker 回收 + OpenBLAS 单线程定界）已落 CHANGELOG；`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1` 为大规模采集必需环境（worker 传递性载 numpy+OpenBLAS）。
 - 上一焦点 = task 149 吞吐 spike 判决 R2 可行（`8850891`）：5.2M 局/天 + 7.4 亿决策点/天（门槛 17×/245×），Rust spike 不立项，M16 kill 吞吐项解除。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：

@@ -4,6 +4,8 @@
   （deck_a/deck_b/card_effects/seed/pair_index/teacher params）→ play_game
   （双侧 MCTSAgent 教师 + SnapshotCollector）→ (seed, pair_index, rows, error)；
   失败局 rows=None + 错误文本（对齐 runner/collect 失败局口径：剔除、计数上报）。
+  payload 带 ``mix: true`` 时切混编种群（task 151）：(seed−对种子起点)%2 交替
+  指派 {MCTS, Heuristic}，行级 ``agent`` 标签、启发式侧经 record_players 入流。
 - **批量驱动** ``run_collect_snapshots``：配对装载复用 tune.fitness.prepare_pairs
   + runner.collect.pool_assignments；种子协议 = matrix 惯例（pair i →
   [seed_start + i×games_per_pair, +games_per_pair)）；spawn 多进程 imap 保序
@@ -26,6 +28,7 @@ import multiprocessing as mp
 from dataclasses import dataclass
 from pathlib import Path
 
+from battlefrontier.agent.heuristic import HeuristicAgent
 from battlefrontier.agent.mcts import MCTSAgent
 from battlefrontier.agent.snapshot import SnapshotCollector
 from battlefrontier.data.pool import TargetPool
@@ -35,6 +38,7 @@ from battlefrontier.engine.actions import Action
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import CardDef, GameState
 from battlefrontier.runner.collect import (
+    MAXTASKS_PER_CHILD,
     PairCollectSummary,
     collect_seed_range,
     pair_filename,
@@ -61,13 +65,13 @@ SNAPSHOT_FORMAT = "bf-m11-snapshot-v1"
 
 def snapshot_header(
     pp: PreparedPair, *, games_per_pair: int, seed_start: int,
-    teacher: dict[str, int],
+    teacher: dict, mix: bool = False,
 ) -> dict:
     """快照文件首行（record=header）：配对 / 种子区间 / 卡组 / card_effects /
-    教师预算——评估侧自包含重建引擎与 DSL 库（无需 db）。"""
+    教师预算——评估侧自包含重建引擎与 DSL 库（无需 db）。混编模式附 ``mix``。"""
     a = pp.assignment
     seeds = collect_seed_range(a.index, games_per_pair, seed_start)
-    return {
+    header = {
         "record": "header",
         "format": SNAPSHOT_FORMAT,
         "pair_index": a.index,
@@ -82,6 +86,9 @@ def snapshot_header(
         "card_effects": [d.model_dump(mode="json")
                          for d in _unique_docs(pp.card_effects.values())],
     }
+    if mix:
+        header["mix"] = True
+    return header
 
 
 def teacher_action(row: dict) -> Action:
@@ -129,33 +136,63 @@ def load_snapshot_file(path: str | Path) -> SnapshotFile:
 
 
 def _run_one_snapshot(payload: dict) -> tuple[int, int, list[dict] | None, str | None]:
-    """多进程 worker 入口（模块级函数，可 pickle）。失败局返回错误文本而非抛出。"""
+    """多进程 worker 入口（模块级函数，可 pickle）。失败局返回错误文本而非抛出。
+
+    混编种群（task 151 WP1，预注册冻结）：payload 带 ``mix: true`` 时按
+    ``offset = seed − collect_seed_range(pair_index, games_per_pair,
+    seed_start).start`` 的 %2 交替指派——偶 offset → side0=MCTS / side1=启发式，
+    奇 offset 反之。行级 ``agent`` 标签在 worker 内按行动方 player 与指派比对
+    打标（行内零非确定量纪律）；启发式侧决策点经 SnapshotCollector
+    record_players 入流（无 consideration 不丢点）。
+    """
     try:
         # worker 内重建 CardLibrary（载荷为去重后的文档列表；挂载键 = card_id）
         card_effects = CardLibrary.from_docs(
             ("<worker>", CardEffectDoc.model_validate(d))
             for d in payload["card_effects"])
         t = payload["teacher"]
-        # 教师双方同配置 MCTS（预算 + 截断参数经 payload 透传）；rng 走
-        # seed+offset 独立流（experiment.build_agents 同口径）
-        agents = [
-            MCTSAgent(RandomSource(payload["seed"] + 1_000_001),
-                      card_effects=card_effects, **t),
-            MCTSAgent(RandomSource(payload["seed"] + 2_000_002),
-                      card_effects=card_effects, **t),
-        ]
+        mix = bool(payload.get("mix", False))
+        if mix:
+            # 不猜纪律：混编局 offset 计算所需键缺省显式报错
+            for key in ("games_per_pair", "seed_start"):
+                if key not in payload:
+                    raise ValueError(f"混编 payload 缺键 {key!r}（不猜）")
+            offset = payload["seed"] - collect_seed_range(
+                payload["pair_index"], payload["games_per_pair"],
+                payload["seed_start"]).start
+            mcts_side = 0 if offset % 2 == 0 else 1
+            rng_offset = 1_000_001 if mcts_side == 0 else 2_000_002
+            agents = [None, None]
+            agents[mcts_side] = MCTSAgent(
+                RandomSource(payload["seed"] + rng_offset),
+                card_effects=card_effects, **t)
+            agents[1 - mcts_side] = HeuristicAgent(card_effects=card_effects)
+            collector = SnapshotCollector(record_players={1 - mcts_side})
+        else:
+            # 教师双方同配置 MCTS（预算 + 截断参数经 payload 透传）；rng 走
+            # seed+offset 独立流（experiment.build_agents 同口径）
+            agents = [
+                MCTSAgent(RandomSource(payload["seed"] + 1_000_001),
+                          card_effects=card_effects, **t),
+                MCTSAgent(RandomSource(payload["seed"] + 2_000_002),
+                          card_effects=card_effects, **t),
+            ]
+            collector = SnapshotCollector()
         result = play_game(
             deck_a=[CardDef.model_validate(c) for c in payload["deck_a"]],
             deck_b=[CardDef.model_validate(c) for c in payload["deck_b"]],
             seed=payload["seed"],
             card_effects=card_effects,
             agents=agents,
-            snapshot_collector=SnapshotCollector(),
+            snapshot_collector=collector,
         )
         rows = result.snapshot_rows
         assert rows is not None  # snapshot_collector 非 None 则必有（可能为空列表）
         for row in rows:
             row["seed"] = payload["seed"]
+            if mix:
+                row["agent"] = ("mcts" if row["player"] == mcts_side
+                                else "heuristic")
         return payload["seed"], payload["pair_index"], rows, None
     except Exception as e:  # noqa: BLE001 — 不猜纪律：失败局剔除并计数，不拖垮产线
         return payload["seed"], payload["pair_index"], None, f"{type(e).__name__}: {e}"
@@ -163,13 +200,14 @@ def _run_one_snapshot(payload: dict) -> tuple[int, int, list[dict] | None, str |
 
 def _flush_pair(pp: PreparedPair, out: Path, rows: list[dict], failed: int, *,
                 games_per_pair: int, seed_start: int,
-                teacher: dict[str, int]) -> PairCollectSummary:
+                teacher: dict, mix: bool = False) -> PairCollectSummary:
     """单对完成即写盘（header + 快照行，格式与旧统一写盘逐字节一致）并返回汇总。"""
     a = pp.assignment
     filename = pair_filename(a.index, a.archetype_a, a.archetype_b)
     with TrajectoryWriter(out / filename) as writer:
         writer.append(snapshot_header(pp, games_per_pair=games_per_pair,
-                                      seed_start=seed_start, teacher=teacher))
+                                      seed_start=seed_start, teacher=teacher,
+                                      mix=mix))
         for row in rows:
             writer.append({"record": "snapshot", **row})
     return PairCollectSummary(
@@ -181,13 +219,18 @@ def run_collect_snapshots(
     prepared: list[PreparedPair] | tuple[PreparedPair, ...],
     games_per_pair: int, seed_start: int,
     out_dir: str | Path, *, workers: int = 1,
-    teacher: dict[str, int] | None = None,
+    teacher: dict | None = None,
     pair_start: int = 0,
+    mix: bool = False,
 ) -> list[PairCollectSummary]:
     """配对 × 种子区间教师配置跑局并落快照 JSONL；返回各配对汇总。
 
     teacher = MCTS 预算 dict（worlds/iterations/rollout_turn_cap；默认 2×50，
-    D-M11-5 基准配置）。串行与多进程同走 ``_run_one_snapshot``（imap 保序回收）。
+    D-M11-5 基准配置；evaluator_path / eval_cutoff_turns 提供时经全量键透传
+    入 MCTSAgent）。mix = 混编种群（task 151）：每局 side0/side1 按
+    (seed − 该对种子起点) % 2 交替指派 {MCTS, 启发式}，行级打 agent 标签、
+    header 附 ``mix: true``。串行与多进程同走 ``_run_one_snapshot``（imap
+    保序回收）；spawn Pool 带 maxtasksperchild（task 155 内存棘轮修复锚）。
     **增量落盘**：结果流式回收，某对收满 games_per_pair 局（成功+失败剔除合计）
     即写该对文件并释放其行缓冲——中途 kill 只损失未完成对。
     ``pair_start`` 断点续采：跳过前 N 对（合法区间 [0, len(prepared))，
@@ -209,17 +252,22 @@ def run_collect_snapshots(
         deck_a = [c.model_dump(mode="json") for c in pp.deck_a]
         deck_b = [c.model_dump(mode="json") for c in pp.deck_b]
         for seed in collect_seed_range(pp.assignment.index, games_per_pair, seed_start):
-            payloads.append({"deck_a": deck_a, "deck_b": deck_b,
-                             "card_effects": card_effects,
-                             "seed": seed, "pair_index": pp.assignment.index,
-                             "teacher": teacher})
+            payload = {"deck_a": deck_a, "deck_b": deck_b,
+                       "card_effects": card_effects,
+                       "seed": seed, "pair_index": pp.assignment.index,
+                       "teacher": teacher}
+            if mix:
+                # offset 计算所需键随 payload 下发（worker 内完成指派与打标）
+                payload.update({"mix": True, "games_per_pair": games_per_pair,
+                                "seed_start": seed_start})
+            payloads.append(payload)
 
     prepared_by_index = {pp.assignment.index: pp for pp in prepared}
 
     def _results():
         if workers > 1:
             ctx = mp.get_context("spawn")
-            with ctx.Pool(workers) as pool:
+            with ctx.Pool(workers, maxtasksperchild=MAXTASKS_PER_CHILD) as pool:
                 yield from pool.imap(_run_one_snapshot, payloads)
         else:
             for payload in payloads:
@@ -244,7 +292,7 @@ def run_collect_snapshots(
                 rows_by_pair.pop(pair_index, []),
                 failed_by_pair.pop(pair_index, 0),
                 games_per_pair=games_per_pair, seed_start=seed_start,
-                teacher=teacher))
+                teacher=teacher, mix=mix))
     return summaries
 
 
@@ -253,13 +301,14 @@ def run_collect_snapshots_pool(
     games_per_pair: int, seed_start: int,
     out_dir: str | Path, *, workers: int = 1,
     cards_dir: str | Path = "cards",
-    teacher: dict[str, int] | None = None,
+    teacher: dict | None = None,
     pair_start: int = 0,
+    mix: bool = False,
 ) -> tuple[list[PairCollectSummary], list[str]]:
     """卡池装载（tune.fitness.prepare_pairs 复用）+ run_collect_snapshots 一步走。
 
-    ``pair_start`` 断点续采透传（跳过前 N 对，种子映射不变）。
-    返回 (各配对汇总, 装载告警列表)。CLI 入口用。
+    ``pair_start`` 断点续采透传（跳过前 N 对，种子映射不变）；``mix`` 混编
+    种群透传（task 151）。返回 (各配对汇总, 装载告警列表)。CLI 入口用。
     """
     from battlefrontier.data.pool import load_target_pool
 
@@ -269,5 +318,5 @@ def run_collect_snapshots_pool(
                 for p in prepared for w in p.warnings]
     summaries = run_collect_snapshots(prepared, games_per_pair, seed_start, out_dir,
                                       workers=workers, teacher=teacher,
-                                      pair_start=pair_start)
+                                      pair_start=pair_start, mix=mix)
     return summaries, warnings

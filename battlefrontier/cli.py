@@ -934,12 +934,18 @@ def _cmd_collect_snapshots(args: argparse.Namespace) -> int:
     db_path = args.db or load_db_path()
     teacher = {"worlds": args.worlds, "iterations": args.iterations,
                "rollout_turn_cap": args.rollout_turn_cap}
+    # task 151 WP1：评估器 / 浅截断键仅在提供时注入（缺省 None = 现状零变化；
+    # 与 --mix-population 相互独立，不强制绑定）
+    if args.evaluator_path is not None:
+        teacher["evaluator_path"] = args.evaluator_path
+    if args.eval_cutoff_turns is not None:
+        teacher["eval_cutoff_turns"] = args.eval_cutoff_turns
     try:
         summaries, warnings = run_collect_snapshots_pool(
             args.pool, db_path, games_per_pair=args.games_per_pair,
             seed_start=args.seed_start, out_dir=args.out,
             workers=args.workers, cards_dir=args.cards_dir, teacher=teacher,
-            pair_start=args.pair_start)
+            pair_start=args.pair_start, mix=args.mix_population)
     except (ValueError, OSError) as e:
         print(f"错误：{e}")
         return 1
@@ -953,6 +959,9 @@ def _cmd_collect_snapshots(args: argparse.Namespace) -> int:
     print(f"采集完成：{len(summaries)} 个配对 × {args.games_per_pair} 局（教师 "
           f"{args.worlds}×{args.iterations} cap {args.rollout_turn_cap}），"
           f"共 {total_rows} 快照，失败剔除 {total_failed} 局（目录 {args.out}）")
+    if args.mix_population:
+        print("混编种群：MCTS×Heuristic 按 (seed−对种子起点)%2 交替指派"
+              "（行级 agent 标签，header mix=true）")
     return 0
 
 
@@ -1373,6 +1382,16 @@ def main(argv: list[str] | None = None) -> int:
     cs_p.add_argument("--pair-start", type=int, default=0,
                       help="断点续采：跳过前 N 对（默认 0；种子映射不变，"
                            "续采产物与全量跑同对文件逐字节全等；负数/越界报错）")
+    cs_p.add_argument("--mix-population", action="store_true",
+                      help="task 151 混编种群：每局 side0/side1 按 (seed−对种子"
+                           "起点)%%2 交替指派 {MCTS, 启发式}；行级 agent 标签 + "
+                           "header mix=true（task 152 过滤用；缺省 = 双侧同 MCTS）")
+    cs_p.add_argument("--evaluator-path", default=None,
+                      help="task 151：教师 MCTS evaluator_path（评估器模型资产 "
+                           "JSON；提供时注入 teacher dict，缺省 None = 不注入）")
+    cs_p.add_argument("--eval-cutoff-turns", type=int, default=None,
+                      help="task 151：教师 MCTS rollout 浅截断 K（提供时注入 "
+                           "teacher dict，缺省 None = 不注入；>0 须配评估器）")
     cs_p.add_argument("--db", default=None,
                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
     cs_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")

@@ -190,7 +190,7 @@ def main():
     print(f"[probe] MLP n={len(mlp_samples)} AUC={mlp_auc:.4f}", flush=True)
 
     ridge = load_model(ROOT / "models/eval-linear-v3.json")
-    print(f"[probe] ridge v3 同 60 局…", flush=True)
+    print("[probe] ridge v3 同 60 局…", flush=True)
     ridge_samples = sample_states(lambda v: predict(ridge, v), *MATCHUP, seeds)
     ridge_auc = auc(ridge_samples)
     print(f"[probe] ridge v3 n={len(ridge_samples)} AUC={ridge_auc:.4f}", flush=True)

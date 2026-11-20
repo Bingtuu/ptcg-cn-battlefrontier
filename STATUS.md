@@ -5,11 +5,12 @@
 
 ## 当前
 
-**当前焦点 = task 155a 天花板 spike 判决 gate_recalibration（2026-11-20）——线性 ≈ 非线性（0.7874 vs 0.7867），0.90 门实证为 v1 时代尺子，待 Owner 拍 gate 修订**（dig `docs/digs/2026-11-20-t155a-nl-eval-spike.md`）。
+**当前焦点 = task 150 门修订后 PASS，task 151/152 解冻（2026-11-20，PRD v0.7）——M16 BC 主线（自对弈飞轮 → BC+RL）可开工**（dig `docs/digs/2026-11-20-t155a-nl-eval-spike.md` §门修订判决）。
 
-- **判决**：MLP（torch 560→128→64，复用 task 155 数据零新采集）60 局 v2.x 探针 AUC 0.7867；ridge v3 同探针 0.7874 逐位打平 → 模型类不是瓶颈，560 维特征集天花板 ≈ 0.79（不可约随机性：牌库顺序/对手手牌）。预注册规则触发 gate 校准修订案。
-- **Owner 待拍**：gate 主门从「绝对 AUC ≥ 0.90」修订为「≥ 天花板参考 MLP 的 95% + Δ≥+0.05 vs 30 维基线」——按此口径 ridge v3（0.7874 ≈ 99.9% 天花板，Δ=+0.11）立即过门，task 151/152（BC 飞轮/BC+RL）解冻。备选：降档绝对判据（≥0.75）。
-- **task 155 过程资产**：采集产线三次内存修复（流式落盘 + worker 回收 + OpenBLAS 单线程定界）已落 CHANGELOG；`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1` 为大规模采集必需环境（worker 传递性载 numpy+OpenBLAS）。
+- **门修订**：task 155a 天花板 spike 证 0.90 门 = v1 尺子（560 维特征集天花板 ≈0.79，MLP 0.7867 vs ridge 0.7874 逐位打平，瓶颈 = 不可约随机性非模型类）。Owner 批准修订：同 60 局探针成对判据「≥95% 天花板参考 + Δ≥+0.05 vs 30 维基线」。eval-linear-v3 双条件过（0.7874 / 参考 0.7867 / 基线 0.7111）→ **PASS**。
+- **风险 review 落 dig**（Owner 要求）：天花板绑定 → 重锚协议；抽样宽度 → 90–100% 临界带扩 120 局；参考下界 → 换代重钉；泄漏面 → 种子域不重叠 + 双条件互约束；解冻 ≠ BC 成（净效应归 task 151/152 自身门）。
+- **排程**：task 151（自对弈飞轮）→ task 152（BC+RL）按 PRD v0.5 排程开工；task 153 对手建模可选；task 154 v3 池评估并行线。
+- **task 155 过程资产**：采集产线三次内存修复 + `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1` 定界（大规模采集必需，已落 CHANGELOG）。
 - 上一焦点 = task 149 吞吐 spike 判决 R2 可行（`8850891`）：5.2M 局/天 + 7.4 亿决策点/天（门槛 17×/245×），Rust spike 不立项，M16 kill 吞吐项解除。
 - **t105 哨兵周检（2026-11-17，task 112 值守）**：上游未变（v20261107.4 / data_version 4）→ 普查不变：池内 1,520 局、9/18 对 n≥20、判定池 7 套，仍 WAIT；供给面无新事件。
 - **上一焦点 = task 148 M15 门槛实验 GATE PASS**（详见 `docs/digs/2026-11-16-t148-m15-gate-experiment.md`；估计子修正条款 + task 127 联赛评级禁用大步长顺序 Elo 教训）：

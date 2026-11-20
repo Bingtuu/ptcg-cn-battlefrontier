@@ -25,6 +25,7 @@
 
 ### Changed
 
+- **M16 BC 开工门判据修订（PRD v0.7，2026-11-20 Owner 拍板）**：旧「v2.x 绝对 AUC ≥ 0.90」（v0.5）实证为 v1 尺子——task 155a spike 显示 560 维特征集天花板 ≈0.79（MLP 0.7867 vs ridge 0.7874 逐位打平，瓶颈 = 不可约随机性非模型类）；修订为同 60 局探针成对判据「≥95% 天花板参考 + Δ≥+0.05 vs 30 维基线」，含重锚协议（换代必重跑 spike）/ 临界复判（90–100% 带扩 120 局）/ 种子域不重叠三条款。**判决：eval-linear-v3 双条件过（0.7874 / 参考 0.7867 / 基线 0.7111）→ PASS，task 151/152 解冻**；t150 冻结脚本保留为历史件不再用于门判（探针实现 = t155a spike 的 sample_states/auc）；风险 review 五条款落 dig
 - 镜像局口径 v0.3（task 140，M14 gate review 裁决）：源缺镜像由「自然剔除」改为按 50% 默认计入——自然剔除对高份额构筑系统性不利；`assemble_matrix` 补 source="mirror" 对角格（源提供对角时源数据优先），快照自包含 100 格；复跑 field-pick 与 Owner 手算交叉对上（62.1/58.3/55.1 vs 62/58/55）
 - 卡池 v2.x 定向修订（task 135，依据 task 133 dig 建议档）：6 套高漂移表刷新为近窗（2026-11-01..14）冠军表 + 赛富豪土龙节节第 10 套入池；`config/target-pool.v2.yml` 修订（version 保持 2 + revised_at，task 068 原始锁定段保留为注释事实源）；近窗覆盖 85.25%
 - `format_sensitivity` 末行补 `SIM_INTERPRETATION_NOTE`（task 114）：敏感性输出纳入 claims register 守则 1

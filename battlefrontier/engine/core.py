@@ -36,6 +36,12 @@ class DeckConfigError(Exception):
     """卡组不满足开局条件（无基础宝可梦 / 张数不足），明确报错而非死循环。"""
 
 
+# 全额防御哨兵（task 152a 盖诺赛克特ex 防卫充能，D-152a-1）：attack_shield
+# 标记的减伤量语义——5 元组（prevent_attack_damage 全额防御，task 138）=
+# 本哨兵（实际伤害必然归零）；6 元组末位 = 部分减伤量（「-30」）。
+ATTACK_SHIELD_FULL_NEGATE = 10**9
+
+
 def effect_doc_by_ref(
     effects: Mapping[str, CardEffectDoc], card_id: str, name: str
 ) -> CardEffectDoc | None:
@@ -759,9 +765,34 @@ class GameEngine:
             + ((player, iid, event),),
         })
 
+    def _queue_opponent_active_ko(self, taker_idx: int) -> None:
+        """opponent_active_ko 事件触发入队（task 152c 波克基斯 奇迹之吻，D-152c-1）：
+        拿取方场上（战斗场+备战区）声明 trigger_on_event/event=opponent_active_ko
+        的宝可梦逐个入队；同名牌每玩家至多触发 1 次（原文「无论拥有这个特性的
+        宝可梦有多少只，都不会叠加」）——发射侧按卡名去重（对齐 modify_damage
+        同名来源卡去重先例，D-WP7-3③ 口径）。特性消除（监视塔，D-029-1）守卫在
+        排水点实时判定（既有 _fire_trigger_on_event 口径）；同扫描内先离场的
+        同名宝可梦按「离场即失效」排水语义跳过。
+        """
+        p = self.state.players[taker_idx]
+        seen_names: set[str] = set()
+        for mon in ([p.active] if p.active else []) + list(p.bench):
+            doc = self._effect_doc(mon.current.card)
+            if doc is None or not any(
+                e.trigger == "trigger_on_event" and e.event == "opponent_active_ko"
+                for e in doc.effects
+            ):
+                continue
+            name = mon.current.card.name
+            if name in seen_names:
+                continue  # 同名牌不叠加：每只至多入队 1 次
+            seen_names.add(name)
+            self._queue_event_trigger(taker_idx, mon.current.iid, "opponent_active_ko")
+
     def _fire_trigger_on_event(
         self, player: int, source: CardInstance, holder: InPlayPokemon | None,
         event: str, attacker_iid: int | None = None,
+        completion_hint: str = "ability",
     ) -> bool:
         """trigger_on_event 分发公共点（task 026 WP2/WP3/WP6）：检索来源卡文档中挂该事件的
         效果，condition 门控后自动发动（「可使用」的放弃选项不建模，D-WP2-3）；
@@ -770,6 +801,12 @@ class GameEngine:
         holder=None 求值）；completion="attack" 且发动前置 turn_after_promote=触发方——
         攻击方的回合已因攻击消耗，触发效果结算与换上完毕后回合权归被攻击方（D-WP6-6）。
         attacker_iid 穿透进 ctx.attacker_iid（opponent_attacker 选择器数据源）。
+        opponent_active_ko（task 152c，D-152c-1）：完成形态由排水点上下文决定
+        （completion_hint）——招式窗口内排水（含白板招式直结，攻击已消耗）=
+        "attack"，换上后回合权归防守方（默认口径，不预置 turn_after_promote）；
+        效果窗口排水（trainer/ability/stadium 完成路径）与检查阶段排水 =
+        "ability"（换上后回效果方主阶段 / 检查拦截回本函数）。既有事件
+        （own_evolve_from_hand 等）不受 hint 影响，维持原 "ability" 分支不变。
         同卡多个同事件效果 = DslError（不猜，需要时再扩展顺序分发）。
         返回是否实际发动（排水方据此决定继续排下一条还是交棒给被触发效果）。
         """
@@ -808,16 +845,22 @@ class GameEngine:
             })
             self._run_or_suspend(player, source, effect_index, start=0,
                                  completion="attack", attacker_iid=attacker_iid)
+        elif event == "opponent_active_ko":
+            # task 152c（D-152c-1）：完成形态 = 排水点上下文（completion_hint）
+            self._run_or_suspend(player, source, effect_index, start=0,
+                                 completion=completion_hint)
         else:
             self._run_or_suspend(player, source, effect_index, start=0,
                                  completion="ability")
         return True
 
-    def _drain_event_triggers(self) -> bool:
+    def _drain_event_triggers(self, completion_hint: str = "ability") -> bool:
         """事件触发队列共享排水（task 026 WP3/WP6）：先排 pending_event_triggers
         （own_evolve_from_hand 等），再排 pending_ko_triggers（own_ko_by_attack）。
         来源已不在场上时——own_ko_by_attack 从该玩家弃牌堆按 iid 找回来源（昏厥离场
         后仍可发动，holder=None）；其余事件离场即失效，跳过排下一条。
+        completion_hint（task 152c）：仅作用于 opponent_active_ko 的完成形态
+        （排水点上下文决定，见 _fire_trigger_on_event）；既有事件不受影响。
         返回是否实际发动了某条（发动则交棒给被触发效果的执行/挂起）。
         """
         while self.state.pending_event_triggers:
@@ -852,7 +895,8 @@ class GameEngine:
                             break
                 if source is None:
                     continue  # 来源已不在场上（或被消除）：离场即失效，跳过
-            if self._fire_trigger_on_event(tp, source, holder, tevent):
+            if self._fire_trigger_on_event(tp, source, holder, tevent,
+                                           completion_hint=completion_hint):
                 return True
         while self.state.pending_ko_triggers:
             tp, tiid, tattacker = self.state.pending_ko_triggers[0]
@@ -1455,10 +1499,11 @@ class GameEngine:
                                  atk, player,
                                  target_rule_box=d.active.current.card.rule_box,
                                  defender=d.active))
-        # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：命中 → 归零
-        # （满 HP 截顶/昏厥路径对 0 伤害自然 no-op；招式伤害瞬时记录仅 final>0 置位）
-        if self._attack_damage_shielded(d.active, atk):
-            dmg = 0
+        # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石全额归零，D-138-3；
+        # task 152a 盖诺赛克特ex 防卫充能部分减伤泛化，D-152a-1）：命中 →
+        # 伤害 −减伤量（全额防御哨兵 = 归零；满 HP 截顶/昏厥路径对 0 伤害
+        # 自然 no-op；招式伤害瞬时记录仅 final>0 置位）
+        dmg = max(0, dmg - self._attack_damage_reduction(d.active, atk))
         # 满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）
         dmg = self._survival_cap(defender, d.active, dmg)
         target = d.active.model_copy(update={"damage": d.active.damage + dmg})
@@ -2203,33 +2248,47 @@ class GameEngine:
                         return True
         return False
 
-    def _attack_damage_shielded(
+    def _attack_damage_reduction(
         self, target: InPlayPokemon, attacker: InPlayPokemon | None,
-    ) -> bool:
-        """时效减伤判定（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：目标身上
-        attack_shield 标记生效且攻击方命中来源过滤 → 该次招式伤害归零。
+    ) -> int:
+        """时效减伤判定（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3；task 152a
+        盖诺赛克特ex 防卫充能部分减伤泛化，D-152a-1）：目标身上 attack_shield
+        标记生效且攻击方命中来源过滤 → 返回减伤量（0 = 不适用；全额防御 =
+        ATTACK_SHIELD_FULL_NEGATE 哨兵 → 实际伤害归零；部分减伤 = 标记末位
+        amount → 伤害 −amount，下限 0）。
 
-        引擎对卡牌内容零硬编码：标记由 DSL prevent_attack_damage 原语写入
-        （时效词 + 来源过滤词在写入期校验，此处只读结构化标记）。生效窗口 =
-        「下一个对手的回合」：s.turn == 失效turn 且 current_player != 施加方
-        （(player, turn) 对唯一，窗口精确圈定；不随施加后回合数漂移）。
-        来源过滤：攻击方阶段限定（None = 不限）+ 攻击方属性排除。仅招式伤害
-        经本守卫（接入点 = _do_attack 白板 / DSL damage 原语 / copy_attack
-        白板复制，对齐 _survival_cap 三落点纪律）；伤害指示物与招式效果不经
-        （卡面仅「伤害」）。attacker 为 None（来源无法定位）= 不适用。
+        引擎对卡牌内容零硬编码：标记由 DSL prevent_attack_damage（5 元组）/
+        reduce_attack_damage（6 元组，末位 = 减伤量）原语写入（时效词 + 来源
+        过滤词在写入期校验，此处只读结构化标记）。生效窗口 = 「下一个对手的
+        回合」：s.turn == 失效turn 且 current_player != 施加方（(player, turn)
+        对唯一，窗口精确圈定；不随施加后回合数漂移）。来源过滤：攻击方阶段
+        限定（None = 不限）+ 攻击方属性排除。仅招式伤害经本守卫（接入点 =
+        _do_attack 白板 / DSL damage 原语 / copy_attack 白板复制，对齐
+        _survival_cap 三落点纪律）；伤害指示物与招式效果不经（卡面仅
+        「伤害」）。attacker 为 None（来源无法定位）= 不适用。
         """
         shield = target.attack_shield
         if shield is None or attacker is None:
-            return False
-        _set_turn, set_player, expiry_turn, stage, except_types = shield
+            return 0
+        _set_turn, set_player, expiry_turn, stage, except_types = shield[:5]
         s = self.state
         if not (s.turn == expiry_turn and s.current_player != set_player):
-            return False
+            return 0
         if stage is not None and attacker.current.card.stage != stage:
-            return False
-        return not (
-            except_types
-            and attacker.current.card.energy_type in except_types
+            return 0
+        if except_types and attacker.current.card.energy_type in except_types:
+            return 0
+        if len(shield) == 5:  # 全额防御（task 138 存量语义不变）
+            return ATTACK_SHIELD_FULL_NEGATE
+        return shield[5]
+
+    def _attack_damage_shielded(
+        self, target: InPlayPokemon, attacker: InPlayPokemon | None,
+    ) -> bool:
+        """全额防御判定（task 138 存量语义不变）：减伤量 = 全额哨兵 → 归零。"""
+        return (
+            self._attack_damage_reduction(target, attacker)
+            >= ATTACK_SHIELD_FULL_NEGATE
         )
 
     def _survival_cap(self, owner: int, target: InPlayPokemon, final: int) -> int:
@@ -2764,14 +2823,22 @@ class GameEngine:
             # 【rules-manual §8 胜利条件②】战斗场昏厥且备战区无可换上
             self._game_over(winner=1 - wiped[0], reason="no_pokemon")
             return
-        # 招式昏厥触发器排水（task 026 WP6，own_ko_by_attack）：先于 promote 翻阶段——
-        # 被昏厥方场上的触发效果（如仙人掌反伤）在其宝可梦换上之前结算；被触发效果
-        # 以 completion="attack" 发动且发动前置 turn_after_promote=被攻击方，其完成
-        # 路径统一翻 promote，换上后回合权归被攻击方（D-WP6-6）。
+        # 昏厥事件触发器排水（task 026 WP6 own_ko_by_attack；task 152c 扩
+        # pending_event_triggers：opponent_active_ko 昏厥结算点入队、同点排水）：
+        # 先于 promote 翻阶段——被昏厥方场上的触发效果在其宝可梦换上之前结算；
+        # 被触发效果以 completion="attack" 发动且发动前置 turn_after_promote=被攻击方，
+        # 其完成路径统一翻 promote，换上后回合权归被攻击方（D-WP6-6）。
+        # completion_hint：检查阶段排水（pokemon_check_next 非 None）= "ability"
+        # （检查拦截回本函数）；非检查阶段的引擎直结排水（白板招式/混乱自伤）=
+        # "attack"（攻击已消耗，回合权归防守方）；存量 own_ko_by_attack 分支恒
+        # "attack" 不受 hint 影响，扩闸门对存量行为零变化（存量流在到达本闸门前
+        # pending_event_triggers 恒已排空——入队点均紧邻各自排水点）。
         if (
-            self.state.pending_ko_triggers
+            (self.state.pending_ko_triggers or self.state.pending_event_triggers)
             and not self._in_effect
-            and self._drain_event_triggers()
+            and self._drain_event_triggers(
+                "ability" if self.state.pokemon_check_next is not None else "attack"
+            )
         ):
             return
         if self.state.promote_queue and not self._in_effect:
@@ -2862,10 +2929,18 @@ class GameEngine:
         for c in taken:  # 每张一条事件（回放保真）
             self._emit("take_prize", taker_idx, iid=c.iid, name=c.card.name,
                        left=len(self.state.players[taker_idx].prizes))
+        game_ended = False
         if not self.state.players[taker_idx].prizes:
             self._game_over(winner=taker_idx, reason="prizes")
-            return True
-        return False
+            game_ended = True
+        # opponent_active_ko 事件触发入队（task 152c 波克基斯 奇迹之吻，D-152c-1
+        # 🔲 待核）：战斗场任意来源昏厥（active_ko——招式/效果/指示物/自伤同面，
+        # 卡面无来源限定）→ 拿取方场上声明该事件的宝可梦在昏厥结算点入队
+        # pending_event_triggers（对齐既有触发队列纪律：先入队、链收尾统一排水）；
+        # 拿完即胜已终局 → 不入队（终局后队列无排水点）
+        if active_ko and not game_ended:
+            self._queue_opponent_active_ko(taker_idx)
+        return game_ended
 
     def _do_promote(self, player: int, action: Action) -> None:
         p = self.state.players[player]
@@ -3177,7 +3252,9 @@ class GameEngine:
         # 来源已不在场上 / condition 不满足则跳过排下一条（own_evolve 离场即失效；
         # own_ko_by_attack 从弃牌堆找回来源）；实际发动则交棒（被触发效果的自身完成
         # 路径递归排剩余队列 / 翻 promote / 回主阶段，本层不再执行后续收尾）
-        if self.state.phase != "game_over" and self._drain_event_triggers():
+        if self.state.phase != "game_over" and self._drain_event_triggers(
+            "attack" if completion == "attack" else "ability"
+        ):
             return
         # 宝可梦检查内拦截（task 026 WP7，D-WP7-1）：检查阶段触发的效果
         # （雪妖女 冻结帷幕等）完成/挂起恢复后回到检查推进（排水→统一昏厥结算

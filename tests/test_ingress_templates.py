@@ -18,7 +18,7 @@ def test_three_ingress_templates_load() -> None:
     assert pooled.matrix is not None
     assert pooled.matrix.pool.endswith("target-pool.v2.yml")
     assert pooled.matrix.games_per_pair == 1
-    assert len(load_target_pool(pooled.matrix.pool).decks) == 10
+    assert len(load_target_pool(pooled.matrix.pool).decks) == 11
 
     named = load_experiment("experiments/templates/name-count.example.yml")
     assert named.decks is not None

@@ -1,0 +1,26 @@
+# 伽勒尔 喵喵（30thC-080，基础，无特性）
+# text_raw 原文：「【无】 聚宝功 10
+# 从自己牌库上方抽取1张卡牌。
+#
+# 【钢】 宝物突进 10×
+# 造成自己手牌张数×10伤害。」
+# 聚宝功：伤害 10（damage 节点）+ 抽 1（draw 原语缺省 selector=own_deck，
+# 牌库顶；N的索罗亚克ex/猛雷鼓ex 飞溅咆哮先例）；牌库空 → 抽完即止不卡
+# （draw 原语既有空牌库语义）。
+# 宝物突进 10×：count=own_hand_count（新计数词，D-152c-2 🔲 待核）×10——
+# 手牌张数在伤害节点求值点读取，发动后手牌变化不影响本次伤害。
+# 同文本等价类（db 归一化 text_raw 实测一致，2026-11-21）：J 标 2 印刷全收，
+# 均在当前 standard 快照（standard-2026-09-16）合法集内
+card:
+  name_group: 伽勒尔 喵喵
+  card_ids: [30thC-080, 30thC-117]
+effects:
+  - trigger: on_attack
+    attack: 聚宝功
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 10}}
+      - {action: draw, count: 1}
+  - trigger: on_attack
+    attack: 宝物突进
+    actions:
+      - {action: damage, selector: opponent_active, count: own_hand_count, args: {op: "×", per: 10}}

@@ -70,3 +70,20 @@ bfsim field-pick --field results/field-snap-2026-11-21.json \
 3. 可重复验收清单（Owner 第 3 件）已具备落点：swap-search 设计文档两条
    硬门槛（印刷级指定+diff / 组合体同种子配对复核）+ field-pick 头注
    四限定语（登顶率 ≠ 夺冠概率在列）——独立复核可直接按此清单执行。
+
+## 5. 10 小时自主 goal loop（Owner 2026-11-21 23:0x 离线授权）
+
+边界（Owner 明示不动）：BC 重启 / task 153 / task 154 提前 / 新研究线。
+可判断范围：定向补池收尾 + 沙奈朵改表新场核对；遇引擎表达力缺口或
+超出边界的事项 → 停并落档。
+
+1. [x] DSL 批（盖诺赛克特ex + reduce_attack_damage 原语 D-152a-1/2、
+   酿光市 D-152b-1）+ 全量 pytest 复验 → 提交。
+2. [ ] v2.x+ 矩阵重跑（strict-coverage，55 对 × 500 = 27,500 局，
+   种子锚 410000）→ matchup-snap 重导（110 格，验收 0 low_confidence）。
+3. [ ] field-pick 11 套复跑（新 matchup-snap × field-snap-2026-11-21）。
+4. [ ] 沙奈朵改表新场核对：基线(711854) + 改表(t141 deck.txt) × 池内
+   10 对手，同种子成对（seed 640000 域，避开 630000/410000/1110000），
+   2,000 局/格，strict-coverage——赛富豪纯对手格首次成 sim。
+   产出：逐格 Δ + 新场权重（top10 池内归一）期望胜率 + 改表 vs 基线判定。
+5. [ ] 收尾：本 dig 回填、STATUS/CHANGELOG、提交 push。

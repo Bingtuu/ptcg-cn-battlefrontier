@@ -122,8 +122,15 @@ class InPlayPokemon(FrozenModel):
     # 攻击方阶段限定 int|None, 攻击方属性排除 tuple)；生效 iff s.turn == 失效turn
     # 且 current_player != 施加方（(player, turn) 对唯一 = 「下一个对手的回合」
     # 窗口）；对手回合结束（core._on_turn_end）清除；随 InPlayPokemon 走
-    # （撤退/进化保留——「这只宝可梦」），昏厥/离场即消失
-    attack_shield: tuple[int, int, int, int | None, tuple[str, ...]] | None = None
+    # （撤退/进化保留——「这只宝可梦」），昏厥/离场即消失。
+    # task 152a 盖诺赛克特ex 防卫充能（D-152a-1）向后兼容扩 6 元组：末位 =
+    # 部分减伤量 int（「-30」）——命中窗口扣减 amount 而非归零；5 元组 =
+    # 全额防御语义不变（prevent_attack_damage 存量写入形态，既有资产/测试
+    # 逐位不变）
+    attack_shield: (
+        tuple[int, int, int, int | None, tuple[str, ...]]
+        | tuple[int, int, int, int | None, tuple[str, ...], int]
+    ) | None = None
 
     @property
     def current(self) -> CardInstance:

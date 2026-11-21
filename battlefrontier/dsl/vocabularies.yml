@@ -53,6 +53,8 @@ actions:
   - prevent_ko              # 声明式：满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心：持有者卡 passive_static，引擎 _survival_cap 读声明，解释器不执行；args.remaining_hp=免死后剩余 HP / args.when=full_hp；仅截招式伤害，指示物/效果伤害/自伤不经守卫）
   - status_immunity         # 声明式：特殊状态免疫（task 134 咕咕 不眠：args.status=asleep 不会陷入睡眠，任何来源施加均在落点不适用；引擎 apply_status 落点守卫读声明，解释器不执行）
   - prevent_attack_damage   # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石：on_attack 写 attack_shield 标记，「下一个对手的回合」内来源命中（attacker_stage/except_attacker_type）的招式伤害归零；引擎招式伤害三路径读标记，对手回合结束清除，对齐 D-069-1 时点纪律）
+  - reduce_attack_damage    # 时效部分减伤（task 152a 盖诺赛克特ex 防卫充能「-30」，D-152a-1：与 prevent_attack_damage 同款窗口/来源过滤，args.amount=减伤值必填——命中 = 招式伤害 −amount（下限 0）而非归零；写 6 元 attack_shield 标记（末位 = 减伤量），5 元全额防御语义存量不变；引擎招式伤害三路径同守）
+  - take_extra_prize        # 立即拿取 N 张奖赏卡（task 152c 波克基斯 奇迹之吻，D-152c-1：走 core 拿奖赏路径口径——奖赏不足按剩余拿取、拿完即胜；args.amount 暂仅 1）
 
 # 选择器（作用对象）
 selectors:
@@ -106,6 +108,7 @@ counters:
   - opponent_ability_pokemon_count   # 对手场上拥有特性的宝可梦数量（task 029 巨钳螳螂 惩罚巨钳；CardDef.has_ability ← db abilities 非空）
   - opponent_discard_basic_energy_count  # 对手弃牌区基本能量张数（task 071 WP9 N的达摩狒狒 复燃 ×30）
   - one_if_holder_has_energy_雷  # 持有者附着【雷】能量则为 1 否则 0（task 071 电蜘蛛 麻麻网：与复眼同招式只叠加一次）
+  - own_hand_count               # 自己手牌张数（task 152c 伽勒尔 喵喵 宝物突进 ×10，D-152c-2）
 
 # 去向（destination 字段）
 destinations:
@@ -136,3 +139,4 @@ events:
   - pokemon_check                # 每次宝可梦检查时（task 026 WP7 雪妖女 冻结帷幕：双方回合结束后的检查阶段统一触发）
   - own_attach_from_hand_to_bench  # 自己的回合，从手牌附着能量于备战宝可梦时（task 026 WP8 喷射能量；仅手动附着行动，效果附着不触发）
   - own_turn_end                 # 自己的回合结束时（task 069 WP4 力之沙漏：附着道具声明；D-069-1 时点口径 = 检查阶段内、状态结算之后，仅回合结束方入队）
+  - opponent_active_ko           # 对手的战斗宝可梦昏厥时（task 152c 波克基斯 奇迹之吻，D-152c-1：持有者视角 = 「我方对手」的战斗场昏厥，任意来源——招式/效果/指示物/自伤；昏厥结算点发射入队、链收尾统一排水；同名牌不叠加由发射侧按卡名去重保证）

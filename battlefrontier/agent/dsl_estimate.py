@@ -148,6 +148,9 @@ def _visible_counter(
         )
     if word == "damage_counters_on_self":
         return (own.active.damage // 10) if own.active else 0
+    if word == "own_hand_count":
+        # task 152c（伽勒尔 喵喵 宝物突进）：己方手牌张数（己方手牌全可见）
+        return len(own.hand)
     # 对手弃牌区公开（task 080，D-078-7）。不走 attack_quality_gate。
     if word == "opponent_discard_basic_energy_count":
         return sum(1 for c in opp.discard if c.card.is_basic_energy)

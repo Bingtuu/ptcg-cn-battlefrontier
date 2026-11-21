@@ -1,0 +1,34 @@
+# 盖诺赛克特ex（CSV10.5C-069 档，基础，钢属性，HP220，ex）
+# text_raw 原文：「特性: 金属信号
+# 在自己的回合可以使用1次。选择自己牌库中最多2张【钢】属性的进化宝可梦，在给对手看过之后加入手牌。并重洗牌库。
+#
+# 【钢】【钢】【无】 防卫充能 150
+# 在下一个对手的回合，这只宝可梦所受到的招式的伤害「-30」。」
+# 金属信号：ability_manual once_per_turn（「可以使用1次」）；「最多2张」走
+# search_deck 检索 up-to 语义（min_choose=0 可空选，吉尼亚先例，不写
+# args.up_to）；filters=[pokemon_钢, evolved_pokemon]（chooser 参数化属性
+# 过滤器 + evolved_pokemon 均在册，AND 语义）；「在给对手看过之后」= 检索后
+# reveal own_hand 同过滤器（城镇百货/斗子 D-WP3-4 口径）；重洗 = shuffle_deck。
+# 防卫充能：damage 150 白板 + reduce_attack_damage（task 152a 引擎扩展
+# D-152a-1 部分减伤原语——args.amount=30「-30」+ timing=opponent_next_turn
+# 「在下一个对手的回合」；命中 = 招式伤害 −30（下限 0）而非归零；只减招式
+# 伤害，伤害指示物与招式效果不经——卡面仅「伤害」）。
+card:
+  name_group: 盖诺赛克特ex
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-21）：I 标 3 印刷全收，
+  # 均在当前 standard 快照（standard-2026-09-16）合法集内
+  card_ids: [CSV10.5C-069, CSV10.5C-164, CSV10.5C-172]
+effects:
+  - trigger: ability_manual
+    limit: once_per_turn
+    # 决策聚合锚点（task 022）：检索选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: search_deck, selector: own_deck, filters: [pokemon_钢, evolved_pokemon], choose: 2, destination: hand}
+      - {action: reveal, selector: own_hand, filters: [pokemon_钢, evolved_pokemon]}
+      - {action: shuffle_deck}
+  - trigger: on_attack
+    attack: 防卫充能
+    actions:
+      - {action: damage, selector: opponent_active, args: {amount: 150}}
+      - {action: reduce_attack_damage, selector: self, args: {amount: 30, timing: opponent_next_turn}}

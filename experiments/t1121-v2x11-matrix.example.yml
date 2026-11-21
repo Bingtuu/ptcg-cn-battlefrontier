@@ -1,0 +1,14 @@
+# v2.x+ 矩阵：11 套池（v2.x 10 套 + 定向补「赛富豪」纯构筑）55 无向对 × 500 局 = 27,500 局
+# （task 152 备赛线场刷新，2026-11-21；池 = config/target-pool.v2.yml v2.x+ 修订）
+# 卡组只来自池内 deck_id；种子锚 410000 与 v2 矩阵（200000）/ v2.x 矩阵（400000）不重叠（CRN 纪律）。
+# 前置闸：--strict-coverage（task 131）必配。
+# bfsim run experiments/t1121-v2x11-matrix.example.yml --workers 16 --strict-coverage --results results/t1121-v2x11-matrix.db
+# bfsim matchup-snap --matrix <本实验结果库> --out results/matchup-snap-2026-11-21.json（task 125 纪律）
+name: t1121-v2x11-matrix
+seed_start: 410000
+matrix:
+  pool: config/target-pool.v2.yml
+  games_per_pair: 500
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

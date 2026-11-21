@@ -1,0 +1,27 @@
+# 波克基斯（CSV9C-075，2阶进化，无规则盒）
+# text_raw 原文：「特性: 奇迹之吻
+# 只要这只宝可梦在场上，每当对手的战斗宝可梦【昏厥】时，自己抛掷1次硬币。
+# 如果为正面，则多拿取1张奖赏卡。这个效果，无论拥有这个特性的宝可梦有多少只，
+# 都不会叠加。
+#
+# 【无】【无】【无】 高速之翼 140」
+# 奇迹之吻（task 152c 引擎扩展，D-152c-1 🔲 待核）：trigger_on_event /
+# event=opponent_active_ko（新事件词）——持有者视角 = 「我方对手」的战斗场昏厥，
+# 任意来源（招式/效果/指示物/自伤，卡面无来源限定）；core 昏厥结算点
+# （_knockout_one，active_ko 门）发射入队、链收尾统一排水（对齐既有触发队列
+# 与 task 108 缓冲纪律）；「不叠加」= 发射侧按卡名去重、每玩家至多 1 次。
+# coin_flip → take_extra_prize 1 condition=if_flip_heads（桌台市/粉碎之锤
+# 节点门控先例；take_extra_prize 新原语：走 core 拿奖赏路径——奖赏不足按剩余
+# 拿取、拿完即胜）。
+# 高速之翼 140 无效果文 = vanilla 白板（库内惯例：vanilla 招式不绑 DSL）。
+# 同文本等价类（db 归一化 text_raw 实测一致，2026-11-21）：H 标 3 印刷全收，
+# 均在当前 standard 快照（standard-2026-09-16）合法集内
+card:
+  name_group: 波克基斯
+  card_ids: [CSV9C-075, SVP-367, SVP-481]
+effects:
+  - trigger: trigger_on_event
+    event: opponent_active_ko
+    actions:
+      - {action: coin_flip}
+      - {action: take_extra_prize, args: {amount: 1}, condition: if_flip_heads}

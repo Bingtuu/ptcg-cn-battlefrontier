@@ -99,6 +99,12 @@ PRIMITIVE_ARGS: dict[str, frozenset[str]] = {
     "prevent_attack_damage": frozenset({
         "attacker_stage", "except_attacker_type", "timing",
     }),
+    # ── task 152a ───────────────────────────────────────────────
+    "reduce_attack_damage": frozenset({
+        "amount", "attacker_stage", "except_attacker_type", "timing",
+    }),
+    # ── task 152c ───────────────────────────────────────────────
+    "take_extra_prize": frozenset({"amount"}),
 }
 
 
@@ -1356,6 +1362,10 @@ def _eval_counter(ctx: ExecutionContext, word: str, target: InPlayPokemon | None
         return 1 if any(
             e.card.energy_type == "雷" for e in mon.attached_energy
         ) else 0
+    if word == "own_hand_count":
+        # task 152c（伽勒尔 喵喵 宝物突进「自己手牌张数×10」，D-152c-2 🔲 待核）：
+        # 操控方手牌张数，damage 节点求值点读取（发动后手牌变化不影响本次伤害）
+        return len(p.hand)
     if word == "discarded_this_effect":
         # task 026 WP5（D-WP5-1 ×N 伤害族）：本效果内前序 discard 节点弃置张数
         return ctx.discarded_this_effect
@@ -1496,11 +1506,18 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
     # 太晶（task 027，D-027-1，rules-manual §1.4 太晶条目）：备战区太晶宝可梦
     # 受招式伤害 → 0（目标侧判定读 target.is_tera，无侧别比较，双方招式同口径；
     # 战斗场太晶正常受伤；指示物放置不受影响）
-    # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：attack_shield
-    # 窗口内且攻击方命中来源过滤 → 归零（战斗场/备战落点同守——卡面「这只
-    # 宝可梦」不限位置；仅伤害，不免疫招式效果）
-    shielded = ctx.trigger == "on_attack" and engine._attack_damage_shielded(
-        target, attacker)
+    # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石全额归零，D-138-3；task 152a
+    # 盖诺赛克特ex 防卫充能部分减伤泛化，D-152a-1）：attack_shield 窗口内且
+    # 攻击方命中来源过滤 → 全额防御归零 / 部分 = 伤害 −amount（下限 0）
+    # （战斗场/备战落点同守——卡面「这只宝可梦」不限位置；仅伤害，不免疫招式
+    # 效果）
+    from battlefrontier.engine.core import ATTACK_SHIELD_FULL_NEGATE
+
+    reduction = (
+        engine._attack_damage_reduction(target, attacker)
+        if ctx.trigger == "on_attack" else 0
+    )
+    shielded = reduction >= ATTACK_SHIELD_FULL_NEGATE
     protected = (
         shielded
         or (
@@ -1520,6 +1537,10 @@ def _damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | N
             weakness=ctx.engine._effective_weakness(ctx.player, target))
     else:
         final = amount
+    # 部分减伤（D-152a-1）：弱点/抗性结算后的 final 扣减（「所受到的招式的
+    # 伤害『-30』」——减伤作用于实际受到值）
+    if not protected and reduction:
+        final = max(0, final - reduction)
     # 满 HP 免昏厥截顶（task 069 WP2 皮卡丘ex 顽强之心，prevent_ko）：仅招式伤害
     # （ctx.trigger=="on_attack" 门控；on_play 等效果伤害不经守卫，对齐
     # D-WP6-7/D-WP7-5 先例）；截顶作用于弱点/抗性结算后的 final
@@ -2184,11 +2205,11 @@ def _apply_copied_attack(
             if attacker is not None else 0
         ),
     )
+    # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石全额归零，D-138-3；task 152a
+    # 盖诺赛克特ex 防卫充能部分减伤泛化，D-152a-1）：复制招式同属「招式的
+    # 伤害」，白板复制路径同守（对齐 _survival_cap 三接入点纪律）
+    dmg = max(0, dmg - engine._attack_damage_reduction(d.active, attacker))
     dmg = engine._survival_cap(opp_idx, d.active, dmg)
-    # 时效减伤（task 138 太乐巴戈斯ex 皇冠蛋白石，D-138-3）：复制招式同属
-    # 「招式的伤害」，白板复制路径同守（对齐 _survival_cap 三接入点纪律）
-    if engine._attack_damage_shielded(d.active, attacker):
-        dmg = 0
     engine._set_player(opp_idx, d.model_copy(update={
         "active": d.active.model_copy(update={"damage": d.active.damage + dmg}),
     }))
@@ -3049,6 +3070,92 @@ def _prevent_attack_damage(ctx: ExecutionContext, node: ActionNode, choice: tupl
     }
 
 
+@register("reduce_attack_damage")
+def _reduce_attack_damage(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """部分减伤（task 152a 盖诺赛克特ex 防卫充能「在下一个对手的回合，这只宝可
+    梦所受到的招式的伤害『-30』」，D-152a-1 🔲 待核）：与 prevent_attack_damage
+    （task 138 皇冠蛋白石，D-138-3）同款窗口/来源过滤，但命中 = 该次招式伤害
+    −amount（下限 0）而非归零——写 6 元 attack_shield 标记（末位 = 减伤量；
+    prevent_attack_damage 的 5 元全额防御写入形态不动，存量行为逐位不变）。
+
+    args.amount（必填）：正 int 减伤值（30 = 「-30」）。
+    args.timing（必填）：时效词，暂仅 opponent_next_turn（「在下一个对手的
+    回合」；失效 turn 推导与 prevent_attack_damage 同口径——turn 计数仅在
+    先攻方回合开始递增，(player, turn) 对唯一精确圈窗）。
+    args.attacker_stage（可选）：攻击方阶段限定词，暂仅 basic；缺省 = 不限。
+    args.except_attacker_type（可选）：攻击方属性排除（单值或列表）；缺省 = 不排除。
+    判定/接入点/窗口清除全部复用 core 既有 attack_shield 通路（招式伤害三
+    路径 + 对手回合结束跨侧清除 + 昏厥/离场消失）；仅减「招式的伤害」——
+    伤害指示物与招式效果不经（卡面仅「伤害」）。
+    """
+    _require_no_choose(node, "reduce_attack_damage")
+    if node.selector != "self":
+        raise DslError(
+            f"reduce_attack_damage 暂仅支持 selector=self"
+            f"（收到 {node.selector!r}；保护对象是来源宝可梦本身）"
+        )
+    amount = node.args.get("amount")
+    if (
+        not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0
+    ):
+        raise DslError(
+            f"reduce_attack_damage 的 amount 须为正 int 减伤值"
+            f"（收到 {amount!r}；不猜）"
+        )
+    timing = node.args.get("timing")
+    if timing != "opponent_next_turn":
+        raise DslError(
+            f"reduce_attack_damage 的 timing 暂仅支持 opponent_next_turn"
+            f"（收到 {timing!r}；不猜）"
+        )
+    stage_word = node.args.get("attacker_stage")
+    stage_map = {"basic": 0}
+    stage: int | None
+    if stage_word is None:
+        stage = None
+    elif stage_word in stage_map:
+        stage = stage_map[stage_word]
+    else:
+        raise DslError(
+            f"reduce_attack_damage 的 attacker_stage 暂仅支持 basic"
+            f"（收到 {stage_word!r}；不猜）"
+        )
+    except_raw = node.args.get("except_attacker_type")
+    except_types: tuple[str, ...]
+    if except_raw is None:
+        except_types = ()
+    elif isinstance(except_raw, str):
+        except_types = (except_raw,)
+    elif (
+        isinstance(except_raw, list) and except_raw
+        and all(isinstance(t, str) and t for t in except_raw)
+    ):
+        except_types = tuple(except_raw)
+    else:
+        raise DslError(
+            f"reduce_attack_damage 的 except_attacker_type 须为非空属性字符串"
+            f"或其列表（收到 {except_raw!r}；不猜）"
+        )
+    engine = ctx.engine
+    source = _find_source_mon(ctx)
+    if source is None:
+        raise DslError("reduce_attack_damage：来源宝可梦不在场上")
+    s = engine.state
+    # 失效 turn 推导同 prevent_attack_damage：施加方 = first_player → 对手下个
+    # 回合 turn 不变；施加方 = 后攻 → 对手（先攻）下个回合 turn +1
+    expiry_turn = s.turn + (0 if ctx.player == s.first_player else 1)
+    marked = source.model_copy(update={
+        "attack_shield": (s.turn, ctx.player, expiry_turn, stage, except_types, amount),
+    })
+    p = ctx.player_state
+    slot, idx, _holder = engine._find_in_play(p, source.current.iid)
+    ctx.set_player_state(engine._replace_in_play(p, slot, idx, marked))
+    return {
+        "timing": timing, "amount": amount, "expiry_turn": expiry_turn,
+        "attacker_stage": stage_word, "except_attacker_type": list(except_types),
+    }
+
+
 # ── task 026 WP5：prize_bonus（白蕾雅奖赏加成标记）+ transform（百变怪变身替换）──
 
 
@@ -3081,6 +3188,37 @@ def _prize_bonus(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...
         )
     ctx.set_player_state(ctx.player_state.model_copy(update={flag: True}))
     return {"prize_bonus": amount, "scope": scope}
+
+
+@register("take_extra_prize")
+def _take_extra_prize(ctx: ExecutionContext, node: ActionNode, choice: tuple[int, ...] | None) -> dict[str, object]:
+    """立即拿取 N 张奖赏卡（task 152c 波克基斯 奇迹之吻，D-152c-1 🔲 待核）。
+
+    走 core 拿奖赏路径口径（对齐 prize_bonus docstring 与 _knockout_one 实现）：
+    从操控方奖赏堆取顶 N 张入手，奖赏不足按剩余拿取、拿完即胜（胜利条件①，
+    终局交 core._game_over）。逐张落 take_prize 事件（回放保真，同 _knockout_one）。
+    args.amount 暂仅支持 1（多档需要时再扩展，同 prize_bonus 先例）。
+    """
+    _require_no_choose(node, "take_extra_prize")
+    amount = node.args.get("amount")
+    if not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
+        raise DslError(f"take_extra_prize 需要 args.amount 正 int（收到 {amount!r}）")
+    if amount != 1:
+        raise DslError(f"take_extra_prize 的 amount 暂仅支持 1（收到 {amount!r}；多档需要时再扩展）")
+    engine = ctx.engine
+    p = ctx.player_state
+    taken = p.prizes[:amount]
+    if not taken:
+        return {"taken": 0, "reason": "no_prizes"}
+    engine._set_player(ctx.player, p.model_copy(update={
+        "hand": p.hand + taken, "prizes": p.prizes[len(taken):],
+    }))
+    for c in taken:  # 每张一条事件（回放保真，同 core._knockout_one）
+        engine._emit("take_prize", ctx.player, iid=c.iid, name=c.card.name,
+                     left=len(engine.state.players[ctx.player].prizes))
+    if not engine.state.players[ctx.player].prizes:
+        engine._game_over(winner=ctx.player, reason="prizes")
+    return {"taken": len(taken)}
 
 
 @register("transform")

@@ -1,0 +1,22 @@
+# 酿光市（CSV10C-217，竞技场）
+# text_raw 原文：「双方玩家每次在自己的回合有1次机会，可以选择自己弃牌区中
+# 最多2张「基本【雷】能量」，在给对手看过之后加入手牌。」
+# stadium_grant = 双方各每回合 1 次的授予行动（引擎 use_stadium 骨架，task 017，
+# 深钵镇/城镇百货先例）；「最多2张」= up_to（min_choose=0，args.up_to，
+# 能量回收-10.6 先例）；「基本【雷】能量」= basic_energy + energy_雷 组合过滤器
+# （basic_energy 卡维度 + energy_ 属性参数化前缀，chooser 注册词）；
+# 「在给对手看过之后」= recover 后 reveal own_hand（task 132 斗子 D-WP3-4 口径，
+# 仅落结构化事件流）；「每次在自己的回合有1次机会」= stadium_used_this_turn
+# （引擎强制，DSL 不重复声明）。实现注记编号占位：D-152b-1（待核）。
+card:
+  name_group: 酿光市
+  # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-21）：J 标 2 印刷全收，
+  # 均在当前 standard 快照（standard-2026-09-16）合法集内
+  card_ids: [CSV10C-217, CSV10C-286]
+effects:
+  - trigger: stadium_grant
+    # 决策聚合锚点（task 022）：回收选牌为关键决策点
+    observe: [key_search]
+    actions:
+      - {action: recover_from_discard, selector: own_discard, filters: [basic_energy, energy_雷], choose: 2, destination: hand, args: {up_to: true}}
+      - {action: reveal, selector: own_hand, filters: [basic_energy, energy_雷]}

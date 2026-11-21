@@ -5,10 +5,10 @@
 
 ## 当前
 
-**当前焦点 = task 151 自对弈数据飞轮数据集已交付（2026-11-21）——质量门 4/5 过，门 ② 字面未过（147,635 < 150k，缺 1.6%），待 Owner 裁决**（dig `docs/digs/2026-11-20-t151-flywheel-data.md` §4）。
+**当前焦点 = task 151 自对弈数据飞轮收官（2026-11-21）——质量门 5/5 过（门 ② 按 Owner 裁决 (a) 修订为 ≥145k），task 152（BC 自蒸馏）解冻待开工**（dig `docs/digs/2026-11-20-t151-flywheel-data.md` §4）。
 
 - **数据集**：`results/m16-flywheel-v1/`（45 对 × 22 局 = 990 局零失败，147,635 决策点，149.1 点/局；行级 `agent` 标签 mcts 46.6% / heuristic 53.4%；header `mix:true` 教师 2×50 cap50 + eval-linear-v3 截断 10）；种子域 1020000..1020989；跑批 7h45m（14h 上限内）。
-- **门 ② 未过根因**：预注册 ~170k 估计锚 M12 双侧 MCTS 口径，混编密度不可移植（WP2 预警 + 实测证实）；数据面健康（45 对全覆盖、各对 ≥2,169 行）。Owner 裁决项：(a) 接受 + 修订门 ② 附根因披露（推荐）/(b) 补采修正案。task 152（BC 自蒸馏）开工以门 ② 裁决为前提。
+- **门 ② 裁决（Owner 2026-11-21，建议 (a)）**：交付时字面 147,635 < 150k（98.4%），根因 = 预注册 ~170k 估计锚 M12 双侧 MCTS 口径、混编密度不可移植；接受数据集，门 ② 修订 ≥145k（根因披露 dig §4；修订纪律：后续采集任务密度估计按种群口径分别锚定）。数据面健康（45 对全覆盖、各对 ≥2,169 行）。
 - **工程面**：`collect-snapshots --mix-population/--evaluator-path/--eval-cutoff-turns` + `SnapshotCollector.record_players`（启发式侧无 consideration 入流）+ Pool `maxtasksperchild=500`；10 新测，全量 pytest 2100 绿 + ruff 零告警；WP2 真实配置串/并逐字节 6/6 全等。
 - 上一焦点 = task 150 门修订后 PASS，task 151/152 解冻（2026-11-20，PRD v0.7）——M16 BC 主线（自对弈飞轮 → BC+RL）可开工（dig `docs/digs/2026-11-20-t155a-nl-eval-spike.md` §门修订判决）。
 

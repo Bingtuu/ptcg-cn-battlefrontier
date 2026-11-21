@@ -5,12 +5,13 @@
 
 ## 当前
 
-**当前焦点 = task 151 自对弈数据飞轮收官（2026-11-21）——质量门 5/5 过（门 ② 按 Owner 裁决 (a) 修订为 ≥145k），task 152（BC 自蒸馏）解冻待开工**（dig `docs/digs/2026-11-20-t151-flywheel-data.md` §4）。
+**当前焦点 = task 152 BC 阶段收官（2026-11-21）——提升门 FAIL，kill criteria 触发，按 PRD 停损：不进入 RL，回 M15 水平线，资产留档**（dig `docs/digs/2026-11-21-t152-bc-data.md` §4）。
 
-- **数据集**：`results/m16-flywheel-v1/`（45 对 × 22 局 = 990 局零失败，147,635 决策点，149.1 点/局；行级 `agent` 标签 mcts 46.6% / heuristic 53.4%；header `mix:true` 教师 2×50 cap50 + eval-linear-v3 截断 10）；种子域 1020000..1020989；跑批 7h45m（14h 上限内）。
-- **门 ② 裁决（Owner 2026-11-21，建议 (a)）**：交付时字面 147,635 < 150k（98.4%），根因 = 预注册 ~170k 估计锚 M12 双侧 MCTS 口径、混编密度不可移植；接受数据集，门 ② 修订 ≥145k（根因披露 dig §4；修订纪律：后续采集任务密度估计按种群口径分别锚定）。数据面健康（45 对全覆盖、各对 ≥2,169 行）。
-- **工程面**：`collect-snapshots --mix-population/--evaluator-path/--eval-cutoff-turns` + `SnapshotCollector.record_players`（启发式侧无 consideration 入流）+ Pool `maxtasksperchild=500`；10 新测，全量 pytest 2100 绿 + ruff 零告警；WP2 真实配置串/并逐字节 6/6 全等。
-- 上一焦点 = task 150 门修订后 PASS，task 151/152 解冻（2026-11-20，PRD v0.7）——M16 BC 主线（自对弈飞轮 → BC+RL）可开工（dig `docs/digs/2026-11-20-t155a-nl-eval-spike.md` §门修订判决）。
+- **执行面全绿**：147,635 样本零报错转换（v2.x 词表 131）；BC 训练 11.3 min（holdout argmax 0.4717，M12 钉死超参零偏离）；联赛 480 局零失败 4h20m（BT-MLE 设施 + CRN 双向配对全程按冻结预注册）。
+- **提升门两条件 FAIL**：bc-student 对启发式 26.3%（−47.5pp，160 局 CI 远低 0）；对纯 MCTS 2×50 教师逐 deck median 0.25（10/10 为负）。BT-MLE：mcts 1588.9 / heuristic 1535.1 / bc 1375.9。kill criteria 点估计 −47.5pp ≪ +3pp 停损线 → 停损。
+- **归因（假设级）**：混合教师无条件化 BC 模式平均（heuristic 行占 53.4% 单权重兼合）+ covariate shift 复合误差 + 特征表达折扣；事前示警 = 一致率锚 54–58% + argmax 0.47（≪ M12 纯教师 88.8% 口径）。
+- **停损处置（PRD 钉死）**：RL 阶段不启动；回 M15 水平线（备赛工具线：field-pick/swap-search/league 设施可用）；资产留档（policy-m16-bc1 / 联赛注册表 / db / dig）。重启候选仅留档（agent 条件化 BC / DAgger / 纯教师子集 BC），须新预注册 + Owner 拍板。
+- 上一焦点 = task 151 自对弈数据飞轮收官（2026-11-21）——质量门 5/5 过（门 ② 按 Owner 裁决 (a) 修订为 ≥145k），数据集 `results/m16-flywheel-v1/` 在档（dig `docs/digs/2026-11-20-t151-flywheel-data.md` §4）。
 
 - **门修订**：task 155a 天花板 spike 证 0.90 门 = v1 尺子（560 维特征集天花板 ≈0.79，MLP 0.7867 vs ridge 0.7874 逐位打平，瓶颈 = 不可约随机性非模型类）。Owner 批准修订：同 60 局探针成对判据「≥95% 天花板参考 + Δ≥+0.05 vs 30 维基线」。eval-linear-v3 双条件过（0.7874 / 参考 0.7867 / 基线 0.7111）→ **PASS**。
 - **风险 review 落 dig**（Owner 要求）：天花板绑定 → 重锚协议；抽样宽度 → 90–100% 临界带扩 120 局；参考下界 → 换代重钉；泄漏面 → 种子域不重叠 + 双条件互约束；解冻 ≠ BC 成（净效应归 task 151/152 自身门）。

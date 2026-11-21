@@ -1,6 +1,6 @@
 # task 152 · BC+RL 混合栈（BC 阶段，PRD §4 task 152）
 
-- 状态：**预注册已冻结（2026-11-21）——待开工**
+- 状态：**收官（2026-11-21）——提升门 FAIL，kill criteria 触发，按 PRD 停损（不进入 RL，回 M15 水平线，资产留档）**
 - 关联：四期 PRD §4 task 152 + 预注册验收标准/kill criteria（成本门已放宽）；
   task 151（数据集 `results/m16-flywheel-v1/`，质量门 5/5 过已归档）；
   task 058/062（M12 BC 设施与 v2 特征路径）；task 127（联赛设施 BT-MLE，31 测在档）；
@@ -77,4 +77,20 @@ criteria 以 BC 后联赛读数为第一道停损点）。
 
 ## 结果与遗留
 
-（待填）
+**终判：提升门 FAIL，kill criteria 触发，按 PRD 停损收口（2026-11-21）。**
+
+- 数据/训练/评估三 WP 全部按冻结预注册执行：147,635 样本零报错；
+  BC 训练 11.3 min（holdout argmax 0.4717）；联赛 480 局零失败 4h20m。
+- **提升门两条件全 FAIL**：bc 对启发式 42/160 = 26.3%（−47.5pp，CI 远低 0）；
+  对教师逐 deck median 0.25（10/10 为负）。BT-MLE：mcts 1588.9 / heur
+  1535.1 / bc 1375.9。
+- **kill criteria 触发**（点估计 −47.5pp ≪ +3pp 停损线）→ **不进入 RL 阶段，
+  回 M15 水平线，管线资产留档**（`models/policy-m16-bc1.json`、
+  `experiments/t152-bc-league.example.yml`、`results/t152-league.db`、
+  dig 全程）。
+- 归因（假设级，dig §4）：混合教师无条件化 BC 的模式平均 + covariate
+  shift 复合误差 + 特征表达折扣；锚读数（一致率 54–58% / argmax 0.47）
+  事前已示警。
+- 重启候选（仅留档，须新预注册）：agent 条件化 BC / DAgger 迭代补采 /
+  纯 MCTS 教师子集 BC。
+- 已归档 `tasks/done/`。

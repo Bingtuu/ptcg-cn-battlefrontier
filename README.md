@@ -224,6 +224,20 @@ bfsim matchup-snap --pool config/target-pool.v2.yml --intl-db <db> --from 2026-0
 bfsim field-pick --field <snap.json> --pool config/target-pool.v2.yml --matrix-snap snap.json
 ```
 
+### 10. 备赛编排（prep / field-snap / mod-check，task 156）
+
+一场比赛的端到端备赛流程一键编排（场刷新 → field-pick → 报名卡组 × 池内全对手成对核对 → 统一报告）：
+
+```bash
+bfsim field-snap --probe --snap results/field-snap-<旧>.json   # 就绪探针：上游有新场？退出码 0=新鲜 / 3=有新数据
+bfsim prep experiments/prep.example.yml --workers 16           # 全量（报名卡组 + 改表成对跑批 + 判读）
+bfsim prep experiments/prep.example.yml --pick-only            # 只跑场刷新 + field-pick（零对局）
+bfsim mod-check --results <db> --base-prefix <前缀> --mod-prefix <前缀> \
+  --field <snap.json> --pool config/target-pool.v2.yml --entry <中文名>   # 单独判读已跑完的成对实验
+```
+
+纪律由命令固化（不靠记忆）：base/mod 实验同名后缀配对、同种子域 = 成对 CRN、报名卡组恒 a 侧、判读三门（全正/全显著/零回吐）+ 种子缺口显式列出；报告头注限定语必嵌（登顶率 ≠ 夺冠概率、改表增益 = sim 口径）。败局解剖（`bfsim report --autopsy`）与换卡搜索（`bfsim swap-search`，多刀组合须同种子对照复核）为人工驱动下一步，报告内给命令指针。
+
 ## 评估与验证方法
 
 一次完整的「评估/测试」工作流（备赛研究实证口径，2026-11-14）：

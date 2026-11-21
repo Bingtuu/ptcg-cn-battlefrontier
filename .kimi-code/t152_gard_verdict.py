@@ -4,7 +4,6 @@
 """
 
 import json
-import math
 import sqlite3
 from pathlib import Path
 
@@ -38,6 +37,7 @@ rows = con.execute(
 con.close()
 
 from collections import defaultdict
+
 cells = defaultdict(dict)  # (kind, slug) -> seed -> result ('a'|'b'|'draw')
 for name, seed, winner, draw in rows:
     parts = name.split("-vs-")
@@ -88,4 +88,4 @@ for slug, arch in OPP:
     em += rm * wt
     print(f"{arch:22s} {rb:8.1%} {rm:8.1%} {(rm-rb)*100:+7.1f} {p:8.4f} {wt:6.1%}")
 print(f"\n池内条件期望（新场权重）：基线 {eb:.1%} / 改表 {em:.1%} / Δ {(em-eb)*100:+.1f}pp")
-print(f"缺种子对：", {k: len(v) for k, v in cells.items() if len(v) != 2000})
+print("缺种子对：", {k: len(v) for k, v in cells.items() if len(v) != 2000})

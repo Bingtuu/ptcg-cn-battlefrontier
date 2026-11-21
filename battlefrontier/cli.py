@@ -244,6 +244,70 @@ def _summarize(db: ResultsDB, exp_id: int, label: str, defn) -> str:
             f"A胜 {wins_a} / B胜 {wins_b} / 平 {draws} / 失败 {failed}")
 
 
+def _cmd_field_snap(args: argparse.Namespace) -> int:
+    """task 156：场快照导出 + 就绪探针。
+
+    导出：--from/--to/--out 必给（上游 stats_usage 钉口径，见 runner/field_snap）。
+    探针（--probe）：上游最新赛事日期 vs --snap 窗口终点；退出码 0 = 新鲜，
+    3 = 有新数据或无基线（建议刷新/建档）——刻意区别于通用错误码 1。
+    """
+    from battlefrontier.runner.field_snap import (
+        export_field_snap,
+        probe_field_freshness,
+    )
+
+    db_path = args.db or load_db_path()
+    if args.probe:
+        status, detail = probe_field_freshness(db_path, args.snap)
+        print(f"[{status}] {detail}")
+        return 0 if status == "fresh" else 3
+    if not (args.from_date and args.to_date and args.out):
+        print("[field-snap 失败] 导出模式需要 --from/--to/--out（或改用 --probe）")
+        return 1
+    snap = export_field_snap(db_path, args.from_date, args.to_date, args.out)
+    print(f"快照 {args.out}：{len(snap['data'])} 行，窗 "
+          f"{args.from_date}..{args.to_date}，as_of {snap['meta'].get('as_of')}")
+    return 0
+
+
+def _cmd_mod_check(args: argparse.Namespace) -> int:
+    """task 156：改表成对判读（同种子 CRN 配对，纪律见 report/mod_check）。"""
+    from battlefrontier.report.mod_check import format_mod_check, mod_check_report
+
+    try:
+        rep = mod_check_report(args.results, base_prefix=args.base_prefix,
+                               mod_prefix=args.mod_prefix, field_path=args.field,
+                               pool_path=args.pool, entry=args.entry,
+                               alpha=args.alpha)
+    except (ValueError, OSError) as e:
+        print(f"[mod-check 失败] {e}")
+        return 1
+    print(format_mod_check(rep, alpha=args.alpha))
+    return 0
+
+
+def _cmd_prep(args: argparse.Namespace) -> int:
+    """task 156：备赛编排器——场刷新 → field-pick → 成对核对 → 统一报告。"""
+    from battlefrontier.runner.prep import load_prep_cfg, run_prep
+
+    try:
+        cfg = load_prep_cfg(args.prep)
+    except (ValueError, TypeError, OSError) as e:
+        print(f"[prep 失败] {e}")
+        return 1
+    db_path = args.db or load_db_path()
+    results = args.results or str(Path("results") / f"prep-{cfg.name}.db")
+    try:
+        report_path = run_prep(cfg, db_path=db_path, results_path=results,
+                               field_out=args.field_out, out_dir=args.out_dir,
+                               workers=args.workers, pick_only=args.pick_only)
+    except (ValueError, OSError) as e:
+        print(f"[prep 失败] {e}")
+        return 1
+    print(f"备赛报告落盘：{report_path}")
+    return 0
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     from battlefrontier.runner.coverage import (
         format_coverage,
@@ -1198,6 +1262,36 @@ def main(argv: list[str] | None = None) -> int:
     ms_p.add_argument("--to", dest="to_date", default="2026-11-14", help="intl 窗终点（含）")
     ms_p.add_argument("--sim-pack", default=None, help="偏差包 deviation.json（可选，sim 格一并入快照）")
     ms_p.add_argument("--out", required=True, help="快照 JSON 输出路径")
+    fsn_p = sub.add_parser("field-snap",
+                           help="场快照导出 + 就绪探针（task 156，备赛线）")
+    fsn_p.add_argument("--db", default=None,
+                       help="上游 ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    fsn_p.add_argument("--from", dest="from_date", default=None, help="窗起点（导出必填）")
+    fsn_p.add_argument("--to", dest="to_date", default=None, help="窗终点含（导出必填）")
+    fsn_p.add_argument("--out", default=None, help="快照 JSON 输出路径（导出必填）")
+    fsn_p.add_argument("--probe", action="store_true",
+                       help="就绪探针：上游最新赛事 vs 快照窗终点（退出码 0=新鲜 / 3=有新数据）")
+    fsn_p.add_argument("--snap", default=None, help="探针对比的既有快照路径")
+    mc_p = sub.add_parser("mod-check", help="改表成对判读（task 156：同种子 CRN 逐格 Δ+门）")
+    mc_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
+    mc_p.add_argument("--base-prefix", required=True, help="基线臂实验名前缀（如 prep-x-base-vs-）")
+    mc_p.add_argument("--mod-prefix", required=True, help="改表臂实验名前缀（如 prep-x-mod-vs-）")
+    mc_p.add_argument("--field", required=True, help="field 快照 JSON（权重来源）")
+    mc_p.add_argument("--pool", required=True, help="卡池 YAML（slug↔对手映射）")
+    mc_p.add_argument("--entry", required=True, help="报名卡组池内中文名（权重剔除自身）")
+    mc_p.add_argument("--alpha", type=float, default=0.05, help="显著性水准（默认 0.05）")
+    pr_p = sub.add_parser("prep",
+                          help="备赛编排器（task 156）：场刷新→field-pick→成对核对→统一报告")
+    pr_p.add_argument("prep", help="prep 定义 yml 路径（示例 experiments/prep.example.yml）")
+    pr_p.add_argument("--db", default=None,
+                      help="上游 ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+    pr_p.add_argument("--results", default=None,
+                      help="结果库路径（默认 results/prep-<name>.db）")
+    pr_p.add_argument("--field-out", default=None, help="场快照输出路径（默认 results/ 下自动命名）")
+    pr_p.add_argument("--out-dir", default=None, help="报告目录（默认 results/prep-<name>/）")
+    pr_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
+    pr_p.add_argument("--pick-only", action="store_true",
+                      help="只跑场刷新 + field-pick（零对局）")
     run_p = sub.add_parser("run", help="按实验定义 YAML 跑实验并落结果库")
     run_p.add_argument("experiment", help="实验定义 YAML 路径")
     run_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
@@ -1430,6 +1524,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_field_pick(args)
     if args.cmd == "matchup-snap":
         return _cmd_matchup_snap(args)
+    if args.cmd == "field-snap":
+        return _cmd_field_snap(args)
+    if args.cmd == "mod-check":
+        return _cmd_mod_check(args)
+    if args.cmd == "prep":
+        return _cmd_prep(args)
     if args.cmd == "run":
         return _cmd_run(args)
     if args.cmd == "report":

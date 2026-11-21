@@ -1,0 +1,15 @@
+# task 156 备赛编排示例：沙奈朵口径（v2.x+ 十一套池）
+# 用法：bfsim prep experiments/prep.example.yml --workers 16
+#      （--pick-only 只跑场刷新 + field-pick，零对局）
+# 纪律：base/mod 同 seed_start 域 = 成对 CRN；多刀组合改表另须 swap-search 同种子复核。
+name: prep-gardevoir-2026-11-22
+pool: config/target-pool.v2.yml
+matrix_snap: results/matchup-snap-2026-11-22.json   # 池矩阵快照（matchup-snap 产物；池版本不变则复用）
+field: {date_from: "2026-11-01", date_to: "2026-11-15"}   # 上游窗；新窗落地先 bfsim field-snap --probe
+entry:
+  archetype: 沙奈朵
+  deck_id: "mik_moe:711854"                          # 基线臂（池代表表）；缺省亦回退池表
+  modified: experiments/t141-gardevoir-modified.deck.txt   # 改表臂（task 141 两刀表）；无则只跑基线
+games_per_cell: 2000
+seed_start: 650000                                   # 与全部历史种子域不重叠
+agents: heuristic                                    # 备赛口径钉死启发式

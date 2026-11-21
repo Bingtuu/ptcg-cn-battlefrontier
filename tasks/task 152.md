@@ -34,9 +34,15 @@ criteria 以 BC 后联赛读数为第一道停损点）。
 - **提升门（PRD 钉死，终判）**：Elo 联赛（task 127 设施，BT-MLE 主估计子，
   CRN 双向配对）——BC 学生 vs 启发式净胜 CI 下界 > 0，且相对**纯 MCTS
   2×50 教师（联赛基线锚）**中位 Elo 差 > 0。评测可加跑深预算档。
-- **评估预算（WP3 跑数前在本文档钉死，预注册纪律）**：联赛注册表
-  agents/decks/games_per_cell 规模经成本核算后冻结——MCTS 教师局
-  ~9.6 min/局（578.9s 实测），教师参赛格成本须显式核算入册。
+- **评估预算（2026-11-21 WP3 前冻结，预注册纪律）**：注册表
+  `experiments/t152-bc-league.example.yml`——agents {heuristic-base,
+  mcts-2x50-v3cut（= task 151 教师同款 2×50 cap50 + eval-linear-v3 截断 10，
+  联赛基线锚可比性）, bc-student} × v2.x 池 10 decks × `games_per_cell=8`
+  × ab/ba 双向 = 60 细胞 480 局（MCTS 教师参赛 320 局）。成本核算：MCTS 局
+  ~9.65 min（578.9s 实测）× 320 ÷ 16 workers ≈ 200 min 独占口径，桌面争抢
+  ~2.3× → 整夜档 ~8-9h。功效披露：每无序对 160 局（CRN 双向配对对冲先手
+  偏差）；判读落 inconclusive 带（CI 覆盖 0 且 |点估计| ≥ 3pp）→ Owner
+  预算修正案，不得临场加局。
 - **Kill criteria（PRD 钉死，任一触发即停损，回 M15 水平线，管线资产留档）**：
   BC 后联赛对启发式无显著优势（CI 覆盖 0 且点估计 < +3pp）；或吞吐不达标
   且 spike 估期 > 6 周（task 149 已解除，不适用）；或训练非复算面声明

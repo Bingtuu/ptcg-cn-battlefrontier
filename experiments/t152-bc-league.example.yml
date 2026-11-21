@@ -1,0 +1,32 @@
+# task 152 WP3：BC 学生联赛评估注册表（提升门 + kill criteria 判读面）
+# 预注册冻结：2026-11-21（评估预算段写入 tasks/task 152.md 后不得变更）
+# 结构（task 127 设施）：3 无序对 × 10 decks(v2.x) × ab/ba 双向 = 60 细胞
+#   × games_per_cell 8 = 480 局（其中 MCTS 教师参赛 320 局）
+# 教师口径 = task 151 数据集同款（2×50 cap50 + eval-linear-v3 截断 10，
+#   联赛基线锚可比性）；bc-student = task 152 WP2 资产（v2.x 词表）
+# 成本核算：MCTS 局 ~9.65 min（578.9s 实测）× 320 ÷ 16 workers ≈ 200 min
+#   独占口径；桌面争抢实测 ~2.3× → 整夜档 ~8-9h。bc/heur 局 ~0.1s 忽略。
+# 功效披露：每无序对 160 局（10 decks × 16），CRN 双向配对对冲先手偏差；
+#   判读若落在 CI 覆盖 0 且 |点估计| ≥ 3pp 的 inconclusive 带 → Owner 预算
+#   修正案，不得临场加局（预注册纪律）。
+name: t152-bc-league-v1
+seed_start: 1110000
+seed_stride: 1000
+games_per_cell: 8
+decks:
+  - {source: db, deck_id: "mik_moe:676344"}   # 多龙巴鲁托 黑夜魔灵
+  - {source: db, deck_id: "mik_moe:677291"}   # 电电虫Box
+  - {source: db, deck_id: "mik_moe:711855"}   # 玛俐的长毛巨魔 雪妖女
+  - {source: db, deck_id: "mik_moe:711850"}   # 赛富豪 土龙节节
+  - {source: db, deck_id: "mik_moe:711854"}   # 沙奈朵
+  - {source: db, deck_id: "mik_moe:711852"}   # 猛雷鼓 厄诡椪
+  - {source: db, deck_id: "mik_moe:711853"}   # 喷火龙 大比鸟
+  - {source: db, deck_id: "mik_moe:697754"}   # N的索罗亚克
+  - {source: db, deck_id: "mik_moe:677868"}   # 多龙巴鲁托
+  - {source: db, deck_id: "mik_moe:701074"}   # 火伊布 猫头夜鹰
+agents:
+  - {id: heuristic-base, type: heuristic}
+  - {id: mcts-2x50-v3cut, type: mcts,
+     params: {worlds: 2, iterations: 50, rollout_turn_cap: 50,
+              eval_cutoff_turns: 10, evaluator_path: models/eval-linear-v3.json}}
+  - {id: bc-student, type: distilled, params: {policy_path: models/policy-m16-bc1.json}}

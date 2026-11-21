@@ -1,0 +1,10 @@
+# task 152 新场核对：沙奈朵改表(t141 v2 印刷级) vs raging-bolt（2,000 局，与基线同种子成对 CRN）
+name: t152-mod-vs-raging-bolt
+games: 2000
+seed_start: 640000
+decks:
+  a: {source: file, path: experiments/t141-gardevoir-modified.deck.txt}
+  b: {source: db, deck_id: "mik_moe:711852"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

@@ -1,0 +1,10 @@
+# task 152 新场核对：沙奈朵基线(711854) vs flareon-noctowl（2,000 局，种子 640000 域）
+name: t152-base-vs-flareon-noctowl
+games: 2000
+seed_start: 640000
+decks:
+  a: {source: db, deck_id: "mik_moe:711854"}
+  b: {source: db, deck_id: "mik_moe:701074"}
+agents:
+  a: {type: heuristic}
+  b: {type: heuristic}

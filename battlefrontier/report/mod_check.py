@@ -139,17 +139,9 @@ def _sort_build_key(slug: str, key: str) -> int:
     return int(key[len(slug) + 2:])
 
 
-def _load_batch_arms(db_path: str | Path, batch_path: str | Path,
-                     opp_slugs: list[str]
-                     ) -> tuple[dict, dict, dict, list[str]]:
-    """batch.json → (base, mod, incomplete, build_keys)。
-    base/mod: {build_key: {seed: outcome}}；incomplete: {build_key: [原因]}。
-    build_keys（task 160）：池 slug 顺序展开 + `~bN` 额外构筑（#1 = 池代表表）。
-    注册键必须在 {池 slug} ∪ {池 slug~bN} 内（未知键显式报错）；
-    两臂版本不一致 / 登记 ID 缺失 → 显式报错；status/种子缺口 → INCOMPLETE 原因。"""
-    batch = json.loads(Path(batch_path).read_text(encoding="utf-8"))
-    expected = set(range(batch["expected_seeds"][0], batch["expected_seeds"][1]))
-    registered = batch.get("slugs", {})
+def _batch_keys(registered: dict, opp_slugs: list[str]) -> list[str]:
+    """注册键校验 + 池序展开（#1 无后缀 + `~bN` 额外构筑，按 N 升序）。
+    未知键（base 部分不在池内）/ 缺登记 → 显式报错（不猜）。"""
     opp_set = set(opp_slugs)
     for key in registered:
         if key.split("~")[0] not in opp_set:
@@ -165,6 +157,21 @@ def _load_batch_arms(db_path: str | Path, batch_path: str | Path,
         build_keys += sorted(
             (k for k in registered if k.startswith(slug + "~b")),
             key=lambda k: _sort_build_key(slug, k))
+    return build_keys
+
+
+def _load_batch_arms(db_path: str | Path, batch_path: str | Path,
+                     opp_slugs: list[str]
+                     ) -> tuple[dict, dict, dict, list[str]]:
+    """batch.json → (base, mod, incomplete, build_keys)。
+    base/mod: {build_key: {seed: outcome}}；incomplete: {build_key: [原因]}。
+    build_keys（task 160）：池 slug 顺序展开 + `~bN` 额外构筑（#1 = 池代表表）。
+    注册键必须在 {池 slug} ∪ {池 slug~bN} 内（未知键显式报错）；
+    两臂版本不一致 / 登记 ID 缺失 → 显式报错；status/种子缺口 → INCOMPLETE 原因。"""
+    batch = json.loads(Path(batch_path).read_text(encoding="utf-8"))
+    expected = set(range(batch["expected_seeds"][0], batch["expected_seeds"][1]))
+    registered = batch.get("slugs", {})
+    build_keys = _batch_keys(registered, opp_slugs)
     con = sqlite3.connect(str(db_path))
     try:
         base: dict[str, dict[int, str]] = {}
@@ -200,6 +207,45 @@ def _load_batch_arms(db_path: str | Path, batch_path: str | Path,
                 incomplete[key] = reasons
             base[key], mod[key] = out_b, out_m
         return base, mod, incomplete, build_keys
+    finally:
+        con.close()
+
+
+def _load_batch_base_arms(db_path: str | Path, batch_path: str | Path,
+                          opp_slugs: list[str]
+                          ) -> tuple[dict, dict, list[str]]:
+    """base 模式批次（task 161 D-161-2）：无改表臂，单臂按登记 ID 取数 +
+    status/种子完整性校验（复用 paired 批次纪律，不另造机制）。
+    返回 ({key: {seed: outcome}}, incomplete, build_keys)。"""
+    batch = json.loads(Path(batch_path).read_text(encoding="utf-8"))
+    expected = set(range(batch["expected_seeds"][0], batch["expected_seeds"][1]))
+    registered = batch.get("slugs", {})
+    build_keys = _batch_keys(registered, opp_slugs)
+    con = sqlite3.connect(str(db_path))
+    try:
+        outcomes: dict[str, dict[int, str]] = {}
+        incomplete: dict[str, list[str]] = {}
+        for key in build_keys:
+            arms = registered.get(key)
+            if arms is None or "base_id" not in arms:
+                raise ValueError(
+                    f"mod-check：batch.json 未登记对手 slug「{key}」的"
+                    f" base 臂（批次缺登记，不猜）")
+            row = _exp_row(con, arms["base_id"])
+            reasons: list[str] = []
+            if row[0] != "done":
+                reasons.append(f"status={row[0]}（非 done）")
+            out = _load_outcomes_by_exp(db_path, arms["base_id"])
+            missing = sorted(expected - set(out))
+            extra = sorted(set(out) - expected)
+            if missing:
+                reasons.append(f"base 臂缺种子 {missing}")
+            if extra:
+                reasons.append(f"base 臂超种子 {extra}")
+            if reasons:
+                incomplete[key] = reasons
+            outcomes[key] = out
+        return outcomes, incomplete, build_keys
     finally:
         con.close()
 

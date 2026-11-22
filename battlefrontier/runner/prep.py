@@ -30,7 +30,6 @@ from battlefrontier.report.field_pick import (
     load_matrix_snapshot,
 )
 from battlefrontier.report.mod_check import (
-    _load_outcomes,
     _weights_for,
     format_mod_check,
     mod_check_report,
@@ -84,6 +83,8 @@ class PrepCfg(FrozenModel):
     entry: EntryCfg | None = None
     opponent_builds: dict[str, list[str]] = Field(default_factory=dict)
     # task 160：对手额外构筑（池内中文名 → decklist 路径列表）
+    family_size: int = Field(default=1, ge=1)
+    # task 161 D-161-3：扫描族候选批数（Bonferroni α/M，透传 mod-check）
     games_per_cell: int = Field(default=2000, gt=0)
     seed_start: int = Field(ge=0)
     agents: str = "heuristic"
@@ -192,27 +193,35 @@ def _pick_section(cfg: PrepCfg, field_out: Path, pool) -> str:
     return "## 选卡参考（field-pick）\n\n" + format_field_pick(rep)
 
 
-def _base_only_section(cfg: PrepCfg, results_path: Path, field_out: Path,
-                       pool) -> str:
-    """无改表臂：只报基线逐格读数 + 条件期望（门不适用）。
+def _base_only_section(cfg: PrepCfg, db_path: str | Path, batch_path: Path,
+                       field_out: Path, pool) -> str:
+    """无改表臂：基线逐 build 读数 + 条件期望（门不适用）。
+    task 161 D-161-2：按 batch.json 登记 ID 取数（废弃名称前缀 LIKE 搜库——
+    同名重跑零混入）；status/种子缺口 → INCOMPLETE 显式，不出完整基线结论。
     对手多构筑（task 160）：逐 build 行，期望 = 各 build 等权均值。"""
+    from battlefrontier.report.mod_check import _load_batch_base_arms
+
     entry = cfg.entry
     share_raw, _ = load_field_snapshot(field_out)
     weights = _weights_for(pool, share_raw, entry.archetype)
-    base = _load_outcomes(results_path, f"{cfg.name}-base-vs-")
-    multi = any("~" in k for k in base)
+    opp_slugs = [slugify(d.en_archetype) for d in pool.decks
+                 if d.archetype != entry.archetype]
+    base, incomplete, build_keys = _load_batch_base_arms(
+        db_path, batch_path, opp_slugs)
+
+    multi = any("~" in k for k in build_keys)
     lines = ["## 基线场适配读数（无改表臂——判读门不适用）", ""]
     if multi:
         lines.append("对手多构筑：逐 build 行，期望 = 各 build 等权均值")
-    lines += ["", "对手 | 基线 | 场权"]
+    lines.append("")
+    lines.append("对手 | 基线 | 场权")
     exp = 0.0
     for d in pool.decks:
         if d.archetype == entry.archetype:
             continue
         slug = slugify(d.en_archetype)
-        keys = [slug] + sorted(
-            (k for k in base if k.startswith(slug + "~b")),
-            key=lambda k: int(k[len(slug) + 2:]))
+        keys = [k for k in build_keys
+                if k == slug or k.startswith(slug + "~b")]
         wrs: list[float] = []
         for key in keys:
             outcomes = base.get(key)
@@ -225,8 +234,13 @@ def _base_only_section(cfg: PrepCfg, results_path: Path, field_out: Path,
             lines.append(f"{label} | {wr * 100:.1f}% | {w * 100:.1f}%")
         exp += (sum(wrs) / len(wrs)) * weights.get(slug, 0.0)
     lines.append("")
-    note = "（对手多构筑均值口径）" if multi else ""
-    lines.append(f"池内条件期望{note}（基线）：{exp * 100:.1f}%")
+    if incomplete:
+        lines.append("INCOMPLETE：批次不完整，基线结论不可判定")
+        for key, reasons in incomplete.items():
+            lines.append(f"  - {key}：{'；'.join(reasons)}")
+    else:
+        note = "（对手多构筑均值口径）" if multi else ""
+        lines.append(f"池内条件期望{note}（基线）：{exp * 100:.1f}%")
     return "\n".join(lines)
 
 
@@ -267,6 +281,7 @@ def _write_batch_json(cfg: PrepCfg, out_dir: Path,
                 slugs.setdefault(name[len(prefix):], {})[f"{arm}_id"] = exp_id
     payload = {
         "entry": cfg.entry.archetype,
+        "mode": "paired" if cfg.entry.modified else "base",
         "games": cfg.games_per_cell,
         "seed_start": cfg.seed_start,
         "expected_seeds": [cfg.seed_start,
@@ -287,20 +302,12 @@ def _sha256(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
-                   prep_source: str | Path | None,
-                   data_version: str, pool) -> tuple[str, str, str]:
-    """task 158 证据包：改表判读产物升级为可离线追溯制品目录。
-
-    inputs/（prep.yml 副本 + 卡表内容+sha256 + 场快照副本 + 矩阵快照身份
-    + manifest 自含 hash——目录整体拷走即可复核每个数字来源）+
-    verdict.json（逐格 + 四门）+ verdict.csv。返回
-    (definition_sha256, code_version, data_version) 供报告头注回显。
-    """
-    import csv
-    import dataclasses
-    import io
-
+def _freeze_inputs(cfg: PrepCfg, out_dir: Path, pool,
+                   *, prep_source: str | Path | None
+                   ) -> tuple[dict, dict]:
+    """task 161 D-161-1：开跑前冻结卡表字节——证据包文件名「{键}__{原名}」
+    （键 = mod / {slug}~bN，天然唯一，防不同目录同名 decklist 互相覆盖）；
+    冻结后源文件被改不影响本批归档。返回 (decks, files) 供证据包收尾消费。"""
     inputs = out_dir / "inputs"
     inputs.mkdir(parents=True, exist_ok=True)
     if prep_source is not None and Path(prep_source).exists():
@@ -312,24 +319,46 @@ def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
 
     entry = cfg.entry
     decks: dict = {"base": {"deck_id": entry.deck_id or "<池代表表>"}}
+    files: dict = {}
+
+    def _freeze(key: str, path: str) -> None:
+        name = f"{key}__{Path(path).name}"
+        data = Path(path).read_bytes()
+        (inputs / name).write_bytes(data)
+        digest = hashlib.sha256(data).hexdigest()
+        files[name] = digest
+        if key == "mod":
+            decks["mod"] = {"file": name, "sha256": digest}
+        else:
+            decks.setdefault("opponent_builds", {})[key] = {
+                "file": name, "sha256": digest}
+
     if entry.modified:
-        mod_name = Path(entry.modified).name
-        mod_bytes = Path(entry.modified).read_bytes()
-        (inputs / mod_name).write_bytes(mod_bytes)
-        decks["mod"] = {"file": mod_name,
-                        "sha256": hashlib.sha256(mod_bytes).hexdigest()}
+        _freeze("mod", entry.modified)
     if cfg.opponent_builds:
         cn_to_slug = {d.archetype: slugify(d.en_archetype) for d in pool.decks}
-        decks["opponent_builds"] = {}
         for cn, paths in cfg.opponent_builds.items():
             for idx, p in enumerate(paths, start=2):
-                key = f"{cn_to_slug[cn]}~b{idx}"
-                name = Path(p).name
-                data = Path(p).read_bytes()
-                (inputs / name).write_bytes(data)
-                decks["opponent_builds"][key] = {
-                    "file": name,
-                    "sha256": hashlib.sha256(data).hexdigest()}
+                _freeze(f"{cn_to_slug[cn]}~b{idx}", p)
+    return decks, files
+
+
+def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
+                   data_version: str, frozen: tuple[dict, dict]) -> tuple[str, str, str]:
+    """task 158 证据包 + task 161 加固：改表判读产物升级为可离线追溯制品目录。
+
+    inputs/（prep.yml 副本 + 开跑前冻结的卡表内容+sha256 + 场快照副本 +
+    矩阵快照身份 + manifest 自含 hash——目录整体拷走即可复核每个数字来源）+
+    verdict.json（逐格 + 四门 + 扫描族 meta）+ verdict.csv。无改表臂（rep=None）
+    只落 inputs/ 与 manifest（无 verdict——判读门不适用）。返回
+    (definition_sha256, code_version, data_version) 供报告头注回显。
+    """
+    import csv
+    import dataclasses
+    import io
+
+    decks, files = frozen
+    inputs = out_dir / "inputs"
     (inputs / "decks.json").write_text(
         json.dumps(decks, ensure_ascii=False, indent=2), encoding="utf-8")
     (inputs / "field-snap.json").write_bytes(Path(field_out).read_bytes())
@@ -341,18 +370,19 @@ def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
         "matrix_snap": {"path": str(Path(cfg.matrix_snap).resolve()),
                         "sha256": _sha256(cfg.matrix_snap)},
     }
-    if "mod" in decks:
-        manifest[decks["mod"]["file"]] = decks["mod"]["sha256"]
-    for build in decks.get("opponent_builds", {}).values():
-        manifest[build["file"]] = build["sha256"]
+    manifest.update(files)
     (inputs / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
     code_version = _code_version()
+    if rep is None:
+        return manifest["prep.yml"], code_version, data_version
     verdict = {
         "meta": {
             "name": cfg.name,
             "alpha": 0.05,
+            "family_size": rep.family_size,
+            "adopt_alpha": 0.05 / rep.family_size,
             "batch": "batch.json",
             "batch_sha256": _sha256(out_dir / "batch.json"),
             "definition_sha256": manifest["prep.yml"],
@@ -442,23 +472,30 @@ def run_prep(cfg: PrepCfg, *, db_path: str, results_path: str | Path,
             prepared.append((defn, prep_exp))
         sections.append(_load_warn_section(load_warnings, cover_violations))
 
+        # task 161 D-161-1：开跑前冻结卡表字节（防同名覆盖 + 源文件事后改动）
+        frozen = _freeze_inputs(cfg, out_dir, pool, prep_source=prep_source)
         exp_ids: dict[str, int] = {}
         for defn, prep_exp in prepared:
             exp_ids[defn.name] = execute_experiment(
                 prep_exp, defn, results_path, workers=workers)
+        # task 161 D-161-2：无改表臂同样登记批次（base 模式），废弃前缀搜库
+        batch_path = _write_batch_json(
+            cfg, out_dir, exp_ids, prepared[0][1].data_version)
         if cfg.entry.modified:
-            batch_path = _write_batch_json(
-                cfg, out_dir, exp_ids, prepared[0][1].data_version)
             rep = mod_check_report(
                 results_path, batch=batch_path, field_path=field_out,
-                pool_path=cfg.pool, entry=cfg.entry.archetype)
+                pool_path=cfg.pool, entry=cfg.entry.archetype,
+                family_size=cfg.family_size)
             mod_text = "## 改表成对判读（mod-check）\n\n" + format_mod_check(rep)
             triad = _evidence_pack(
                 cfg, out_dir, rep, field_out=Path(field_out),
-                prep_source=prep_source,
-                data_version=prepared[0][1].data_version, pool=pool)
+                data_version=prepared[0][1].data_version, frozen=frozen)
         else:
-            mod_text = _base_only_section(cfg, results_path, Path(field_out), pool)
+            mod_text = _base_only_section(
+                cfg, results_path, batch_path, Path(field_out), pool)
+            _evidence_pack(cfg, out_dir, None, field_out=Path(field_out),
+                           data_version=prepared[0][1].data_version,
+                           frozen=frozen)
     if mod_text:
         sections.append(mod_text)
 

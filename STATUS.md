@@ -5,7 +5,9 @@
 
 ## 当前
 
-**当前焦点 = task 160 对手构筑分布收官（2026-11-22，审计 P1 结构性缺口）**——prep yml `opponent_builds` 挂对手额外 decklist（池代表表恒 build #1，实验名 `~bN`），mod-check 批次逐 build 判读 + **保守门**（最劣 build 驱动：任一 build 回吐即门否，防均值陷阱）+ 期望 = 各 build 等权均值；证据包同步落对手构筑副本 + sha256；存量 prep 零变化。6 新测 + ruff 零告警 + 全量重跑绿。此前 **task 159 判读诚实度 P0 收官**（`--family-size M` Bonferroni 扫描族校正 + `match_odds` 赛制口径段 Bo3/瑞士轮出线概率），全量 2186 passed + 1 skipped；双任务均已归档 `tasks/done/`。审计清单剩余 P1/P2（对手强度谱系门/赛前一页纸/演练卡/rogue 守望/k 组合搜索）待 Owner 挑单。
+**当前焦点 = task 161 备赛线加固轮收官（2026-11-22，Grok 二轮 review 四项全采纳）**——①证据包 `{键}__{原名}` 防同名覆盖 + 开跑前冻结（源文件跑后被改不影响归档）；②base-only 接入批次协议（batch.json `mode: paired|base`，按 ID 取数 + 完整性校验，废弃前缀搜库）；③`PrepCfg.family_size` 贯通 prep（verdict meta 落族规模 + 校正阈值）；④探针 `content_sha256` 合格行内容签名（同窗纯内容修订判 backfill，旧快照明示能力边界）。9 新测 + ruff 零告警 + 全量重跑绿。此前 159（扫描族校正 + 赛制换算）/ 160（对手多构筑 + 最劣 build 保守门）已归档。Grok 建议的下一步 = 拿真实报名候选完整走一次备赛流程（人工驱动，Owner 拍板卡表后走 prep 全链路）。
+
+- 上一焦点 = task 160 对手构筑分布收官（2026-11-22，审计 P1 结构性缺口）——prep yml `opponent_builds` 挂对手额外 decklist（池代表表恒 build #1，实验名 `~bN`），mod-check 批次逐 build 判读 + **保守门**（最劣 build 驱动：任一 build 回吐即门否，防均值陷阱）+ 期望 = 各 build 等权均值；证据包同步落对手构筑副本 + sha256；存量 prep 零变化。6 新测 + ruff 零告警 + 全量重跑绿。此前 **task 159 判读诚实度 P0 收官**（`--family-size M` Bonferroni 扫描族校正 + `match_odds` 赛制口径段 Bo3/瑞士轮出线概率），全量 2186 passed + 1 skipped；双任务均已归档 `tasks/done/`。审计清单剩余 P1/P2（对手强度谱系门/赛前一页纸/演练卡/rogue 守望/k 组合搜索）待 Owner 挑单。
 
 - 上一焦点 = task 159 判读诚实度 P0（2026-11-22）——备赛线自我审计 P0 两件
 

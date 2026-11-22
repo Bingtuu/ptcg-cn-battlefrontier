@@ -80,12 +80,12 @@ def test_export_结构与口径逐键锁定(tmp_path, monkeypatch):
     assert written["meta"]["n_tournaments"] == 19
     assert written["meta"]["as_of"] == "2026-11-22"  # 钉运行日
     assert written["data"] == [{"group_key": "甲", "value": 0.5}]
-    # task 158：签名三键
-    assert written["meta"]["sig"] == {
-        "window": ["2026-11-01", "2026-11-15"],
-        "n_qualified": 0,
-        "data_version": "user_version=3",
-    }
+    # task 158：签名三键；task 161：+ 内容签名
+    sig = written["meta"]["sig"]
+    assert sig["window"] == ["2026-11-01", "2026-11-15"]
+    assert sig["n_qualified"] == 0
+    assert sig["data_version"] == "user_version=3"
+    assert len(sig["content_sha256"]) == 64
 
 
 def test_export_as_of_缺省取当日(tmp_path, monkeypatch):
@@ -233,3 +233,67 @@ def test_probe_无签名旧快照_降级日期比对(tmp_path):
     status, detail = probe_field_freshness(db, snap)
     assert status == "fresh"
     assert "降级" in detail
+
+
+# ── task 161：内容签名（同窗纯内容修订检测 + 能力边界明示）──────────
+
+def test_export_sig_含内容签名(tmp_path, monkeypatch):
+    """sig 增 content_sha256（合格行内容哈希，best-effort 检测
+    「计数与日期不变、仅修订内容」的修订路径）。"""
+    import battlefrontier.runner.field_snap as fs
+
+    db_path, stub = _make_upstream(tmp_path, [{"group_key": "甲", "value": 0.5}],
+                                   {"n_tournaments": 0})
+    monkeypatch.setattr(fs, "open_backend", lambda p: stub)
+    out = tmp_path / "snap.json"
+    export_field_snap(db_path, "2026-11-01", "2026-11-15", out)
+
+    sig = json.loads(out.read_text(encoding="utf-8"))["meta"]["sig"]
+    assert sig["window"] == ["2026-11-01", "2026-11-15"]
+    assert sig["n_qualified"] == 0
+    assert sig["data_version"] == "user_version=3"
+    assert len(sig["content_sha256"]) == 64
+
+
+def test_probe_同窗纯内容修订_stale_backfill(tmp_path):
+    """日期与合格赛事数全不变，仅修订同窗一行 static_weight
+    （牌表更正/权重修订路径）→ 内容签名判出 backfill。"""
+    from battlefrontier.runner.field_snap import qualified_content_sha256
+
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    snap = tmp_path / "snap.json"
+    snap_obj = {"meta": {"date_to": "2026-11-15",
+                         "sig": {"window": ["2026-11-01", "2026-11-15"],
+                                 "n_qualified": 2,
+                                 "data_version": "user_version=3",
+                                 "content_sha256": qualified_content_sha256(
+                                     db, "2026-11-01", "2026-11-15")}},
+                "data": []}
+    snap.write_text(json.dumps(snap_obj), encoding="utf-8")
+    status, detail = probe_field_freshness(db, snap)
+    assert status == "fresh"
+
+    # 同窗纯内容修订： tournament_id=0 的 static_weight 1.0 → 2.0
+    con = sqlite3.connect(db)
+    con.execute("UPDATE v_tournament_weights SET static_weight=2.0 "
+                "WHERE tournament_id=0")
+    con.commit()
+    con.close()
+    status, detail = probe_field_freshness(db, snap)
+    assert status == "stale"
+    assert "backfill" in detail and "内容签名" in detail
+
+
+def test_probe_旧快照无内容签名_能力边界注记(tmp_path):
+    """旧签名（无 content_sha256）fresh 时明示检测能力边界。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    status, detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+    assert "签名一致" in detail
+    assert "不保证内容未变" in detail

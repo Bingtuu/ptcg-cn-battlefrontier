@@ -224,19 +224,24 @@ bfsim matchup-snap --pool config/target-pool.v2.yml --intl-db <db> --from 2026-0
 bfsim field-pick --field <snap.json> --pool config/target-pool.v2.yml --matrix-snap snap.json
 ```
 
-### 10. 备赛编排（prep / field-snap / mod-check，task 156）
+### 10. 备赛编排（prep / field-snap / mod-check，task 156–161）
 
-一场比赛的端到端备赛流程一键编排（场刷新 → field-pick → 报名卡组 × 池内全对手成对核对 → 统一报告）：
+一场比赛的端到端备赛流程一键编排（场刷新 → field-pick → 报名卡组 × 池内全对手成对跑批 → 批次判读 + 证据包 → 统一报告）：
 
 ```bash
-bfsim field-snap --probe --snap results/field-snap-<旧>.json   # 就绪探针：上游有新场？退出码 0=新鲜 / 3=有新数据
-bfsim prep experiments/prep.example.yml --workers 16           # 全量（报名卡组 + 改表成对跑批 + 判读）
+bfsim field-snap --probe --snap results/field-snap-<旧>.json   # 就绪探针：退出码 0=新鲜 / 3=有新数据（签名双判 newer/backfill + 合格行内容签名）
+bfsim prep experiments/prep.example.yml --workers 16           # 全量（场刷新 + 选卡 + 成对跑批 + 判读 + 证据包）
 bfsim prep experiments/prep.example.yml --pick-only            # 只跑场刷新 + field-pick（零对局）
-bfsim mod-check --results <db> --base-prefix <前缀> --mod-prefix <前缀> \
-  --field <snap.json> --pool config/target-pool.v2.yml --entry <中文名>   # 单独判读已跑完的成对实验
+bfsim mod-check --results <db> --batch results/prep-<名>/batch.json \
+  --field <snap.json> --pool config/target-pool.v2.yml --entry <中文名> \
+  [--family-size M]   # 单独判读：按 prep 登记的实验 ID 取数（同名重跑零混入）+ 完整性第四门
 ```
 
-纪律由命令固化（不靠记忆）：base/mod 实验同名后缀配对、同种子域 = 成对 CRN、报名卡组恒 a 侧、判读三门（全正/全显著/零回吐）+ 种子缺口显式列出；报告头注限定语必嵌（登顶率 ≠ 夺冠概率、改表增益 = sim 口径）。败局解剖（`bfsim report --autopsy`）与换卡搜索（`bfsim swap-search`，多刀组合须同种子对照复核）为人工驱动下一步，报告内给命令指针。
+prep yml 能力面（task 157–161）：`entry.deck_id`（基线表）+ `entry.modified`（改表 decklist）+ `opponent_builds`（对手额外构筑——逐 build 判读、最劣 build 保守门、期望 = 各 build 等权均值）+ `family_size`（扫描 M 个候选改表批时的 Bonferroni α/M 校正）+ strict 覆盖率默认开（`--no-strict-coverage` 显式逃生）。
+
+纪律由命令固化（不靠记忆）：实验名 `{prep名}-{arm}-vs-{slug}`（额外构筑 `~bN` 后缀）同名后缀配对、同种子域 = 成对 CRN、报名卡组恒 a 侧；判读三门（全正/全显著/零回吐）+ 批次完整性第四门（INCOMPLETE 时三门「不可判定」）；报告头注限定语必嵌（登顶率 ≠ 夺冠概率、改表增益 = sim 口径），并附 Bo3 比赛胜率与瑞士轮出线概率的赛制口径换算（解析派生、简化口径注记）。
+
+证据包（task 158/161）：判读落 `results/prep-<名>/` = inputs/（定义副本 + **开跑前冻结**的卡表内容+sha256——按 `{键}__{原名}` 落盘防同名覆盖 + 场快照副本 + 矩阵快照身份 + manifest 自含 hash）+ verdict.json/csv（逐格 + 四门 + 扫描族 meta）+ batch.json（实验 ID 批次 + 预期种子全集 + 两臂版本）——目录整体拷走即可离线复核每个数字来源，卡表事后篡改可发现；无改表臂（base 模式）同样按 ID 批次取数，INCOMPLETE 不出完整基线结论。
 
 ## 评估与验证方法
 
@@ -275,8 +280,9 @@ PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -X utf8 -m pytest -q
 - **核验与诚实性收口**（111/114）：task 102「无向 36 对」预检数勘误（口径未存档不可复现，权威口径 = 有向 72 格 + 判决 JSON）；`format_sensitivity` 补 sim 解释限定语（claims register 守则 1 遗留缺口）。
 - **引擎与观测层收官**（108）：事件序观感债修复（招式效果窗口内昏厥/拿奖事件滞后到链收尾入流，replay 抽查 20/20 四指标等价 + 排水内层帧漏洞修复）。
 - **M12 残留盲区清零**（109）：use_ability / play_stadium / end_turn 三盲区预注册诊断预检全部关闭（教师强信号 lift 均 ≤ 0——use_ability 甚至 −8.5pp 反向；end_turn 与 066 低上限结论互证）。
+- **备赛编排线收官**（156–161，2026-11-22）：`bfsim prep / field-snap（含就绪探针）/ mod-check` 三命令 + 批次隔离协议（batch.json 按实验 ID 取数，paired/base 双模式）+ 证据包（开跑前冻结卡表 + 自含 hash，篡改可发现）+ 对手多构筑分布（最劣 build 保守门）+ 扫描族 Bonferroni 校正 + Bo3/瑞士轮赛制换算 + 探针内容签名；赛后记录模板 `docs/tournament-log-template.md`。Grok 两轮外部评审 9 条建议全闭环。下一步 = 拿真实报名候选完整走一次备赛流程（人工驱动）。
 
-**度量地基**：`results/m13-baseline/` 三份双轨偏差包（full/development/validation，72/72 格 `sim_failed=0`，串行=并行 100/100）；启发式加权 |Δ| 15.0%–18.1% 为**自对局结构度量**，非精度指标。全量 **1949 测试绿** + ruff 零告警；DSL 定义库 155 份（v2.x 池 10 套零缺口——2026-11-15 修订：6 套刷新 + 赛富豪土龙节节第 10 套入池，近窗覆盖 85.25%，task 135/136/138/139）；四类 AI（启发式 / 随机 / MCTS / 蒸馏学生）+ 学得评估器与蒸馏模型资产 `models/`。
+**度量地基**：`results/m13-baseline/` 三份双轨偏差包（full/development/validation，72/72 格 `sim_failed=0`，串行=并行 100/100）；启发式加权 |Δ| 15.0%–18.1% 为**自对局结构度量**，非精度指标。全量 **2201 测试绿** + ruff 零告警；DSL 定义库 155 份（v2.x+ 池 11 套零缺口——2026-11-15 定向补池：赛富豪纯构筑第 11 套 + 4 卡引擎扩展，近窗覆盖 85.25%→field 快照口径，task 135/136/138/139/152）；四类 AI（启发式 / 随机 / MCTS / 蒸馏学生）+ 学得评估器与蒸馏模型资产 `models/`。
 
 **待触发（值守线 task 112）**：t105 哨兵 + cron 周期普查（当前 WAIT：9/18 对 n≥20、池内 1,520 局），达标（≥18 对且 ≥1,000 局）即自动出 RUN 判决（R1 解禁 / R2 钉死）；判决报告必嵌「真实侧 = 国际线上周赛 meta」限定语。新方向立项待 Owner 拍板。
 

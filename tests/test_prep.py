@@ -367,9 +367,10 @@ def test_run_prep_证据包落盘(tmp_path, monkeypatch):
     out_dir = tmp_path / "out"
 
     # inputs/：定义副本 + 改表 decklist 内容副本 + 场快照副本 + 卡表身份
+    #（task 161：文件按「键__原名」落盘，防同名覆盖）
     inputs = out_dir / "inputs"
     assert (inputs / "prep.yml").is_file()
-    mod_copy = inputs / "mod.deck.txt"
+    mod_copy = inputs / "mod__mod.deck.txt"
     assert mod_copy.is_file()
     assert mod_copy.read_text(encoding="utf-8") == "1 卡甲\n"
     field_copy = inputs / "field-snap.json"
@@ -377,10 +378,10 @@ def test_run_prep_证据包落盘(tmp_path, monkeypatch):
     assert json.loads(field_copy.read_text(encoding="utf-8"))["meta"]["as_of"]
     decks = json.loads((inputs / "decks.json").read_text(encoding="utf-8"))
     assert decks["base"] == {"deck_id": "src:3"}            # 基线 deck_id
-    assert decks["mod"]["file"] == "mod.deck.txt"
+    assert decks["mod"]["file"] == "mod__mod.deck.txt"
     assert len(decks["mod"]["sha256"]) == 64
     manifest = json.loads((inputs / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["mod.deck.txt"] == decks["mod"]["sha256"]  # 自含 hash
+    assert manifest["mod__mod.deck.txt"] == decks["mod"]["sha256"]  # 自含 hash
     assert manifest["prep.yml"]                         # 定义副本 hash
     assert manifest["matrix_snap"]["path"].endswith("snap.json")
     assert len(manifest["matrix_snap"]["sha256"]) == 64
@@ -425,7 +426,7 @@ def test_run_prep_卡表篡改可发现(tmp_path, monkeypatch):
     manifest = json.loads(
         (tmp_path / "out" / "inputs" / "manifest.json").read_text(encoding="utf-8"))
     now = hashlib.sha256(mod_file.read_bytes()).hexdigest()
-    assert now != manifest["mod.deck.txt"]                # 篡改被证据包发现
+    assert now != manifest["mod__mod.deck.txt"]           # 篡改被证据包发现
 
 
 # ── task 160：对手构筑分布（opponent_builds）────────────────────────
@@ -494,12 +495,12 @@ def test_run_prep_对手多构筑_批次与证据包(tmp_path, monkeypatch):
     decks = json.loads((out_dir / "inputs" / "decks.json").read_text(
         encoding="utf-8"))
     build = decks["opponent_builds"]["alpha-a~b2"]
-    assert build["file"] == "opp-alpha-b2.deck.txt"
+    assert build["file"] == "alpha-a~b2__opp-alpha-b2.deck.txt"
     assert len(build["sha256"]) == 64
-    assert (out_dir / "inputs" / "opp-alpha-b2.deck.txt").is_file()
+    assert (out_dir / "inputs" / "alpha-a~b2__opp-alpha-b2.deck.txt").is_file()
     manifest = json.loads((out_dir / "inputs" / "manifest.json").read_text(
         encoding="utf-8"))
-    assert manifest["opp-alpha-b2.deck.txt"] == build["sha256"]
+    assert manifest["alpha-a~b2__opp-alpha-b2.deck.txt"] == build["sha256"]
 
     verdict = json.loads((out_dir / "verdict.json").read_text(encoding="utf-8"))
     assert len(verdict["cells"]) == 3                    # 逐 build 格
@@ -509,3 +510,270 @@ def test_run_prep_对手多构筑_批次与证据包(tmp_path, monkeypatch):
     text = Path(report_path).read_text(encoding="utf-8")
     assert "alpha-a~b2" in text                          # 判读节逐 build 行
     assert "多构筑均值" in text                           # 期望口径声明
+
+
+# ── task 161：证据包加固 / base-only 批次化 / family_size 贯通 ──────
+
+def _write_cfg_three_same_name(tmp_path) -> dict[str, Path]:
+    """三份同名不同内容 decklist：己方改表 + 甲的两份额外构筑。"""
+    dirs = []
+    for d in ("d1", "d2", "d3"):
+        (tmp_path / d).mkdir(exist_ok=True)
+        dirs.append(tmp_path / d)
+    files = {}
+    for d, content in zip(dirs, ("1 自改甲\n", "1 对手改乙\n", "1 对手改丙\n")):
+        f = d / "deck.txt"
+        f.write_text(content, encoding="utf-8")
+        files[d.name] = f
+    p = _write_cfg(tmp_path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    raw["entry"]["modified"] = str(files["d1"])
+    raw["opponent_builds"] = {"甲": [str(files["d2"]), str(files["d3"])]}
+    p.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    return {"cfg": p, **files}
+
+
+def test_run_prep_同名decklist三份全保留(tmp_path, monkeypatch):
+    """D-161-1：三份同名 deck.txt 按「键__原名」落盘，内容与哈希各自正确。"""
+    import hashlib
+
+    _patch_field_export(monkeypatch)
+    _fake_run_prepare_execute(monkeypatch)
+    (tmp_path / "cards").mkdir()
+    files = _write_cfg_three_same_name(tmp_path)
+    cfg = load_prep_cfg(files["cfg"])
+
+    run_prep(cfg, **_run_prep_kwargs(tmp_path))
+    inputs = tmp_path / "out" / "inputs"
+
+    expect = {
+        "mod__deck.txt": files["d1"],
+        "alpha-a~b2__deck.txt": files["d2"],
+        "alpha-a~b3__deck.txt": files["d3"],
+    }
+    for archived, src in expect.items():
+        copy = inputs / archived
+        assert copy.is_file(), archived
+        assert copy.read_text(encoding="utf-8") == src.read_text(encoding="utf-8")
+    decks = json.loads((inputs / "decks.json").read_text(encoding="utf-8"))
+    manifest = json.loads((inputs / "manifest.json").read_text(encoding="utf-8"))
+    # 逐键哈希断言（钉内容归属：哪个归档 = 哪份源）
+    assert decks["mod"]["file"] == "mod__deck.txt"
+    assert decks["mod"]["sha256"] == hashlib.sha256(
+        files["d1"].read_bytes()).hexdigest()
+    assert decks["opponent_builds"]["alpha-a~b2"]["sha256"] == hashlib.sha256(
+        files["d2"].read_bytes()).hexdigest()
+    assert decks["opponent_builds"]["alpha-a~b3"]["sha256"] == hashlib.sha256(
+        files["d3"].read_bytes()).hexdigest()
+    for archived in expect:
+        assert manifest[archived] == hashlib.sha256(
+            (inputs / archived).read_bytes()).hexdigest()
+
+
+def test_run_prep_开跑后源文件被改_归档冻结(tmp_path, monkeypatch):
+    """D-161-1：开跑前冻结——fake_execute 中途篡改源文件，归档仍是开跑前字节。"""
+    import hashlib
+
+    _patch_field_export(monkeypatch)
+    from helpers import energy
+
+    import battlefrontier.runner.prep as prep_mod
+    from battlefrontier.runner.results_db import ResultsDB
+
+    def fake_prepare(defn, db_path, **kw):
+        deck = [energy()] * 60
+        return SimpleNamespace(deck_a=list(deck), deck_b=list(deck),
+                               warnings=[], data_version="dv1")
+
+    tampered = {"done": False}
+
+    def fake_execute(prep_exp, defn, results_path, **kw):
+        if not tampered["done"] and defn.decks.a.source == "file":
+            tampered["done"] = True
+            Path(defn.decks.a.path).write_text("TAMPERED\n", encoding="utf-8")
+        db = ResultsDB(results_path)
+        eid = db.start_experiment(name=defn.name, definition_yaml="",
+                                  code_version="t", data_version="dv1")
+        for seed in range(defn.seed_start, defn.seed_start + defn.games):
+            db.record_game(eid, seed=seed, first_player=0,
+                           result=SimpleNamespace(winner=0, is_draw=False,
+                                                  turns=5, events_hash="h",
+                                                  events=[]),
+                           deck_a_id="a", deck_b_id="b")
+        db.finish_experiment(eid)
+        db.close()
+        return eid
+
+    monkeypatch.setattr(prep_mod, "prepare_experiment", fake_prepare)
+    monkeypatch.setattr(prep_mod, "execute_experiment", fake_execute)
+    (tmp_path / "cards").mkdir()
+    cfg = load_prep_cfg(_write_cfg(tmp_path))   # mod.deck.txt = "1 卡甲\n"
+    original = (tmp_path / "mod.deck.txt").read_bytes()
+
+    run_prep(cfg, **_run_prep_kwargs(tmp_path))
+    archived = tmp_path / "out" / "inputs" / "mod__mod.deck.txt"
+    assert archived.read_bytes() == original          # 冻结 = 开跑前字节
+    manifest = json.loads(
+        (tmp_path / "out" / "inputs" / "manifest.json").read_text(
+            encoding="utf-8"))
+    assert manifest["mod__mod.deck.txt"] == hashlib.sha256(original).hexdigest()
+
+
+def test_run_prep_base_only_同名两批完全隔离(tmp_path, monkeypatch):
+    """D-161-2：无改表臂也走批次协议——同名先跑全负、再跑全胜，
+    基线读数只认第二批登记 ID（旧批零混入）。"""
+    _patch_field_export(monkeypatch)
+    (tmp_path / "cards").mkdir()
+
+    import battlefrontier.runner.prep as prep_mod
+    from battlefrontier.runner.results_db import ResultsDB
+
+    rounds: list[str] = []
+
+    def fake_prepare(defn, db_path, **kw):
+        from helpers import energy
+        deck = [energy()] * 60
+        return SimpleNamespace(deck_a=list(deck), deck_b=list(deck),
+                               warnings=[], data_version="dv1")
+
+    def fake_execute(prep_exp, defn, results_path, **kw):
+        rounds.append(defn.name)
+        winner = 1 if len(rounds) <= 2 else 0      # 第一批全负、第二批全胜
+        db = ResultsDB(results_path)
+        eid = db.start_experiment(name=defn.name, definition_yaml="",
+                                  code_version="t", data_version="dv1")
+        for seed in range(defn.seed_start, defn.seed_start + defn.games):
+            db.record_game(eid, seed=seed, first_player=0,
+                           result=SimpleNamespace(winner=winner, is_draw=False,
+                                                  turns=5, events_hash="h",
+                                                  events=[]),
+                           deck_a_id="a", deck_b_id="b")
+        db.finish_experiment(eid)
+        db.close()
+        return eid
+
+    monkeypatch.setattr(prep_mod, "prepare_experiment", fake_prepare)
+    monkeypatch.setattr(prep_mod, "execute_experiment", fake_execute)
+
+    cfg = load_prep_cfg(_write_cfg(tmp_path, with_mod=False))
+    run_prep(cfg, **_run_prep_kwargs(tmp_path))            # 第一批
+    report_path = run_prep(cfg, **_run_prep_kwargs(tmp_path))  # 同名第二批
+
+    text = Path(report_path).read_text(encoding="utf-8")
+    assert "100.0%" in text                                # 只读到第二批全胜
+    batch = json.loads((tmp_path / "out" / "batch.json").read_text(
+        encoding="utf-8"))
+    con = __import__("sqlite3").connect(str(tmp_path / "res.db"))
+    second_ids = {r[0] for r in con.execute(
+        "SELECT id FROM experiments WHERE id > 2")}   # 第一批 = 2 实验
+    con.close()
+    assert {v["base_id"] for v in batch["slugs"].values()} == second_ids
+
+
+def test_run_prep_base_only_缺局_INCOMPLETE(tmp_path, monkeypatch):
+    """D-161-2：缺种子 → INCOMPLETE 显式，不出完整基线结论。"""
+    _patch_field_export(monkeypatch)
+    (tmp_path / "cards").mkdir()
+
+    import battlefrontier.runner.prep as prep_mod
+    from battlefrontier.runner.results_db import ResultsDB
+
+    def fake_prepare(defn, db_path, **kw):
+        from helpers import energy
+        deck = [energy()] * 60
+        return SimpleNamespace(deck_a=list(deck), deck_b=list(deck),
+                               warnings=[], data_version="dv1")
+
+    def fake_execute(prep_exp, defn, results_path, **kw):
+        db = ResultsDB(results_path)
+        eid = db.start_experiment(name=defn.name, definition_yaml="",
+                                  code_version="t", data_version="dv1")
+        for seed in range(defn.seed_start, defn.seed_start + defn.games - 1):
+            db.record_game(eid, seed=seed, first_player=0,
+                           result=SimpleNamespace(winner=0, is_draw=False,
+                                                  turns=5, events_hash="h",
+                                                  events=[]),
+                           deck_a_id="a", deck_b_id="b")
+        db.finish_experiment(eid)
+        db.close()
+        return eid
+
+    monkeypatch.setattr(prep_mod, "prepare_experiment", fake_prepare)
+    monkeypatch.setattr(prep_mod, "execute_experiment", fake_execute)
+
+    cfg = load_prep_cfg(_write_cfg(tmp_path, with_mod=False))
+    report_path = run_prep(cfg, **_run_prep_kwargs(tmp_path))
+    text = Path(report_path).read_text(encoding="utf-8")
+    assert "INCOMPLETE" in text
+    assert "不可判定" in text
+
+
+def test_run_prep_family_size_校正贯通(tmp_path, monkeypatch):
+    """D-161-3：prep 透传 family_size——同组结果（7 正向翻转 p=0.015625）
+    在 =1 全显著、=4 校正后（α'=0.0125）不显著；verdict meta 落族规模。"""
+    _patch_field_export(monkeypatch)
+    (tmp_path / "cards").mkdir()
+
+    import battlefrontier.runner.prep as prep_mod
+    from battlefrontier.runner.results_db import ResultsDB
+
+    def fake_prepare(defn, db_path, **kw):
+        from helpers import energy
+        deck = [energy()] * 60
+        return SimpleNamespace(deck_a=list(deck), deck_b=list(deck),
+                               warnings=[], data_version="dv1")
+
+    def fake_execute(prep_exp, defn, results_path, **kw):
+        db = ResultsDB(results_path)
+        eid = db.start_experiment(name=defn.name, definition_yaml="",
+                                  code_version="t", data_version="dv1")
+        for i, seed in enumerate(range(defn.seed_start,
+                                       defn.seed_start + defn.games)):
+            if "-mod-vs-" in defn.name and i < 7:
+                winner = 0            # mod 前 7 局胜 = 7 正向翻转（p=0.015625）
+            else:
+                winner = 1            # 其余全负
+            db.record_game(eid, seed=seed, first_player=0,
+                           result=SimpleNamespace(winner=winner, is_draw=False,
+                                                  turns=5, events_hash="h",
+                                                  events=[]),
+                           deck_a_id="a", deck_b_id="b")
+        db.finish_experiment(eid)
+        db.close()
+        return eid
+
+    monkeypatch.setattr(prep_mod, "prepare_experiment", fake_prepare)
+    monkeypatch.setattr(prep_mod, "execute_experiment", fake_execute)
+
+    p = _write_cfg(tmp_path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    raw["family_size"] = 4
+    p.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    cfg = load_prep_cfg(p)
+
+    report_path = run_prep(cfg, **_run_prep_kwargs(tmp_path))
+    text = Path(report_path).read_text(encoding="utf-8")
+    assert "扫描族" in text and "0.0125" in text          # 校正注落报告
+    verdict = json.loads((tmp_path / "out" / "verdict.json").read_text(
+        encoding="utf-8"))
+    assert verdict["meta"]["family_size"] == 4
+    assert verdict["gates"]["all_significant"] is False   # α'=0.0125：p=0.015625 不过
+
+    # 同组结果 family_size=1 → 全显著翻转（判读随声明变化）
+    raw["family_size"] = 1
+    p.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    cfg1 = load_prep_cfg(p)
+    run_prep(cfg1, **_run_prep_kwargs(tmp_path))
+    verdict1 = json.loads((tmp_path / "out" / "verdict.json").read_text(
+        encoding="utf-8"))
+    assert verdict1["meta"]["family_size"] == 1
+    assert verdict1["gates"]["all_significant"] is True
+
+
+def test_cfg_family_size_非法拒收(tmp_path):
+    p = _write_cfg(tmp_path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    raw["family_size"] = 0
+    p.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    with pytest.raises(ValueError, match="family_size"):
+        load_prep_cfg(p)

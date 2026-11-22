@@ -7,6 +7,8 @@
 
 ### Added
 
+- 备赛线加固轮（task 161，Grok 二轮 review 四项全采纳）：**证据包防同名覆盖 + 开跑前冻结**——卡表副本按 `{键}__{原名}` 落 inputs/（键 = mod / `{slug}~bN`，天然唯一），`_freeze_inputs` 在 execute 前捕获字节 + sha256（源文件跑后被改不影响本批归档，fake_execute 中途篡改测试实证）；**base-only 接入批次协议**——batch.json 增 `mode: paired|base`，无改表臂同样按登记 ID 取数 + status/种子完整性校验（`_load_batch_base_arms` 复用 `_batch_keys` 不另造机制），废弃名称前缀 LIKE 搜库（同名重跑零混入），INCOMPLETE 显式不出完整基线结论，无改表臂也落 inputs/ + manifest；**family_size 贯通 prep**——`PrepCfg.family_size`（ge=1）透传 mod-check，verdict meta 落 family_size + adopt_alpha（subprocess 级 prep E2E 降档不立项：场数据管道 sqlite-only，现有集成测试已覆盖真判读 + 真证据包）；**探针内容签名**——`qualified_content_sha256`（合格行 tournament_id/date/static_weight 排序哈希）入 sig，同窗纯内容修订（计数与日期不变）判 backfill，旧快照 fresh 明示「计数与版本未变不保证内容未变」；9 新测 + 3 既有测试随命名更新
+
 - 对手构筑分布（task 160，审计 P1 结构性缺口）：prep yml 新增 `opponent_builds: {池内中文名: [decklist, ...]}` = 对手额外构筑（池代表表恒 build #1，实验名 `~bN` 后缀，`~` 免 slugify 碰撞）；mod-check 批次逐 build 判读格 + **保守门**（全正/零回吐/全显著逐 build 判定，最劣 build 驱动，防「均值好看、最劣改表崩盘」采纳陷阱）+ 期望 = 各 build 等权均值（`ModReport.cell_weights` = 对手场权 / build 数）；batch.json 注册键白名单校验（未知键显式报错），前缀模式遇 `~bN` 显式拒绝；证据包 decks.json 落对手构筑副本 + sha256；base-only 段同支持多构筑；存量 prep 定义零变化（36 夹具全兼容）；6 新测
 
 - 判读诚实度 P0（task 159，2026-11-22 备赛线自我审计 P0 两件）：**扫描族多重比较校正**——`mod-check --family-size M`（本次扫描族候选改表批数，跨批 OR 采纳的假阳性通胀护栏）：全显著门按 Bonferroni α/M 判、逐格 p 仍显示原始值、报告头注明示校正阈值（M=1 旧输出逐字节兼容、非正整数显式报错）；**赛制口径解析换算**——新模块 `battlefrontier/report/match_odds.py`：`bo3_match_prob`（单局 p→Bo3 比赛胜率 p²(3−2p)）+ `cut_prob`（瑞士轮二项尾出线概率）+ `format_match_odds`，mod-check 报告条件期望行后追加赛制段（基线/改表两栏 Bo3 + 「6 轮 ≥4 胜」出线概率，简化口径注：无 tiebreak、Bo3 单局独立同 p；仍是 sim 口径数字不构成真实胜率预测）；纯解析派生不进 verdict.json schema；8 新测（手算锚定：Bo3 0.6→0.648、cut 6/4 p=0.5→22/64 等）

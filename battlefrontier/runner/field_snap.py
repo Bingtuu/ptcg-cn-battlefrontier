@@ -66,6 +66,30 @@ def qualified_count(db_path: str | Path, date_from: str, date_to: str) -> int:
     return int(row[0] or 0)
 
 
+def qualified_content_sha256(db_path: str | Path, date_from: str,
+                             date_to: str) -> str:
+    """合格行内容签名（task 161，best-effort）：(tournament_id, date,
+    static_weight) 排序后 sha256——同窗纯内容修订（牌表更正/权重修订，
+    日期与计数不变）据此判出。能力边界：修订不触碰 v_tournament_weights
+    行则哈希不动（探针 fresh 注记明示）。"""
+    import hashlib
+
+    con = sqlite3.connect(str(db_path))
+    try:
+        rows = con.execute(
+            f"SELECT tournament_id, date, static_weight "
+            f"FROM v_tournament_weights "
+            f"WHERE date BETWEEN ? AND ? AND {QUALIFIED_WHERE} "
+            f"ORDER BY tournament_id",
+            (date_from, date_to, "master", "cn")).fetchall()
+    finally:
+        con.close()
+    digest = hashlib.sha256()
+    for row in rows:
+        digest.update(repr(tuple(row)).encode("utf-8") + b"\n")
+    return digest.hexdigest()
+
+
 def _sig_data_version(db_path: str | Path) -> str:
     """签名数据版本锚点：sqlite = user_version（只读）；jsonl dist = schema_version。"""
     if Path(db_path).is_dir():
@@ -101,6 +125,8 @@ def export_field_snap(db_path: str | Path, date_from: str, date_to: str,
         "window": [date_from, date_to],
         "n_qualified": qualified_count(db_path, date_from, date_to),
         "data_version": _sig_data_version(db_path),
+        "content_sha256": qualified_content_sha256(
+            db_path, date_from, date_to),
     }
     snap = {"meta": meta,
             "data": [r.model_dump(mode="json") for r in res.data]}
@@ -156,9 +182,18 @@ def probe_field_freshness(db_path: str | Path,
     dv_now = _sig_data_version(db_path)
     if dv_now != sig["data_version"]:
         reasons.append(f"数据版本 {sig['data_version']}→{dv_now}（变更）")
+    # task 161：同窗纯内容修订（计数/版本不变）——合格行内容哈希比对
+    content_sig = sig.get("content_sha256")
+    if content_sig is not None:
+        c_now = qualified_content_sha256(db_path, window[0], window[1])
+        if c_now != content_sig:
+            reasons.append("合格赛事内容签名变更（牌表/权重修订）")
     if reasons:
         return ("stale", (f"上游最新赛事 {latest} 未超窗终点 {win_to}，"
                           f"但签名不符：{'；'.join(reasons)}"
                           f"——刷新可取回修订数据（backfill）"))
+    note = ("（无内容签名：计数与版本未变不保证内容未变）"
+            if content_sig is None else "")
     return ("fresh", (f"上游最新赛事 {latest} ≤ 快照窗终点 {win_to}，签名一致"
-                      f"（n_qualified={n_now}）——现在刷新拿不到新场"))
+                      f"（n_qualified={n_now}）{note}"
+                      f"——现在刷新拿不到新场"))

@@ -7,7 +7,8 @@
 # （basic_energy 卡维度 + energy_ 属性参数化前缀，chooser 注册词）；
 # 「在给对手看过之后」= recover 后 reveal own_hand（task 132 斗子 D-WP3-4 口径，
 # 仅落结构化事件流）；「每次在自己的回合有1次机会」= stadium_used_this_turn
-# （引擎强制，DSL 不重复声明）。实现注记编号占位：D-152b-1（待核）。
+# （引擎强制，DSL 不重复声明）。实现注记：D-152b-1 ✅ 已核（2026-11-22 闸 3
+# 核销，Owner 原文对照一致）。
 card:
   name_group: 酿光市
   # 同文本等价类（db 归一化 text_raw 实测一致，2026-11-21）：J 标 2 印刷全收，

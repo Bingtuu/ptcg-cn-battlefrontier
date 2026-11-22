@@ -10,7 +10,8 @@
 # 过滤器 + evolved_pokemon 均在册，AND 语义）；「在给对手看过之后」= 检索后
 # reveal own_hand 同过滤器（城镇百货/斗子 D-WP3-4 口径）；重洗 = shuffle_deck。
 # 防卫充能：damage 150 白板 + reduce_attack_damage（task 152a 引擎扩展
-# D-152a-1 部分减伤原语——args.amount=30「-30」+ timing=opponent_next_turn
+# D-152a-1/2 ✅ 已核，2026-11-22 闸 3 核销——text_raw 三印刷均「-30」，
+# Owner 口述 -50 系误记，以原文为准）——args.amount=30「-30」+ timing=opponent_next_turn
 # 「在下一个对手的回合」；命中 = 招式伤害 −30（下限 0）而非归零；只减招式
 # 伤害，伤害指示物与招式效果不经——卡面仅「伤害」）。
 card:

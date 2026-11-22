@@ -5,7 +5,14 @@
 
 ## 当前
 
-**当前焦点 = task 152 闸 3 核销收官（2026-11-22，Owner 逐卡原文对照）——酿光市 / 盖诺赛克特ex / 伽勒尔 喵喵 / 波克基斯 4 卡 6 决议全 ✅，附录 A 四行 + authoring-log gate3=true 落账；证据分歧一处：防卫充能 db 三印刷 text_raw 均「-30」，Owner 口述 -50 系误记，以原文为准**。
+**当前焦点 = Grok 外部评审收口（2026-11-22）：静态审查 5 条建议采纳评审完成，task 157（prep 可信化 P0）/ task 158（签名+证据包+E2E P1）立项文档落笔待 Owner review——通过即按 157 → 小型验收 → 158 顺序开工**。
+
+- 采纳结论（Owner 评审）：①合法性/覆盖率进 prep **采纳**（事实修正：db 臂 load_deck 已有 validate_deck 全校验，缺口只在 file 臂 `_load_decklist_file`）；②批次隔离+完整配对硬门 **全盘采纳**（确认两处真实缺陷：mod-check 按前缀搜全库同名静默合批、种子缺口只告警但门可置 ✅）；③同窗回填签名 **采纳**（本轮 5→15 场同窗回填是第一手证据）；④证据包+E2E **采纳**（jsonl fixture 优先、缺口如实落档）；⑤赛后记录 **降档文档模板**。
+- task 157 关键决策：file 臂补 validate_deck 同口径调用；strict 覆盖率默认开 + `--no-strict-coverage` 显式逃生；批次协议 batch.json（实验 ID 取数 + 预期种子全集 + 版本一致）；第四门 `complete`——INCOMPLETE 时三门显示「不可判定」。
+- task 158 关键决策：sig={window, n_qualified, data_version} 双判（newer/backfill 分因）；证据包固化卡表内容+sha256（非路径）；E2E subprocess 首选 open_jsonl fixture 后端；赛后模板纯 docs 不立项。
+- 待 Owner review 点：157 逃生口是否保留 / 前缀模式去留标注；158 E2E 降级诚实条款。
+
+- 上一焦点 = task 152 闸 3 核销收官（2026-11-22，Owner 逐卡原文对照）——酿光市 / 盖诺赛克特ex / 伽勒尔 喵喵 / 波克基斯 4 卡 6 决议全 ✅，附录 A 四行 + authoring-log gate3=true 落账；证据分歧一处：防卫充能 db 三印刷 text_raw 均「-30」，Owner 口述 -50 系误记，以原文为准。
 
 - 核销方式：Owner 给出四卡原文理解 → 逐条对照 DSL 注释与上游 text_raw（7 印刷全查）→ 4 卡机制全一致；dsl-check 闸 1 重过 4/4，35 单卡测试重跑全绿，ruff 零告警。
 

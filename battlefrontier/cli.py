@@ -283,7 +283,7 @@ def _cmd_mod_check(args: argparse.Namespace) -> int:
                                mod_prefix=args.mod_prefix, batch=args.batch,
                                field_path=args.field,
                                pool_path=args.pool, entry=args.entry,
-                               alpha=args.alpha)
+                               alpha=args.alpha, family_size=args.family_size)
     except (ValueError, OSError) as e:
         print(f"[mod-check 失败] {e}")
         return 1
@@ -1292,6 +1292,9 @@ def main(argv: list[str] | None = None) -> int:
     mc_p.add_argument("--pool", required=True, help="卡池 YAML（slug↔对手映射）")
     mc_p.add_argument("--entry", required=True, help="报名卡组池内中文名（权重剔除自身）")
     mc_p.add_argument("--alpha", type=float, default=0.05, help="显著性水准（默认 0.05）")
+    mc_p.add_argument("--family-size", dest="family_size", type=int, default=1,
+                      help="扫描族候选改表批数 M（task 159：跨批 OR 采纳的 "
+                           "Bonferroni 校正 α/M，缺省 1 无校正）")
     pr_p = sub.add_parser("prep",
                           help="备赛编排器（task 156）：场刷新→field-pick→成对核对→统一报告")
     pr_p.add_argument("prep", help="prep 定义 yml 路径（示例 experiments/prep.example.yml）")

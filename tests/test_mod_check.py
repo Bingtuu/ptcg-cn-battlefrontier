@@ -337,3 +337,177 @@ def test_batch_与前缀参数互斥(tmp_path):
                          base_prefix="t-base-vs-",
                          field_path=_write_field(tmp_path),
                          pool_path=_write_pool(tmp_path), entry="报名")
+
+
+# ── task 159：扫描族多重比较校正（Bonferroni α/M 采纳门）────────────
+
+def _build_db_family(tmp_path: Path) -> tuple[str, dict[str, dict[str, int]]]:
+    """两格全正向翻转批次：alpha-a = 7 翻转（p=2/128=0.015625）、
+    beta-b = 10 翻转（p=2/1024≈0.00195）。α=0.05 时两门全过；
+    M=10 校正 α'=0.005 时 alpha 格不过 → 全显著门翻转。"""
+    db = ResultsDB(tmp_path / "res.db")
+    ids: dict[str, dict[str, int]] = {}
+    arms = {
+        "alpha-a": ({s: "b" for s in range(1, 11)},
+                    {**{s: "a" for s in range(1, 8)},
+                     **{s: "b" for s in range(8, 11)}}),
+        "beta-b": ({s: "b" for s in range(1, 11)},
+                   {s: "a" for s in range(1, 11)}),
+    }
+    for slug, (base, mod) in arms.items():
+        eb = _start(db, f"t-base-vs-{slug}")
+        _record(db, eb, base)
+        db.finish_experiment(eb)
+        em = _start(db, f"t-mod-vs-{slug}")
+        _record(db, em, mod)
+        db.finish_experiment(em)
+        ids[slug] = {"base_id": eb, "mod_id": em}
+    db.close()
+    return str(tmp_path / "res.db"), ids
+
+
+def test_family_size_M1过门_M10校正翻转(tmp_path):
+    db_path, ids = _build_db_family(tmp_path)
+    batch = _write_batch(tmp_path, ids, games=10)
+
+    rep1 = mod_check_report(db_path, batch=batch, family_size=1,
+                            field_path=_write_field(tmp_path),
+                            pool_path=_write_pool(tmp_path), entry="报名")
+    assert rep1.family_size == 1
+    alpha = next(c for c in rep1.cells if c.slug == "alpha-a")
+    assert alpha.p == pytest.approx(0.015625)
+    assert rep1.all_positive is True
+    assert rep1.all_significant is True          # α=0.05：两门 p 均过
+
+    rep10 = mod_check_report(db_path, batch=batch, family_size=10,
+                             field_path=_write_field(tmp_path),
+                             pool_path=_write_pool(tmp_path), entry="报名")
+    assert rep10.family_size == 10
+    assert rep10.all_positive is True            # 全正门不受校正影响
+    assert rep10.all_significant is False        # α'=0.005：alpha 格 0.015625 不过
+
+
+def test_family_size_头注与缺省兼容(tmp_path):
+    db_path, ids = _build_db_family(tmp_path)
+    batch = _write_batch(tmp_path, ids, games=10)
+
+    text1 = format_mod_check(mod_check_report(
+        db_path, batch=batch, family_size=1,
+        field_path=_write_field(tmp_path),
+        pool_path=_write_pool(tmp_path), entry="报名"))
+    assert "扫描族" not in text1                # 缺省 M=1：旧输出逐字节兼容
+
+    text10 = format_mod_check(mod_check_report(
+        db_path, batch=batch, family_size=10,
+        field_path=_write_field(tmp_path),
+        pool_path=_write_pool(tmp_path), entry="报名"))
+    assert "扫描族" in text10
+    assert "0.0050" in text10                   # Bonferroni 校正阈值 α/M 显式落注
+
+
+def test_family_size_非法值显式报错(tmp_path):
+    db_path, ids = _build_db_family(tmp_path)
+    batch = _write_batch(tmp_path, ids, games=10)
+    for bad in (0, -3):
+        with pytest.raises(ValueError, match="family_size"):
+            mod_check_report(db_path, batch=batch, family_size=bad,
+                             field_path=_write_field(tmp_path),
+                             pool_path=_write_pool(tmp_path), entry="报名")
+
+
+# ── task 159：赛制口径换算落判读报告（Bo3 + 瑞士轮出线）────────────
+
+def test_format_赛制段与限定语(tmp_path):
+    db_path, ids = _build_db_family(tmp_path)
+    rep = mod_check_report(db_path, batch=_write_batch(tmp_path, ids, games=10),
+                           field_path=_write_field(tmp_path),
+                           pool_path=_write_pool(tmp_path), entry="报名")
+    text = format_mod_check(rep)
+    assert "Bo3" in text
+    assert "胜" in text and "出线" in text
+    assert "tiebreak" in text                   # 简化口径声明
+    assert "不构成真实胜率预测" in text          # sim 限定语不丢
+
+
+# ── task 160：对手构筑分布（批次逐 build 格 + 保守门 + 均值期望）────────
+
+def _build_db_with_opp_builds(tmp_path: Path
+                              ) -> tuple[str, dict[str, dict[str, int]]]:
+    """alpha-a（池代表表）：base 4/8、mod 8/8（p=0.125，Δ+50pp）；
+    alpha-a~b2（额外构筑）：base 6/8、mod 5/8（Δ=−12.5pp 回吐；仅种子 6
+    反向翻转 → p=1.0）；beta-b：两臂同赛果 0 翻转。"""
+    db = ResultsDB(tmp_path / "res.db")
+    arms = {
+        "alpha-a": ({1: "a", 2: "a", 3: "b", 4: "b", 5: "a", 6: "a",
+                     7: "b", 8: "b"},
+                    {s: "a" for s in range(1, 9)}),
+        "alpha-a~b2": ({1: "a", 2: "a", 3: "a", 4: "a", 5: "a", 6: "a",
+                        7: "b", 8: "b"},
+                       {1: "a", 2: "a", 3: "a", 4: "a", 5: "a", 6: "b",
+                        7: "b", 8: "b"}),
+        "beta-b": ({1: "a", 2: "b", 3: "draw", 4: "a", 5: "b",
+                    6: "draw", 7: "a", 8: "b"},
+                   {1: "a", 2: "b", 3: "draw", 4: "a", 5: "b",
+                    6: "draw", 7: "a", 8: "b"}),
+    }
+    ids: dict[str, dict[str, int]] = {}
+    for slug, (base, mod) in arms.items():
+        eb = _start(db, f"t-base-vs-{slug}")
+        _record(db, eb, base)
+        db.finish_experiment(eb)
+        em = _start(db, f"t-mod-vs-{slug}")
+        _record(db, em, mod)
+        db.finish_experiment(em)
+        ids[slug] = {"base_id": eb, "mod_id": em}
+    db.close()
+    return str(tmp_path / "res.db"), ids
+
+
+def test_batch_对手多构筑_逐build格与均值期望(tmp_path):
+    db_path, ids = _build_db_with_opp_builds(tmp_path)
+    rep = _batch_report(db_path, _write_batch(tmp_path, ids), tmp_path)
+
+    assert [c.slug for c in rep.cells] == ["alpha-a", "alpha-a~b2", "beta-b"]
+    # 权重按对手（池 slug）不变
+    assert rep.weights == pytest.approx({"alpha-a": 5 / 8, "beta-b": 3 / 8})
+
+    b2 = rep.cells[1]
+    assert b2.base_wr == pytest.approx(0.75) and b2.mod_wr == pytest.approx(0.625)
+    assert b2.delta_pp == pytest.approx(-12.5)           # 额外构筑回吐
+    assert b2.p == 1.0
+
+    # 期望 = Σ w_opp × mean_build：beta 臂 3a/3b/2draw → wr=3/8=0.375；
+    # base 5/8×0.625 + 3/8×0.375 = 0.53125；
+    # mod 5/8×0.8125 + 3/8×0.375 = 0.6484375（Δ=+11.71875pp）
+    assert rep.base_exp == pytest.approx(0.53125)
+    assert rep.mod_exp == pytest.approx(0.6484375)
+    assert rep.delta_pp == pytest.approx(11.71875)
+
+    # 保守门：任一 build 回吐/不显著 → 门否（均值好看不救最劣改表）
+    assert rep.all_positive is False
+    assert rep.zero_giveback is False
+    assert rep.all_significant is False
+
+    text = format_mod_check(rep)
+    assert "alpha-a~b2" in text
+    assert "多构筑均值" in text
+
+
+def test_batch_未知注册键_显式报错(tmp_path):
+    db_path, ids = _build_db_with_opp_builds(tmp_path)
+    ids["gamma-c~b2"] = {"base_id": 999, "mod_id": 999}
+    with pytest.raises(ValueError, match="不在池内对手"):
+        _batch_report(db_path, _write_batch(tmp_path, ids), tmp_path)
+
+
+def test_前缀模式_多构筑实验名_显式拒绝(tmp_path):
+    db = ResultsDB(tmp_path / "res.db")
+    for slug in ("alpha-a", "alpha-a~b2", "beta-b"):
+        _record(db, _start(db, f"t-base-vs-{slug}"), {1: "a"})
+        _record(db, _start(db, f"t-mod-vs-{slug}"), {1: "a"})
+    db.close()
+    with pytest.raises(ValueError, match="不支持对手多构筑"):
+        mod_check_report(str(tmp_path / "res.db"), base_prefix="t-base-vs-",
+                         mod_prefix="t-mod-vs-",
+                         field_path=_write_field(tmp_path),
+                         pool_path=_write_pool(tmp_path), entry="报名")

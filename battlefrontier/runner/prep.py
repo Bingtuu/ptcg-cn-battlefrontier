@@ -82,6 +82,8 @@ class PrepCfg(FrozenModel):
     matrix_snap: str = Field(min_length=1)
     field: FieldWinCfg
     entry: EntryCfg | None = None
+    opponent_builds: dict[str, list[str]] = Field(default_factory=dict)
+    # task 160：对手额外构筑（池内中文名 → decklist 路径列表）
     games_per_cell: int = Field(default=2000, gt=0)
     seed_start: int = Field(ge=0)
     agents: str = "heuristic"
@@ -112,6 +114,9 @@ def generate_prep_experiments(cfg: PrepCfg, pool) -> list[ExperimentDef]:
     """报名卡组 × 池内对手 → 成对实验定义（base/mod 同种子域 = CRN 配对）。
 
     无改表臂（entry.modified 缺省）→ 只出 base 组。
+    对手多构筑（task 160，D-160-1）：opponent_builds[池内中文名] 的额外
+    decklist = 该对手 build #2..k（池代表表恒为 #1），实验名后缀 `~b{n}`
+    （`~` 不在 slugify 字符集内，天然免碰撞）。
     """
     entry = cfg.entry
     if entry is None:
@@ -121,6 +126,14 @@ def generate_prep_experiments(cfg: PrepCfg, pool) -> list[ExperimentDef]:
         raise ValueError(f"报名卡组「{entry.archetype}」不在卡池（不猜）")
     if entry.modified and not Path(entry.modified).exists():
         raise ValueError(f"改表 decklist 不存在: {entry.modified}")
+    opp_builds: dict[str, list[str]] = {}
+    for cn, paths in cfg.opponent_builds.items():
+        if cn not in {d.archetype for d in pool.decks} or cn == entry.archetype:
+            raise ValueError(f"对手多构筑「{cn}」不在卡池（不猜）")
+        for p in paths:
+            if not Path(p).exists():
+                raise ValueError(f"对手「{cn}」额外构筑 decklist 不存在: {p}")
+        opp_builds[cn] = list(paths)
 
     agents = AgentSides(a=AgentCfg(type=cfg.agents),
                         b=AgentCfg(type=cfg.agents))
@@ -134,16 +147,23 @@ def generate_prep_experiments(cfg: PrepCfg, pool) -> list[ExperimentDef]:
         if opp.archetype == entry.archetype:
             continue
         slug = slugify(opp.en_archetype)
-        b = DeckSourceCfg(source="db", deck_id=opp.deck_id)
-        exps.append(ExperimentDef(
-            name=f"{cfg.name}-base-vs-{slug}", games=cfg.games_per_cell,
-            seed_start=cfg.seed_start, decks=DeckSides(a=base_a, b=b),
-            agents=agents))
-        if mod_a is not None:
+        # build #1 = 池代表表（db 臂），#2.. = opponent_builds 额外 decklist
+        b_decks = [DeckSourceCfg(source="db", deck_id=opp.deck_id)]
+        b_decks += [DeckSourceCfg(source="file", path=p)
+                    for p in opp_builds.get(opp.archetype, [])]
+        for idx, b in enumerate(b_decks):
+            suffix = "" if idx == 0 else f"~b{idx + 1}"
             exps.append(ExperimentDef(
-                name=f"{cfg.name}-mod-vs-{slug}", games=cfg.games_per_cell,
-                seed_start=cfg.seed_start, decks=DeckSides(a=mod_a, b=b),
+                name=f"{cfg.name}-base-vs-{slug}{suffix}",
+                games=cfg.games_per_cell,
+                seed_start=cfg.seed_start, decks=DeckSides(a=base_a, b=b),
                 agents=agents))
+            if mod_a is not None:
+                exps.append(ExperimentDef(
+                    name=f"{cfg.name}-mod-vs-{slug}{suffix}",
+                    games=cfg.games_per_cell,
+                    seed_start=cfg.seed_start, decks=DeckSides(a=mod_a, b=b),
+                    agents=agents))
     return exps
 
 
@@ -174,27 +194,39 @@ def _pick_section(cfg: PrepCfg, field_out: Path, pool) -> str:
 
 def _base_only_section(cfg: PrepCfg, results_path: Path, field_out: Path,
                        pool) -> str:
-    """无改表臂：只报基线逐格读数 + 条件期望（门不适用）。"""
+    """无改表臂：只报基线逐格读数 + 条件期望（门不适用）。
+    对手多构筑（task 160）：逐 build 行，期望 = 各 build 等权均值。"""
     entry = cfg.entry
     share_raw, _ = load_field_snapshot(field_out)
     weights = _weights_for(pool, share_raw, entry.archetype)
     base = _load_outcomes(results_path, f"{cfg.name}-base-vs-")
-    lines = ["## 基线场适配读数（无改表臂——判读门不适用）", "",
-             "对手 | 基线 | 场权"]
+    multi = any("~" in k for k in base)
+    lines = ["## 基线场适配读数（无改表臂——判读门不适用）", ""]
+    if multi:
+        lines.append("对手多构筑：逐 build 行，期望 = 各 build 等权均值")
+    lines += ["", "对手 | 基线 | 场权"]
     exp = 0.0
     for d in pool.decks:
         if d.archetype == entry.archetype:
             continue
         slug = slugify(d.en_archetype)
-        outcomes = base.get(slug)
-        if outcomes is None:
-            raise ValueError(f"缺基线实验：对手「{d.archetype}」({slug})")
-        wr = sum(1 for v in outcomes.values() if v == "a") / len(outcomes)
-        w = weights.get(slug, 0.0)
-        exp += wr * w
-        lines.append(f"{d.archetype} | {wr * 100:.1f}% | {w * 100:.1f}%")
+        keys = [slug] + sorted(
+            (k for k in base if k.startswith(slug + "~b")),
+            key=lambda k: int(k[len(slug) + 2:]))
+        wrs: list[float] = []
+        for key in keys:
+            outcomes = base.get(key)
+            if outcomes is None:
+                raise ValueError(f"缺基线实验：对手「{d.archetype}」({key})")
+            wr = sum(1 for v in outcomes.values() if v == "a") / len(outcomes)
+            wrs.append(wr)
+            label = d.archetype if key == slug else f"{d.archetype}（{key}）"
+            w = weights.get(slug, 0.0) / len(keys)
+            lines.append(f"{label} | {wr * 100:.1f}% | {w * 100:.1f}%")
+        exp += (sum(wrs) / len(wrs)) * weights.get(slug, 0.0)
     lines.append("")
-    lines.append(f"池内条件期望（基线）：{exp * 100:.1f}%")
+    note = "（对手多构筑均值口径）" if multi else ""
+    lines.append(f"池内条件期望{note}（基线）：{exp * 100:.1f}%")
     return "\n".join(lines)
 
 
@@ -257,7 +289,7 @@ def _sha256(path: str | Path) -> str:
 
 def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
                    prep_source: str | Path | None,
-                   data_version: str) -> tuple[str, str, str]:
+                   data_version: str, pool) -> tuple[str, str, str]:
     """task 158 证据包：改表判读产物升级为可离线追溯制品目录。
 
     inputs/（prep.yml 副本 + 卡表内容+sha256 + 场快照副本 + 矩阵快照身份
@@ -286,6 +318,18 @@ def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
         (inputs / mod_name).write_bytes(mod_bytes)
         decks["mod"] = {"file": mod_name,
                         "sha256": hashlib.sha256(mod_bytes).hexdigest()}
+    if cfg.opponent_builds:
+        cn_to_slug = {d.archetype: slugify(d.en_archetype) for d in pool.decks}
+        decks["opponent_builds"] = {}
+        for cn, paths in cfg.opponent_builds.items():
+            for idx, p in enumerate(paths, start=2):
+                key = f"{cn_to_slug[cn]}~b{idx}"
+                name = Path(p).name
+                data = Path(p).read_bytes()
+                (inputs / name).write_bytes(data)
+                decks["opponent_builds"][key] = {
+                    "file": name,
+                    "sha256": hashlib.sha256(data).hexdigest()}
     (inputs / "decks.json").write_text(
         json.dumps(decks, ensure_ascii=False, indent=2), encoding="utf-8")
     (inputs / "field-snap.json").write_bytes(Path(field_out).read_bytes())
@@ -299,6 +343,8 @@ def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
     }
     if "mod" in decks:
         manifest[decks["mod"]["file"]] = decks["mod"]["sha256"]
+    for build in decks.get("opponent_builds", {}).values():
+        manifest[build["file"]] = build["sha256"]
     (inputs / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -333,10 +379,11 @@ def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
     writer.writerow(["slug", "opponent", "base_wr", "mod_wr", "delta_pp", "p",
                      "flips", "n_base", "n_mod", "n_missing", "weight"])
     for c in rep.cells:
+        w = rep.cell_weights.get(c.slug, rep.weights.get(c.slug, 0.0))
         writer.writerow([c.slug, c.opponent, f"{c.base_wr:.6f}",
                          f"{c.mod_wr:.6f}", f"{c.delta_pp:.4f}", f"{c.p:.6f}",
                          c.flips, c.n_base, c.n_mod, c.n_missing,
-                         f"{rep.weights.get(c.slug, 0.0):.6f}"])
+                         f"{w:.6f}"])
     (out_dir / "verdict.csv").write_text(buf.getvalue(), encoding="utf-8")
     return manifest["prep.yml"], code_version, data_version
 
@@ -409,7 +456,7 @@ def run_prep(cfg: PrepCfg, *, db_path: str, results_path: str | Path,
             triad = _evidence_pack(
                 cfg, out_dir, rep, field_out=Path(field_out),
                 prep_source=prep_source,
-                data_version=prepared[0][1].data_version)
+                data_version=prepared[0][1].data_version, pool=pool)
         else:
             mod_text = _base_only_section(cfg, results_path, Path(field_out), pool)
     if mod_text:

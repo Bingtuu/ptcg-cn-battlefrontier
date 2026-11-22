@@ -426,3 +426,86 @@ def test_run_prep_卡表篡改可发现(tmp_path, monkeypatch):
         (tmp_path / "out" / "inputs" / "manifest.json").read_text(encoding="utf-8"))
     now = hashlib.sha256(mod_file.read_bytes()).hexdigest()
     assert now != manifest["mod.deck.txt"]                # 篡改被证据包发现
+
+
+# ── task 160：对手构筑分布（opponent_builds）────────────────────────
+
+def _write_cfg_with_opp_builds(tmp_path, builds: dict[str, list[str]],
+                               *, with_mod=True) -> Path:
+    """builds: {池内中文名: [额外 decklist 路径, ...]}。"""
+    p = _write_cfg(tmp_path, with_mod=with_mod)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    raw["opponent_builds"] = builds
+    p.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    return p
+
+
+def test_generate_对手多构筑_双臂展开(tmp_path):
+    b2 = tmp_path / "opp-alpha-b2.deck.txt"
+    b2.write_text("1 卡乙\n", encoding="utf-8")
+    cfg = load_prep_cfg(_write_cfg_with_opp_builds(tmp_path, {"甲": [str(b2)]}))
+    pool = cfg.load_pool()
+    exps = generate_prep_experiments(cfg, pool)
+
+    assert len(exps) == 6          # 2 臂 × (alpha-a + alpha-a~b2 + beta-b)
+    names = {e.name for e in exps}
+    assert "prep-test-base-vs-alpha-a~b2" in names
+    assert "prep-test-mod-vs-alpha-a~b2" in names
+    for e in exps:
+        assert e.games == 8 and e.seed_start == 650000   # 同域 = 成对 CRN
+        if e.name.endswith("alpha-a~b2"):
+            assert e.decks.b.source == "file"
+            assert e.decks.b.path.endswith("opp-alpha-b2.deck.txt")
+        else:
+            assert e.decks.b.source == "db"
+
+
+def test_generate_对手多构筑_池外名或缺文件拒收(tmp_path):
+    b2 = tmp_path / "b2.deck.txt"
+    b2.write_text("1 卡乙\n", encoding="utf-8")
+    cfg = load_prep_cfg(_write_cfg_with_opp_builds(tmp_path, {"池外": [str(b2)]}))
+    with pytest.raises(ValueError, match="不在卡池"):
+        generate_prep_experiments(cfg, cfg.load_pool())
+
+    cfg = load_prep_cfg(_write_cfg_with_opp_builds(
+        tmp_path, {"甲": [str(tmp_path / "nope.deck.txt")]}))
+    with pytest.raises(ValueError, match="不存在"):
+        generate_prep_experiments(cfg, cfg.load_pool())
+
+
+def test_run_prep_对手多构筑_批次与证据包(tmp_path, monkeypatch):
+    """opponent_builds 全流程：batch.json 登记 ~bN 臂、判读逐 build 格、
+    证据包 decks.json 落对手构筑副本 + sha256。"""
+    _patch_field_export(monkeypatch)
+    _fake_run_prepare_execute(monkeypatch)
+    (tmp_path / "cards").mkdir()
+    b2 = tmp_path / "opp-alpha-b2.deck.txt"
+    b2.write_text("1 卡乙\n", encoding="utf-8")
+    cfg = load_prep_cfg(_write_cfg_with_opp_builds(tmp_path, {"甲": [str(b2)]}))
+
+    report_path = run_prep(cfg, **_run_prep_kwargs(tmp_path),
+                           prep_source=_write_cfg_with_opp_builds(
+                               tmp_path, {"甲": [str(b2)]}))
+    out_dir = tmp_path / "out"
+
+    batch = json.loads((out_dir / "batch.json").read_text(encoding="utf-8"))
+    assert set(batch["slugs"]) == {"alpha-a", "alpha-a~b2", "beta-b"}
+
+    decks = json.loads((out_dir / "inputs" / "decks.json").read_text(
+        encoding="utf-8"))
+    build = decks["opponent_builds"]["alpha-a~b2"]
+    assert build["file"] == "opp-alpha-b2.deck.txt"
+    assert len(build["sha256"]) == 64
+    assert (out_dir / "inputs" / "opp-alpha-b2.deck.txt").is_file()
+    manifest = json.loads((out_dir / "inputs" / "manifest.json").read_text(
+        encoding="utf-8"))
+    assert manifest["opp-alpha-b2.deck.txt"] == build["sha256"]
+
+    verdict = json.loads((out_dir / "verdict.json").read_text(encoding="utf-8"))
+    assert len(verdict["cells"]) == 3                    # 逐 build 格
+    assert {c["slug"] for c in verdict["cells"]} == {
+        "alpha-a", "alpha-a~b2", "beta-b"}
+
+    text = Path(report_path).read_text(encoding="utf-8")
+    assert "alpha-a~b2" in text                          # 判读节逐 build 行
+    assert "多构筑均值" in text                           # 期望口径声明

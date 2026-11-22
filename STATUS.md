@@ -5,7 +5,11 @@
 
 ## 当前
 
-**当前焦点 = 无活跃开发项——Grok 外部评审 5 建议全部闭环：task 157（prep 可信化 P0）/ task 158（签名+证据包+E2E P1 + 赛后模板）均已收官归档（2026-11-22）**。158 收官数字 = 全量 **2179 passed + 1 skipped**（复验修复后重跑 9m20s）、ruff 零告警。158 交付回顾：①探针签名双判（`qualified_count` 与 `stats_engine._base_meta` 的 n_tournaments 逐条件对齐——独立复验实证 static_weight IS NOT NULL 关键过滤，真库 sig==meta==19；newer/backfill 分因，被筛除赛事不误报，无 sig 旧快照降级）；②备赛证据包（inputs/ 自含 hash + verdict.json/csv + 复算三元组回显，卡表篡改可发现）；③CLI 端到端小样例（subprocess 真实 CLI 与 API 逐局一致，E2E 后端决策 = open_jsonl fixture 可行，`data/backend.py` 分派 10 处切换零行为变化，探针裸 SQL sqlite-only 缺口如实落档）；④赛后记录模板（实战 vs 模拟分栏，示例行非真实数据声明）。**复验值得一提**：合成 fixture 全绿的签名口径在真库实测暴露 41 vs 19 偏差（漏 static_weight 过滤），修复后逐位一致——同口径断言必须真库对账。细节见 `tasks/done/task 158.md`；157 见 `tasks/done/task 157.md`。下一方向待 Owner 拍板（备赛编排线已全链路可用：prep 含场刷新/field-pick/成对跑批/批次判读/证据包/签名探针）。
+**当前焦点 = task 160 对手构筑分布收官（2026-11-22，审计 P1 结构性缺口）**——prep yml `opponent_builds` 挂对手额外 decklist（池代表表恒 build #1，实验名 `~bN`），mod-check 批次逐 build 判读 + **保守门**（最劣 build 驱动：任一 build 回吐即门否，防均值陷阱）+ 期望 = 各 build 等权均值；证据包同步落对手构筑副本 + sha256；存量 prep 零变化。6 新测 + ruff 零告警 + 全量重跑绿。此前 **task 159 判读诚实度 P0 收官**（`--family-size M` Bonferroni 扫描族校正 + `match_odds` 赛制口径段 Bo3/瑞士轮出线概率），全量 2186 passed + 1 skipped；双任务均已归档 `tasks/done/`。审计清单剩余 P1/P2（对手强度谱系门/赛前一页纸/演练卡/rogue 守望/k 组合搜索）待 Owner 挑单。
+
+- 上一焦点 = task 159 判读诚实度 P0（2026-11-22）——备赛线自我审计 P0 两件
+
+- 上一焦点 = 无活跃开发项——Grok 外部评审 5 建议全部闭环（157/158 双收官，2026-11-22）。158 收官数字 = 全量 **2179 passed + 1 skipped**（复验修复后重跑 9m20s）、ruff 零告警。158 交付回顾：①探针签名双判（`qualified_count` 与 `stats_engine._base_meta` 的 n_tournaments 逐条件对齐——独立复验实证 static_weight IS NOT NULL 关键过滤，真库 sig==meta==19；newer/backfill 分因，被筛除赛事不误报，无 sig 旧快照降级）；②备赛证据包（inputs/ 自含 hash + verdict.json/csv + 复算三元组回显，卡表篡改可发现）；③CLI 端到端小样例（subprocess 真实 CLI 与 API 逐局一致，E2E 后端决策 = open_jsonl fixture 可行，`data/backend.py` 分派 10 处切换零行为变化，探针裸 SQL sqlite-only 缺口如实落档）；④赛后记录模板（实战 vs 模拟分栏，示例行非真实数据声明）。**复验值得一提**：合成 fixture 全绿的签名口径在真库实测暴露 41 vs 19 偏差（漏 static_weight 过滤），修复后逐位一致——同口径断言必须真库对账。细节见 `tasks/done/task 158.md`；157 见 `tasks/done/task 157.md`。下一方向待 Owner 拍板（备赛编排线已全链路可用：prep 含场刷新/field-pick/成对跑批/批次判读/证据包/签名探针）。
 
 - 上一焦点 = task 157 prep 可信化 P0 已收官（2026-11-22：开发 + 小型验收通过 + 归档 `tasks/done/`）。157 验收 = **真库回测**：t152 沙奈朵 4 万局库构造 batch.json 走 `mod-check --batch`——COMPLETE、10/10 格与 task 156 判读脚本逐位一致（全正全显著、最差 p=0.0404、池内条件期望 Δ+5.5pp）、三门全 ✅；INCOMPLETE 负控逐格「不可判定」正确；交付四件 = file 臂 validate_deck 同口径零局前拒绝 / prep 装载告警段 / strict 默认开 + `--no-strict-coverage` 逃生 / mod-check 批次隔离 + complete 第四门（smoke 产物 `results/t157-smoke-batch.json` 留档）；细节见 `tasks/done/task 157.md`。
 

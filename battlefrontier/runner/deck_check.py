@@ -49,11 +49,11 @@ class DeckCheckReport:
 def check_decklist(db_path: str, path: str | Path,
                    cards_dir: str | Path = DEFAULT_CARDS_DIR) -> DeckCheckReport:
     """卡表体检：逐行解析（同 run 装载口径）→ 60 张校验 → DSL 状态。"""
-    from ptcgdb.sdk import open_db
+    from battlefrontier.data.backend import open_backend
 
     entries = parse_decklist(Path(path).read_text(encoding="utf-8"))
     lib = load_card_dir(cards_dir)
-    db = open_db(db_path)
+    db = open_backend(db_path)
     rep = DeckCheckReport()
     try:
         for count, name, card_id in entries:

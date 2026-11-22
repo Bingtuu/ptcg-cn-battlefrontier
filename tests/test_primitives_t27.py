@@ -248,7 +248,7 @@ def test_ace_spec_two_in_deck_rejected() -> None:
     finally:
         db.close()
     # load_deck 级钉住：同一构筑经 load_deck 抛 ValueError（violations 明细透出）
-    real_open = deck_mod.open_db
+    real_open = deck_mod.open_backend
 
     class _WrappedDb:
         """get_deck 返回捏造构筑，其余调用透传真实 db（validate_deck 为真判定）。"""
@@ -266,13 +266,13 @@ def test_ace_spec_two_in_deck_rejected() -> None:
         return _WrappedDb(real_open(path))
 
     import battlefrontier.data.deck as dm
-    orig = dm.open_db
-    dm.open_db = fake_open
+    orig = dm.open_backend
+    dm.open_backend = fake_open
     try:
         with pytest.raises(ValueError, match="(?i)ace"):
             dm.load_deck(str(DB_PATH), "mik_moe:650353")
     finally:
-        dm.open_db = orig
+        dm.open_backend = orig
     # 含 1 张 ACE 的池内构筑正常装载
     d = dm.load_deck(str(DB_PATH), "mik_moe:650353")
     assert sum(1 for c in d.cards if c.is_ace_spec) == 1

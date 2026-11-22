@@ -7,8 +7,7 @@
 
 from dataclasses import dataclass, field
 
-from ptcgdb.sdk import open_db
-
+from battlefrontier.data.backend import open_backend
 from battlefrontier.data.cards import carddef_from_db
 from battlefrontier.engine.state import CardDef
 
@@ -23,7 +22,7 @@ class LoadedDeck:
 
 def load_deck(db_path: str, deck_id: str, *, fmt: str = "standard") -> LoadedDeck:
     """从 db 装载卡组。合法性校验失败抛 ValueError（带 violations 明细）。"""
-    db = open_db(db_path)
+    db = open_backend(db_path)
     try:
         deck = db.get_deck(deck_id)
 

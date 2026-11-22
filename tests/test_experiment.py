@@ -117,6 +117,12 @@ def _fake_db_t118(records: dict[str, str]):
                 provides=None, evolves_from_text=None, evolution_chain_id=None,
                 is_basic_energy=False, is_ace_spec=False)
 
+        def snapshots(self, fmt):
+            return [types.SimpleNamespace(effective_from="2026-09-16")]
+
+        def validate_deck(self, ids, on_date, fmt):
+            return types.SimpleNamespace(ok=True, violations=[])
+
     return FakeDb()
 
 
@@ -175,6 +181,87 @@ def test_load_decklist_file_裸名同名命中_正常装载(tmp_path):
     db = _fake_db_t118({"CSVE1C-PSY": "基本超能量", "30thC-PSY": "基本超能量"})
     cards, _ = _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量"))
     assert len(cards) == 60 and cards[0].card_id == "CSVE1C-PSY"
+
+
+# ── task 157：file 臂构筑合法性（db 臂 validate_deck 同口径同调用）─────
+
+def _fake_db_t157(records: dict[str, str], *, violations=None):
+    """records: card_id -> 卡名；violations: 非空 = validate_deck 违规。
+    返回 (FakeDb, calls)——calls 记录 validate_deck 的 (ids, on_date, fmt)。"""
+    import types
+
+    calls: list[tuple[list[str], str, str]] = []
+    date = "2026-09-16"
+
+    class FakeDb:
+        def search_cards(self, name=None, limit=1):
+            for cid, n in records.items():
+                if n == name:
+                    return [types.SimpleNamespace(card_id=cid)]
+            return []
+
+        def get_card(self, card_id):
+            if card_id not in records:
+                return None
+            return types.SimpleNamespace(
+                card_id=card_id, name_full=records[card_id],
+                card_type="trainer", stage=None, hp=None, types=(),
+                weakness=None, resistance=None, attacks=(), retreat_cost=0,
+                rule_box_type=None, prize_cards=1, trainer_subtype="物品",
+                provides=None, evolves_from_text=None, evolution_chain_id=None,
+                is_basic_energy=False, is_ace_spec=False)
+
+        def snapshots(self, fmt):
+            assert fmt == "standard"
+            return [types.SimpleNamespace(effective_from=date)]
+
+        def validate_deck(self, ids, on_date, fmt):
+            calls.append((list(ids), on_date, fmt))
+            return types.SimpleNamespace(
+                ok=not violations, violations=list(violations or []))
+
+    return FakeDb(), calls
+
+
+def test_load_decklist_file_合法性校验与db臂同口径(tmp_path):
+    """合法 decklist：validate_deck 以 (ids, 最新快照 effective_from, 'standard')
+    被调用一次（与 load_deck db 臂逐字同口径），装载正常返回。"""
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db, calls = _fake_db_t157({"CSVE1C-PSY": "基本超能量"})
+    cards, _ = _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量"))
+    assert len(cards) == 60
+    assert len(calls) == 1
+    ids, on_date, fmt = calls[0]
+    assert ids == ["CSVE1C-PSY"] * 60
+    assert on_date == "2026-09-16"
+    assert fmt == "standard"
+
+
+@pytest.mark.parametrize("violations", [
+    ["同名卡超过 4 张上限: 沙奈朵ex ×5"],
+    ["ACE SPEC 超过 1 张: 反击捕捉器 ×2"],
+    ["赛制外印刷: 卡X（2027-01-01 起生效）"],
+])
+def test_load_decklist_file_合法性违规零局前拒绝(tmp_path, violations):
+    """同名超 4 / 双 ACE SPEC / 赛制外印刷：validate_deck 违规透传，
+    在第一局模拟前抛错（带 violations 明细）。"""
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db, _ = _fake_db_t157({"CSVE1C-PSY": "基本超能量"}, violations=violations)
+    with pytest.raises(ValueError, match="构筑校验失败") as ei:
+        _load_decklist_file(db, _decklist_t118(tmp_path, "60 基本超能量"))
+    assert violations[0] in str(ei.value)  # 明细原样透传
+
+
+def test_load_decklist_file_总数校验保留(tmp_path):
+    """59/61 张仍由现有总数校验拒绝（与合法性校验并存）。"""
+    from battlefrontier.runner.experiment import _load_decklist_file
+
+    db, calls = _fake_db_t157({"CSVE1C-PSY": "基本超能量"})
+    with pytest.raises(ValueError, match="60"):
+        _load_decklist_file(db, _decklist_t118(tmp_path, "59 基本超能量"))
+    assert calls == []  # 总数不过，未到合法性校验
 
 
 # ── Agent 构建 ───────────────────────────────────────────

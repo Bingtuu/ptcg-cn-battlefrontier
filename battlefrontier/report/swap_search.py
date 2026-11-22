@@ -109,7 +109,7 @@ def candidate_in_cards(
 
     返回 (CardDef 列表, 解析告警)。全部经 db 解析为印刷级 CardDef。
     """
-    from ptcgdb.sdk import open_db
+    from battlefrontier.data.backend import open_backend
 
     if top_n <= 0 and not include:
         raise ValueError("候选源为空（top_n=0 且无 --include），不猜：请调参")
@@ -136,7 +136,7 @@ def candidate_in_cards(
         conn.close()
 
     ranked = sorted(tally, key=lambda c: (-tally[c][0], -tally[c][1], c))[:top_n]
-    db = open_db(str(db_path))
+    db = open_backend(str(db_path))
     try:
         cards: dict[str, CardDef] = {}
         from battlefrontier.data.cards import carddef_from_db
@@ -214,7 +214,7 @@ def _validate_ids(db, date: str, ids: list[str]) -> list[str]:
     """赛制+结构合法关：db validate_deck（60 张/同名≤4/ACE SPEC≤1），
     装载日期 = 最新 standard 快照 effective_from（load_deck 同口径）。
 
-    db 为调用方持有的 open_db 连接（候选链全程复用一次打开）。
+    db 为调用方持有的 open_backend 连接（候选链全程复用一次打开）。
     """
     report = db.validate_deck(ids, date, "standard")
     return [str(v) for v in report.violations]
@@ -240,9 +240,9 @@ def build_candidates(
     drop: Counter = Counter()
     out: list[SwapCandidate] = []
     in_seen = {c.card_id for c in in_cards}
-    from ptcgdb.sdk import open_db
+    from battlefrontier.data.backend import open_backend
 
-    db = open_db(str(db_path))
+    db = open_backend(str(db_path))
     try:
         snapshots = db.snapshots("standard")
         if not snapshots:

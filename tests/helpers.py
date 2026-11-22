@@ -1,5 +1,8 @@
 """测试共用 fixture 助手：stub 卡定义与引擎驱动。"""
 
+import json
+from pathlib import Path
+
 from battlefrontier.engine.core import GameEngine
 from battlefrontier.engine.rng import RandomSource
 from battlefrontier.engine.state import (
@@ -10,6 +13,86 @@ from battlefrontier.engine.state import (
     InPlayPokemon,
     PlayerState,
 )
+
+# ── task 158：jsonl dist 最小 fixture（E2E 后端，spike 实证字段全集）────
+
+def _jsonl_card(card_id: str, name: str, energy_type: str, damage: int) -> dict:
+    """最小合法 CardSchema 行（ptcgdb CardSchema 必填域全集，spike 逐字段钉过）。"""
+    return {
+        "card_id": card_id, "set_id": "TST", "number": card_id[-3:],
+        "number_display": card_id[-3:], "name_full": name, "species": name,
+        "owner": "", "card_type": "pokemon", "regulation_mark": "A",
+        "rarity": "", "stage": "基础", "hp": 70, "types": [energy_type],
+        "evolves_from_text": None, "evolves_from_id": None,
+        "evolution_chain_id": None, "rule_box_type": None, "has_rule_box": False,
+        "is_tera": False, "union_position": None, "deck_limit": 4,
+        "prize_cards": 1, "is_ace_spec": False,
+        "abilities": [], "is_basic_energy": False,
+        "attacks": [{"name": "打击", "cost": [{"type": energy_type, "count": 1}],
+                     "damage_base": damage, "damage_modifier": None,
+                     "effect_text": ""}],
+        "weakness": None, "resistance": None, "retreat_cost": 1,
+        "trainer_subtype": None, "provides": None, "effect_tags": [],
+        "name_en": "", "name_ja": "", "name_zh_tw": "",
+        "source": "test", "fetched_at": "2026-01-01", "status": "active",
+        "text_raw": "",
+    }
+
+
+def _jsonl_energy(card_id: str, name: str, energy_type: str) -> dict:
+    card = _jsonl_card(card_id, name, energy_type, 0)
+    card.update(card_type="energy", stage=None, hp=None, types=[],
+                retreat_cost=None, prize_cards=0, attacks=[],
+                provides=[energy_type], is_basic_energy=True)
+    return card
+
+
+def write_jsonl_dist(dist: Path, cards: list[dict]) -> Path:
+    """写最小 jsonl dist 导出目录（manifest/cards/sets/relations/legality）。"""
+    dist = Path(dist)
+    dist.mkdir(parents=True, exist_ok=True)
+    (dist / "manifest.json").write_text(json.dumps({"schema_version": 99}),
+                                        encoding="utf-8")
+    (dist / "cards.jsonl").write_text(
+        "\n".join(json.dumps(c, ensure_ascii=False) for c in cards),
+        encoding="utf-8")
+    (dist / "sets.jsonl").write_text(json.dumps({
+        "set_id": "TST", "name_zh": "测试扩展", "era": "test",
+        "release_date": "2020-01-01", "regulation_mark": "A",
+        "expected_count": len(cards), "expected_secret_count": 0,
+        "card_face_total": len(cards), "source": "test",
+        "fetched_at": "2026-01-01"}, ensure_ascii=False), encoding="utf-8")
+    (dist / "relations.jsonl").write_text("", encoding="utf-8")
+    energy_types = sorted({c["types"][0] for c in cards if c["card_type"] == "pokemon"}
+                          | {p for c in cards for p in (c["provides"] or [])})
+    (dist / "legality.json").write_text(json.dumps({"data": {
+        "snapshots": [{
+            "snapshot_id": "std-test", "format": "standard",
+            "effective_from": "2020-01-01", "effective_to": None,
+            "allowed_marks": ["A"],
+            "allowed_basic_energy_types": energy_types,
+            "whitelist_cards": [], "banned_cards": [], "mark_overrides": [],
+            "latest_text_overrides": {}, "source_url": "",
+            "created_at": "2026-01-01"}],
+        "errata": []}}, ensure_ascii=False), encoding="utf-8")
+    return dist
+
+
+def make_e2e_dist(tmp_path) -> Path:
+    """E2E 用 4 宝可梦 + 1 基本能量最小库（每种 ≤4 上限内可组 60 张）。"""
+    return write_jsonl_dist(Path(tmp_path) / "dist", [
+        _jsonl_card("TST-001", "测试苗蛙", "草", 20),
+        _jsonl_card("TST-002", "测试火蜥", "火", 30),
+        _jsonl_card("TST-003", "测试水鱼", "水", 20),
+        _jsonl_card("TST-004", "测试雷鼠", "雷", 30),
+        _jsonl_energy("TST-101", "基本草能量", "草"),
+    ])
+
+
+def e2e_decklist() -> str:
+    """60 张合法 decklist（4 同名上限内；印刷级行）。"""
+    return ("4 测试苗蛙 [TST-001]\n4 测试火蜥 [TST-002]\n"
+            "4 测试水鱼 [TST-003]\n4 测试雷鼠 [TST-004]\n44 基本草能量 [TST-101]\n")
 
 
 def _attacks(damage: int | None, cost: int) -> tuple[AttackDef, ...]:

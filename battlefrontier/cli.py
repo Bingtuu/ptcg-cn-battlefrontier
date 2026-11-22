@@ -271,12 +271,17 @@ def _cmd_field_snap(args: argparse.Namespace) -> int:
 
 
 def _cmd_mod_check(args: argparse.Namespace) -> int:
-    """task 156：改表成对判读（同种子 CRN 配对，纪律见 report/mod_check）。"""
+    """task 156：改表成对判读（同种子 CRN 配对，纪律见 report/mod_check）。
+
+    task 157：--batch 批次模式（prep 登记的实验 ID + 完整性第四门）；
+    --base-prefix/--mod-prefix 前缀模式保留（非批次模式，仅一次性干净库）。
+    """
     from battlefrontier.report.mod_check import format_mod_check, mod_check_report
 
     try:
         rep = mod_check_report(args.results, base_prefix=args.base_prefix,
-                               mod_prefix=args.mod_prefix, field_path=args.field,
+                               mod_prefix=args.mod_prefix, batch=args.batch,
+                               field_path=args.field,
                                pool_path=args.pool, entry=args.entry,
                                alpha=args.alpha)
     except (ValueError, OSError) as e:
@@ -297,10 +302,13 @@ def _cmd_prep(args: argparse.Namespace) -> int:
         return 1
     db_path = args.db or load_db_path()
     results = args.results or str(Path("results") / f"prep-{cfg.name}.db")
+    strict = False if args.no_strict_coverage else None
     try:
         report_path = run_prep(cfg, db_path=db_path, results_path=results,
                                field_out=args.field_out, out_dir=args.out_dir,
-                               workers=args.workers, pick_only=args.pick_only)
+                               workers=args.workers, pick_only=args.pick_only,
+                               strict_coverage=strict,
+                               prep_source=args.prep)
     except (ValueError, OSError) as e:
         print(f"[prep 失败] {e}")
         return 1
@@ -572,8 +580,7 @@ def _cmd_calibration_split(args: argparse.Namespace, defn, pool) -> int:
 
 def _cmd_calibration(args: argparse.Namespace) -> int:
     """M6 偏差表（task 030 WP3）：matrix 实验定义 → 结果库子实验 vs 真实赛事 matchup。"""
-    from ptcgdb.sdk import open_db
-
+    from battlefrontier.data.backend import open_backend
     from battlefrontier.data.pool import load_target_pool
     from battlefrontier.report.calibration import (
         REAL_AS_OF,
@@ -593,7 +600,7 @@ def _cmd_calibration(args: argparse.Namespace) -> int:
     pool = load_target_pool(defn.matrix.pool)
     if args.tournament_split:
         return _cmd_calibration_split(args, defn, pool)
-    sdk = open_db(args.db or load_db_path())
+    sdk = open_backend(args.db or load_db_path())
     try:
         real = sdk.stats_matchup(date_from=REAL_DATE_FROM, date_to=REAL_DATE_TO,
                                  as_of=REAL_AS_OF, basis=REAL_BASIS,
@@ -1096,9 +1103,9 @@ def _cmd_dsl_check(args: argparse.Namespace) -> int:
     legal_ids: frozenset = frozenset()
     snapshot_id = ""
     if args.db:
-        from ptcgdb.sdk import open_db
+        from battlefrontier.data.backend import open_backend
 
-        db = open_db(args.db)
+        db = open_backend(args.db)
         try:
             snapshots = db.snapshots("standard")
             if not snapshots:
@@ -1272,10 +1279,15 @@ def main(argv: list[str] | None = None) -> int:
     fsn_p.add_argument("--probe", action="store_true",
                        help="就绪探针：上游最新赛事 vs 快照窗终点（退出码 0=新鲜 / 3=有新数据）")
     fsn_p.add_argument("--snap", default=None, help="探针对比的既有快照路径")
-    mc_p = sub.add_parser("mod-check", help="改表成对判读（task 156：同种子 CRN 逐格 Δ+门）")
+    mc_p = sub.add_parser("mod-check", help="改表成对判读（task 156：同种子 CRN 逐格 Δ+门；task 157：--batch 批次模式）")
     mc_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
-    mc_p.add_argument("--base-prefix", required=True, help="基线臂实验名前缀（如 prep-x-base-vs-）")
-    mc_p.add_argument("--mod-prefix", required=True, help="改表臂实验名前缀（如 prep-x-mod-vs-）")
+    mc_p.add_argument("--batch", default=None,
+                      help="prep 登记的批次 JSON（task 157：按实验 ID 取数 + 完整性第四门；"
+                           "与 --base-prefix/--mod-prefix 互斥）")
+    mc_p.add_argument("--base-prefix", default=None,
+                      help="基线臂实验名前缀（非批次模式，仅一次性干净库）")
+    mc_p.add_argument("--mod-prefix", default=None,
+                      help="改表臂实验名前缀（非批次模式，仅一次性干净库）")
     mc_p.add_argument("--field", required=True, help="field 快照 JSON（权重来源）")
     mc_p.add_argument("--pool", required=True, help="卡池 YAML（slug↔对手映射）")
     mc_p.add_argument("--entry", required=True, help="报名卡组池内中文名（权重剔除自身）")
@@ -1284,7 +1296,8 @@ def main(argv: list[str] | None = None) -> int:
                           help="备赛编排器（task 156）：场刷新→field-pick→成对核对→统一报告")
     pr_p.add_argument("prep", help="prep 定义 yml 路径（示例 experiments/prep.example.yml）")
     pr_p.add_argument("--db", default=None,
-                      help="上游 ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+                      help="上游数据后端（缺省读 config/battlefrontier.local.yml）："
+                           "ptcg-cn.db 文件 = sqlite ∥ dist 目录 = jsonl 导出")
     pr_p.add_argument("--results", default=None,
                       help="结果库路径（默认 results/prep-<name>.db）")
     pr_p.add_argument("--field-out", default=None, help="场快照输出路径（默认 results/ 下自动命名）")
@@ -1292,12 +1305,16 @@ def main(argv: list[str] | None = None) -> int:
     pr_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
     pr_p.add_argument("--pick-only", action="store_true",
                       help="只跑场刷新 + field-pick（零对局）")
+    pr_p.add_argument("--no-strict-coverage", action="store_true",
+                      help="显式关闭跑前 strict 覆盖率门槛（task 157：报告头注声明降级，"
+                           "违规如实落装载告警段）")
     run_p = sub.add_parser("run", help="按实验定义 YAML 跑实验并落结果库")
     run_p.add_argument("experiment", help="实验定义 YAML 路径")
     run_p.add_argument("--workers", type=int, default=1, help="多进程 worker 数（默认串行）")
     run_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")
     run_p.add_argument("--db", default=None,
-                       help="ptcg-cn.db 路径（缺省读 config/battlefrontier.local.yml）")
+                       help="上游数据后端（缺省读 config/battlefrontier.local.yml）："
+                            "ptcg-cn.db 文件 = sqlite ∥ dist 目录 = jsonl 导出")
     run_p.add_argument("--cards-dir", default=DEFAULT_CARDS_DIR, help="DSL 定义库目录")
     run_p.add_argument("--strict-coverage", action="store_true",
                        help="跑前 DSL 覆盖率门槛（task 131）：存在无文档非基本能量卡即拒绝开跑")

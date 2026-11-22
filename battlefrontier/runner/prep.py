@@ -12,11 +12,14 @@ field-pick（matchup 快照 × 新场）→（可选）报名卡组 × 池内全
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import yaml
 from pydantic import Field, model_validator
 
+from battlefrontier.dsl.loader import load_card_dir
 from battlefrontier.report.field_pick import (
     QUALIFIER_HEADER,
     adapt_field_share,
@@ -33,15 +36,19 @@ from battlefrontier.report.mod_check import (
     mod_check_report,
     slugify,
 )
+from battlefrontier.runner.coverage import side_coverage, strict_violations
 from battlefrontier.runner.experiment import (
     AGENT_TYPES,
+    DEFAULT_CARDS_DIR,
     AgentCfg,
     AgentSides,
     DeckSides,
     DeckSourceCfg,
     ExperimentDef,
     FrozenModel,
-    run_experiment,
+    _code_version,
+    execute_experiment,
+    prepare_experiment,
 )
 from battlefrontier.runner.field_snap import export_field_snap, today_iso
 
@@ -78,6 +85,7 @@ class PrepCfg(FrozenModel):
     games_per_cell: int = Field(default=2000, gt=0)
     seed_start: int = Field(ge=0)
     agents: str = "heuristic"
+    strict_coverage: bool = True      # task 157：默认开；--no-strict-coverage 显式逃生
 
     @model_validator(mode="after")
     def _check_agents(self) -> PrepCfg:
@@ -204,14 +212,151 @@ def _next_steps(cfg: PrepCfg, results_path: Path) -> str:
     return "\n".join(lines)
 
 
+def _load_warn_section(load_warnings: list[str],
+                       cover_violations: list[str]) -> str:
+    """task 157：逐实验装载告警段（不丢弃）；strict 逃生口下无文档违规也落此段。"""
+    lines = ["## 装载告警", ""]
+    lines += [f"- {w}" for w in load_warnings] or ["- 无装载告警"]
+    for v in cover_violations:
+        lines.append(f"- [strict 已关闭] {v}")
+    return "\n".join(lines)
+
+
+def _write_batch_json(cfg: PrepCfg, out_dir: Path,
+                      exp_ids: dict[str, int],
+                      data_version: str) -> Path:
+    """批次协议（task 157）：判读只认本文件登记的实验 ID 批次——按 ID 取数
+    （废弃名称前缀搜全库），预期种子全集来自实验定义而非落库数。"""
+    slugs: dict[str, dict[str, int]] = {}
+    for name, exp_id in exp_ids.items():
+        for arm in ("base", "mod"):
+            prefix = f"{cfg.name}-{arm}-vs-"
+            if name.startswith(prefix):
+                slugs.setdefault(name[len(prefix):], {})[f"{arm}_id"] = exp_id
+    payload = {
+        "entry": cfg.entry.archetype,
+        "games": cfg.games_per_cell,
+        "seed_start": cfg.seed_start,
+        "expected_seeds": [cfg.seed_start,
+                           cfg.seed_start + cfg.games_per_cell],
+        "code_version": _code_version(),
+        "data_version": data_version,
+        "pool_sha256": hashlib.sha256(
+            Path(cfg.pool).read_bytes()).hexdigest(),
+        "slugs": slugs,
+    }
+    path = out_dir / "batch.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+    return path
+
+
+def _sha256(path: str | Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _evidence_pack(cfg: PrepCfg, out_dir: Path, rep, *, field_out: Path,
+                   prep_source: str | Path | None,
+                   data_version: str) -> tuple[str, str, str]:
+    """task 158 证据包：改表判读产物升级为可离线追溯制品目录。
+
+    inputs/（prep.yml 副本 + 卡表内容+sha256 + 场快照副本 + 矩阵快照身份
+    + manifest 自含 hash——目录整体拷走即可复核每个数字来源）+
+    verdict.json（逐格 + 四门）+ verdict.csv。返回
+    (definition_sha256, code_version, data_version) 供报告头注回显。
+    """
+    import csv
+    import dataclasses
+    import io
+
+    inputs = out_dir / "inputs"
+    inputs.mkdir(parents=True, exist_ok=True)
+    if prep_source is not None and Path(prep_source).exists():
+        (inputs / "prep.yml").write_bytes(Path(prep_source).read_bytes())
+    else:
+        (inputs / "prep.yml").write_text(
+            yaml.safe_dump(cfg.model_dump(mode="json"), allow_unicode=True),
+            encoding="utf-8")
+
+    entry = cfg.entry
+    decks: dict = {"base": {"deck_id": entry.deck_id or "<池代表表>"}}
+    if entry.modified:
+        mod_name = Path(entry.modified).name
+        mod_bytes = Path(entry.modified).read_bytes()
+        (inputs / mod_name).write_bytes(mod_bytes)
+        decks["mod"] = {"file": mod_name,
+                        "sha256": hashlib.sha256(mod_bytes).hexdigest()}
+    (inputs / "decks.json").write_text(
+        json.dumps(decks, ensure_ascii=False, indent=2), encoding="utf-8")
+    (inputs / "field-snap.json").write_bytes(Path(field_out).read_bytes())
+
+    manifest: dict = {
+        "prep.yml": _sha256(inputs / "prep.yml"),
+        "decks.json": _sha256(inputs / "decks.json"),
+        "field-snap.json": _sha256(inputs / "field-snap.json"),
+        "matrix_snap": {"path": str(Path(cfg.matrix_snap).resolve()),
+                        "sha256": _sha256(cfg.matrix_snap)},
+    }
+    if "mod" in decks:
+        manifest[decks["mod"]["file"]] = decks["mod"]["sha256"]
+    (inputs / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    code_version = _code_version()
+    verdict = {
+        "meta": {
+            "name": cfg.name,
+            "alpha": 0.05,
+            "batch": "batch.json",
+            "batch_sha256": _sha256(out_dir / "batch.json"),
+            "definition_sha256": manifest["prep.yml"],
+            "code_version": code_version,
+            "data_version": data_version,
+        },
+        "cells": [dataclasses.asdict(c) for c in rep.cells],
+        "weights": rep.weights,
+        "base_exp": rep.base_exp,
+        "mod_exp": rep.mod_exp,
+        "delta_pp": rep.delta_pp,
+        "gates": {"all_positive": rep.all_positive,
+                  "all_significant": rep.all_significant,
+                  "zero_giveback": rep.zero_giveback,
+                  "complete": rep.complete},
+        "incomplete_reasons": list(rep.incomplete_reasons),
+        "seed_gaps": rep.seed_gaps,
+    }
+    (out_dir / "verdict.json").write_text(
+        json.dumps(verdict, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(["slug", "opponent", "base_wr", "mod_wr", "delta_pp", "p",
+                     "flips", "n_base", "n_mod", "n_missing", "weight"])
+    for c in rep.cells:
+        writer.writerow([c.slug, c.opponent, f"{c.base_wr:.6f}",
+                         f"{c.mod_wr:.6f}", f"{c.delta_pp:.4f}", f"{c.p:.6f}",
+                         c.flips, c.n_base, c.n_mod, c.n_missing,
+                         f"{rep.weights.get(c.slug, 0.0):.6f}"])
+    (out_dir / "verdict.csv").write_text(buf.getvalue(), encoding="utf-8")
+    return manifest["prep.yml"], code_version, data_version
+
+
 def run_prep(cfg: PrepCfg, *, db_path: str, results_path: str | Path,
              field_out: str | Path | None = None,
              out_dir: str | Path | None = None, workers: int = 1,
-             pick_only: bool = False) -> str:
+             pick_only: bool = False,
+             strict_coverage: bool | None = None,
+             cards_dir: str | Path = DEFAULT_CARDS_DIR,
+             prep_source: str | Path | None = None) -> str:
     """编排执行：场刷新 → field-pick →（可选）成对跑批 + 判读 → 统一报告。
 
     返回报告路径。报告头注限定语必嵌（ claims register 守则）。
+    strict 门槛（task 157）：装载后、开跑前对每个实验查 DSL 覆盖率，
+    默认拒绝无文档非基本能量卡（零局跑批）；显式关闭时违规如实落报告。
+    证据包（task 158）：改表判读落 inputs/ + verdict.json/csv，
+    报告头注回显复算三元组（实验定义 sha256 / 代码版本 / 数据版本）。
     """
+    eff_strict = cfg.strict_coverage if strict_coverage is None else strict_coverage
     pool = cfg.load_pool()
     results_path = Path(results_path)
     field_out = Path(field_out) if field_out else Path(
@@ -227,16 +372,44 @@ def run_prep(cfg: PrepCfg, *, db_path: str, results_path: str | Path,
 
     # ③ 成对跑批 + 判读
     mod_text = None
+    triad: tuple[str, str, str] | None = None
     if cfg.entry is not None and not pick_only:
         exps = generate_prep_experiments(cfg, pool)
+        library = load_card_dir(cards_dir)
+        prepared: list[tuple[ExperimentDef, object]] = []
+        load_warnings: list[str] = []
+        cover_violations: list[str] = []
         for defn in exps:
-            run_experiment(defn, db_path, results_path, workers=workers)
+            prep_exp = prepare_experiment(defn, db_path, cards_dir=cards_dir)
+            covers = [
+                side_coverage(f"{defn.name} 卡组 a", prep_exp.deck_a, library),
+                side_coverage(f"{defn.name} 卡组 b", prep_exp.deck_b, library),
+            ]
+            violations = strict_violations(covers)
+            if violations and eff_strict:
+                raise ValueError(
+                    "[strict-coverage] 备赛跑批拒绝开跑（零局）：\n"
+                    + "\n".join(f"[strict-coverage] {v}" for v in violations))
+            cover_violations.extend(violations)
+            load_warnings.extend(f"[{defn.name}] {w}" for w in prep_exp.warnings)
+            prepared.append((defn, prep_exp))
+        sections.append(_load_warn_section(load_warnings, cover_violations))
+
+        exp_ids: dict[str, int] = {}
+        for defn, prep_exp in prepared:
+            exp_ids[defn.name] = execute_experiment(
+                prep_exp, defn, results_path, workers=workers)
         if cfg.entry.modified:
+            batch_path = _write_batch_json(
+                cfg, out_dir, exp_ids, prepared[0][1].data_version)
             rep = mod_check_report(
-                results_path, base_prefix=f"{cfg.name}-base-vs-",
-                mod_prefix=f"{cfg.name}-mod-vs-", field_path=field_out,
+                results_path, batch=batch_path, field_path=field_out,
                 pool_path=cfg.pool, entry=cfg.entry.archetype)
             mod_text = "## 改表成对判读（mod-check）\n\n" + format_mod_check(rep)
+            triad = _evidence_pack(
+                cfg, out_dir, rep, field_out=Path(field_out),
+                prep_source=prep_source,
+                data_version=prepared[0][1].data_version)
         else:
             mod_text = _base_only_section(cfg, results_path, Path(field_out), pool)
     if mod_text:
@@ -245,6 +418,14 @@ def run_prep(cfg: PrepCfg, *, db_path: str, results_path: str | Path,
     # ④ 统一报告
     header = (f"# 备赛报告 {cfg.name}（{today_iso()}）\n\n"
               + QUALIFIER_HEADER + "\n" + PREP_HEADER_EXTRA)
+    if not eff_strict:
+        header += ("\n  · ⚠ strict 覆盖率门槛已显式关闭（--no-strict-coverage）："
+                   "无文档卡按无效果结算，判读强度打折")
+    if triad is not None:
+        definition_sha, code_version, data_version = triad
+        header += (f"\n  · 复算三元组：实验定义 sha256={definition_sha[:12]}… / "
+                   f"代码版本 {code_version} / 数据版本 {data_version}"
+                   f"（证据包见本目录 inputs/ + verdict.json/csv）")
     body = "\n\n".join([header] + sections + [_next_steps(cfg, results_path)])
     report_path = out_dir / "report.md"
     report_path.write_text(body, encoding="utf-8")

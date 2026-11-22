@@ -10,7 +10,6 @@ agent 实例在 worker 内按同一种子规则重建——并行与串行逐局
 from __future__ import annotations
 
 import multiprocessing as mp
-import sqlite3
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -352,24 +351,14 @@ def load_db_path(config_path: str | Path = DEFAULT_CONFIG_PATH) -> str:
 
 
 def _data_version(db_path: str, snapshot_date: str | None) -> str:
-    """数据版本锚点：快照日期（默认最新 standard）+ db user_version（只读连接）。"""
-    from ptcgdb.sdk import open_db
+    """数据版本锚点：快照日期（默认最新 standard）+ db user_version（只读连接）。
 
-    db = open_db(db_path)
-    try:
-        snapshots = db.snapshots("standard")
-        date = snapshot_date or (snapshots[-1].effective_from if snapshots else "unknown")
-    finally:
-        db.close()
-    try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)  # 主库只读（FR-10）
-        try:
-            uv = conn.execute("PRAGMA user_version").fetchone()[0]
-        finally:
-            conn.close()
-        return f"{date} (user_version={uv})"
-    except sqlite3.Error:
-        return str(date)
+    task 158：委托 backend.backend_data_version（jsonl dist 目录锚 schema_version，
+    sqlite 只读纪律在 backend 内保留）。
+    """
+    from battlefrontier.data.backend import backend_data_version
+
+    return backend_data_version(db_path, snapshot_date)
 
 
 def _resolve_decklist_entry(db, name: str, card_id: str | None):
@@ -412,13 +401,21 @@ def _load_decklist_file(db, path: str) -> tuple[list[CardDef], list[str]]:
         ids.extend([card_id] * count)
     if len(cards) != 60:
         raise ValueError(f"decklist 展开后为 {len(cards)} 张，应为 60")
+    # task 157：file 臂构筑合法性与 load_deck db 臂同口径同调用（60/同名 4 上限
+    # /ACE SPEC 限 1/赛制快照全由 db validate_deck 判定），违规在第一局模拟前抛错。
+    snapshots = db.snapshots("standard")
+    if not snapshots:
+        raise ValueError("db 无 standard 合法性快照，无法确定装载日期")
+    report = db.validate_deck(ids, snapshots[-1].effective_from, "standard")
+    if not report.ok:
+        raise ValueError(f"decklist 构筑校验失败: {report.violations}")
     return cards, warnings
 
 
 def prepare_experiment(defn: ExperimentDef, db_path: str,
                        cards_dir: str | Path = DEFAULT_CARDS_DIR) -> PreparedExperiment:
     """解析双方卡组（db/file）+ 按卡组卡名过滤 DSL 文档 + 锁定数据版本。"""
-    from ptcgdb.sdk import open_db
+    from battlefrontier.data.backend import open_backend
 
     # matrix 顶层定义不会走到这里（CLI 先走 run_matrix）；子实验必有 decks
     assert defn.decks is not None, "prepare_experiment 需要单实验模式或 matrix 子实验"
@@ -432,7 +429,7 @@ def prepare_experiment(defn: ExperimentDef, db_path: str,
             warnings.extend(loaded.warnings)
             ids.append(side.deck_id)
         else:
-            db = open_db(db_path)
+            db = open_backend(db_path)
             try:
                 cards, ws = _load_decklist_file(db, side.path)
             finally:
@@ -456,9 +453,9 @@ def prepare_variant(prep: PreparedExperiment, variant: VariantCfg,
 
     换入卡可能不在 baseline 卡组里，其 DSL 文档需从定义库补入 card_effects。
     """
-    from ptcgdb.sdk import open_db
+    from battlefrontier.data.backend import open_backend
 
-    db = open_db(db_path)
+    db = open_backend(db_path)
     try:
         in_cards: dict[str, CardDef] = {}
         for swap in variant.swaps:

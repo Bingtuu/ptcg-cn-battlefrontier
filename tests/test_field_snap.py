@@ -43,6 +43,15 @@ class _StubDb:
 
 def _make_upstream(tmp_path: Path, rows: list[dict], meta: dict) -> tuple[str, _StubDb]:
     db_path = str(tmp_path / "upstream.db")
+    # task 158：签名 n_qualified 走真实 qualified_count SQL——造最小
+    # v_tournament_weights 表（0 合格赛事），user_version=3 锚数据版本
+    con = sqlite3.connect(db_path)
+    con.execute("CREATE TABLE v_tournament_weights (tournament_id INTEGER,"
+                " date TEXT, basis TEXT, division TEXT, weight REAL,"
+                " is_qual INTEGER, is_team INTEGER, static_weight REAL)")
+    con.execute("PRAGMA user_version=3")
+    con.commit()
+    con.close()
     stub = _StubDb(_StubRes(rows, meta))
     return db_path, stub
 
@@ -53,7 +62,7 @@ def test_export_结构与口径逐键锁定(tmp_path, monkeypatch):
     db_path, stub = _make_upstream(tmp_path, [{"group_key": "甲", "value": 0.5}],
                                    {"n_tournaments": 19, "date_from": "2026-11-01",
                                     "date_to": "2026-11-15"})
-    monkeypatch.setattr(fs, "open_db", lambda p: stub)
+    monkeypatch.setattr(fs, "open_backend", lambda p: stub)
 
     out = tmp_path / "snap.json"
     snap = export_field_snap(db_path, "2026-11-01", "2026-11-15", out,
@@ -71,29 +80,52 @@ def test_export_结构与口径逐键锁定(tmp_path, monkeypatch):
     assert written["meta"]["n_tournaments"] == 19
     assert written["meta"]["as_of"] == "2026-11-22"  # 钉运行日
     assert written["data"] == [{"group_key": "甲", "value": 0.5}]
+    # task 158：签名三键
+    assert written["meta"]["sig"] == {
+        "window": ["2026-11-01", "2026-11-15"],
+        "n_qualified": 0,
+        "data_version": "user_version=3",
+    }
 
 
 def test_export_as_of_缺省取当日(tmp_path, monkeypatch):
     import battlefrontier.runner.field_snap as fs
 
     db_path, stub = _make_upstream(tmp_path, [], {"n_tournaments": 0})
-    monkeypatch.setattr(fs, "open_db", lambda p: stub)
+    monkeypatch.setattr(fs, "open_backend", lambda p: stub)
     out = tmp_path / "snap.json"
     snap = export_field_snap(db_path, "2026-11-01", "2026-11-15", out)
     assert snap["meta"]["as_of"] == fs.today_iso()
 
 
-def _write_weights_db(path: Path, dates: list[tuple[str, str, str]]) -> str:
-    """造上游 v_tournament_weights 最小表：(date, basis, division) 行。"""
+def _write_weights_db(path: Path, dates: list[tuple[str, str, str]],
+                      *, user_version: int = 3) -> str:
+    """造上游 v_tournament_weights 最小表：(date, basis, division) 行——
+    is_qual/is_team=0、static_weight=1.0（默认行均合格，对齐 _base_meta 口径）。"""
     con = sqlite3.connect(path)
     con.execute("CREATE TABLE v_tournament_weights (tournament_id INTEGER, date TEXT,"
-                " basis TEXT, division TEXT, weight REAL)")
+                " basis TEXT, division TEXT, weight REAL,"
+                " is_qual INTEGER, is_team INTEGER, static_weight REAL)")
     for i, (d, b, div) in enumerate(dates):
-        con.execute("INSERT INTO v_tournament_weights VALUES (?,?,?,?,?)",
-                    (i, d, b, div, 1.0))
+        con.execute("INSERT INTO v_tournament_weights VALUES (?,?,?,?,?,?,?,?)",
+                    (i, d, b, div, 1.0, 0, 0, 1.0))
+    con.execute(f"PRAGMA user_version={user_version}")
     con.commit()
     con.close()
     return str(path)
+
+
+def _write_sig_snap(path: Path, *, n_qualified: int = 2,
+                    user_version: int = 3) -> Path:
+    """带 task 158 签名的快照（窗 11-01..11-15，签名与 _write_weights_db
+    的默认 fixture 同源：前两行合格）。"""
+    snap = {"meta": {"date_to": "2026-11-15",
+                     "sig": {"window": ["2026-11-01", "2026-11-15"],
+                             "n_qualified": n_qualified,
+                             "data_version": f"user_version={user_version}"}},
+            "data": []}
+    path.write_text(json.dumps(snap), encoding="utf-8")
+    return path
 
 
 def test_probe_无基线(tmp_path):
@@ -126,3 +158,78 @@ def test_probe_stale_上游超出窗(tmp_path):
     status, detail = probe_field_freshness(db, snap)
     assert status == "stale"
     assert "2026-11-20" in detail and "2026-11-15" in detail
+    assert "newer" in detail
+
+
+# ── task 158：签名双判（newer / backfill）──────────────────────────
+
+def test_probe_签名一致_fresh(tmp_path):
+    """同窗同数据：n_qualified 与 data_version 全等 → fresh。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    status, detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+    assert "签名一致" in detail
+
+
+def test_probe_同窗回填合格赛事_stale_backfill(tmp_path):
+    """同窗补入合格赛事（MAX(date) 不动）→ stale 且注明 backfill。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+        ("2026-11-12", "cn", "master"),   # 同窗回填（tournament_id 不同 → DISTINCT +1）
+    ])
+    status, detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "stale"
+    assert "backfill" in detail and "2→3" in detail
+
+
+def test_probe_同窗仅新增被筛除赛事_still_fresh(tmp_path):
+    """同窗新增 junior/其他 basis（口径外）→ 计数不变 → 仍 fresh 不误报。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+        ("2026-11-12", "cn", "junior"),          # 被筛除
+        ("2026-11-13", "intl_aligned", "master"),  # 其他 basis
+    ])
+    status, _detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+
+
+def test_probe_同窗新增未加权赛事_still_fresh(tmp_path):
+    """static_weight IS NULL（数据未完备）的赛事不计入签名口径——独立复验
+    实证该过滤是真库 41 vs meta 19 的差异源；同窗新增未加权赛事不误报。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO v_tournament_weights "
+                "VALUES (99, '2026-11-12', 'cn', 'master', 1.0, 0, 0, NULL)")
+    con.commit()
+    con.close()
+    status, _detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+
+
+def test_probe_数据版本变更_stale_backfill(tmp_path):
+    """上游 user_version 变（同窗数据修订）→ stale backfill。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ], user_version=9)  # 签名锚的是 3
+    status, detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "stale"
+    assert "backfill" in detail and "user_version=3→user_version=9" in detail
+
+
+def test_probe_无签名旧快照_降级日期比对(tmp_path):
+    db = _write_weights_db(tmp_path / "up.db", [("2026-11-15", "cn", "master")])
+    snap = tmp_path / "snap.json"
+    snap.write_text(json.dumps({"meta": {"date_to": "2026-11-15"}, "data": []}),
+                    encoding="utf-8")
+    status, detail = probe_field_freshness(db, snap)
+    assert status == "fresh"
+    assert "降级" in detail

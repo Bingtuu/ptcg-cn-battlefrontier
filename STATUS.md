@@ -5,7 +5,13 @@
 
 ## 当前
 
-**当前焦点 = task 161 备赛线加固轮收官（2026-11-22，Grok 二轮 review 四项全采纳）**——①证据包 `{键}__{原名}` 防同名覆盖 + 开跑前冻结（源文件跑后被改不影响归档）；②base-only 接入批次协议（batch.json `mode: paired|base`，按 ID 取数 + 完整性校验，废弃前缀搜库）；③`PrepCfg.family_size` 贯通 prep（verdict meta 落族规模 + 校正阈值）；④探针 `content_sha256` 合格行内容签名（同窗纯内容修订判 backfill，旧快照明示能力边界）。9 新测 + ruff 零告警 + 全量重跑绿。此前 159（扫描族校正 + 赛制换算）/ 160（对手多构筑 + 最劣 build 保守门）已归档。Grok 建议的下一步 = 拿真实报名候选完整走一次备赛流程（人工驱动，Owner 拍板卡表后走 prep 全链路）。
+**当前焦点 = task 164 ACE SPEC 槽位评估收官（2026-11-28，Owner 提问驱动）**——多龙巴鲁托「不公印章 vs 新冲天能量」prep 成对 40,000 局零失败：池内条件期望 78.1%→80.8%（**Δ +2.7pp**，新冲天能量方向），8/10 格正、增益精确落胶着对局（<75% 四格 +3.3~+5.5pp 全显著）、碾压格统计零、**无格显著为负**；保守门字面未过（全正/全显著/零回吐 ❌，土龙节节 −0.2 噪声级）→ 不自动采纳，换与不换均可辩护（判决与机制读数见 `tasks/done/task 164.md`）。
+
+- 上一焦点 = task 163 备赛全流程实战演练收官（2026-11-28，Grok 建议「真实候选完整走一次」落地）——新场数据（合格 19→20，窗 11-01..11-22）下主会话自主选卡走通全链路七步：场快照（sig 20 场与上游逐位一致）→ field-pick（Dragapult 63.8%/登顶率 100% 三期连续第一）→ **首选多龙巴鲁托 base-only + 备选沙奈朵 t141 改表 paired**（理由成文 dig §3）→ prep 60,000 局零失败零平局 → mod-check 四门（gardevoir：全正 ✅/全显著 ❌ 土龙节节 p=0.2328/零回吐 ✅/COMPLETE ✅；条件期望 +4.0pp，改表新场头下维持成立但强度降一档 10/10→9/10 显著；dragapult base 池内条件期望 77.9%）→ 证据包全文件 sha256 核验 OK。零产品代码改动；流程文档 `docs/digs/2026-11-27-t163-prep-walkthrough.md` = README 移植源（Owner 后续更新 README）。遗留：上游 12 场待加权（Pokearena 侧）；报名决策归牌手。
+
+- 上一焦点 = task 162 field-snap 探针 newer 判定收紧到合格口径（2026-11-27，Grok 评审探针项采纳）——`_LATEST_TOURNAMENT_SQL` 复用 `QUALIFIED_WHERE` 单源（+is_qual/is_team/static_weight 过滤）：未加权/组队/资格赛永远进不了快照，不再触发 stale/newer 误报（真库实证：11-28/29 共 17 条未来赛事预告行使旧探针持续误报；收紧后正确指向真实最新合格赛事 2026-11-22——该日 1 场已加权，合格场数 19→20）；无漏报（加权完成后 backfill 路径判出）。5 新测（红 4 → 绿）+ ruff 零告警 + 全量 **2206 passed + 1 skipped**。**Grok 评审事实修正留档**（见 `tasks/done/task 162.md`）：上游采集未停（11-27 11:56 仍入库 18 条）、「唯一 P0」言重——真实缺口 = 上游 ~10 条已结束赛事待加权（Pokearena 侧）+ 本探针小修（已闭环）。探针当前 stale/newer 为正确信号，场窗推进决策归 Owner。
+
+- 上一焦点 = task 161 备赛线加固轮收官（2026-11-22，Grok 二轮 review 四项全采纳）——①证据包 `{键}__{原名}` 防同名覆盖 + 开跑前冻结（源文件跑后被改不影响归档）；②base-only 接入批次协议（batch.json `mode: paired|base`，按 ID 取数 + 完整性校验，废弃前缀搜库）；③`PrepCfg.family_size` 贯通 prep（verdict meta 落族规模 + 校正阈值）；④探针 `content_sha256` 合格行内容签名（同窗纯内容修订判 backfill，旧快照明示能力边界）。9 新测 + ruff 零告警 + 全量重跑绿。此前 159（扫描族校正 + 赛制换算）/ 160（对手多构筑 + 最劣 build 保守门）已归档。Grok 建议的下一步 = 拿真实报名候选完整走一次备赛流程（人工驱动，Owner 拍板卡表后走 prep 全链路）。
 
 - 上一焦点 = task 160 对手构筑分布收官（2026-11-22，审计 P1 结构性缺口）——prep yml `opponent_builds` 挂对手额外 decklist（池代表表恒 build #1，实验名 `~bN`），mod-check 批次逐 build 判读 + **保守门**（最劣 build 驱动：任一 build 回吐即门否，防均值陷阱）+ 期望 = 各 build 等权均值；证据包同步落对手构筑副本 + sha256；存量 prep 零变化。6 新测 + ruff 零告警 + 全量重跑绿。此前 **task 159 判读诚实度 P0 收官**（`--family-size M` Bonferroni 扫描族校正 + `match_odds` 赛制口径段 Bo3/瑞士轮出线概率），全量 2186 passed + 1 skipped；双任务均已归档 `tasks/done/`。审计清单剩余 P1/P2（对手强度谱系门/赛前一页纸/演练卡/rogue 守望/k 组合搜索）待 Owner 挑单。
 

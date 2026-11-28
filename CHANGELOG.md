@@ -7,6 +7,10 @@
 
 ### Added
 
+- ACE SPEC 槽位评估（task 164，Owner 提问驱动，零产品代码）：多龙巴鲁托「不公印章 vs 新冲天能量」prep 成对 40,000 局零失败——条件期望 78.1%→80.8%（Δ +2.7pp 新冲天能量方向），8/10 格正、胶着对局 +3.3~+5.5pp 全显著、无格显著为负；保守门字面未过（噪声级回吐 1 格）→ 不自动采纳，判决与机制读数留档 `tasks/done/task 164.md`；prep yml + 印刷级改表 deck 进版本控制
+
+- 备赛全流程实战演练（task 163，Grok 建议「真实候选完整走一次」落地，零产品代码）：新场窗 11-01..11-22（合格 19→20）场快照 + field-pick 选卡（首选多龙巴鲁托 base-only / 备选沙奈朵 t141 改表 paired，理由成文）→ prep 60,000 局零失败 → mod-check 四门判读（沙奈朵改表新场头维持成立但强度降一档：全正 ✅/全显著 ❌/零回吐 ✅/COMPLETE ✅，条件期望 +4.0pp；多龙 base 池内条件期望 77.9%）→ 证据包 sha256 全核验；流程文档 `docs/digs/2026-11-27-t163-prep-walkthrough.md`（README 移植源）+ prep 定义 ×2 进版本控制
+
 - 备赛线加固轮（task 161，Grok 二轮 review 四项全采纳）：**证据包防同名覆盖 + 开跑前冻结**——卡表副本按 `{键}__{原名}` 落 inputs/（键 = mod / `{slug}~bN`，天然唯一），`_freeze_inputs` 在 execute 前捕获字节 + sha256（源文件跑后被改不影响本批归档，fake_execute 中途篡改测试实证）；**base-only 接入批次协议**——batch.json 增 `mode: paired|base`，无改表臂同样按登记 ID 取数 + status/种子完整性校验（`_load_batch_base_arms` 复用 `_batch_keys` 不另造机制），废弃名称前缀 LIKE 搜库（同名重跑零混入），INCOMPLETE 显式不出完整基线结论，无改表臂也落 inputs/ + manifest；**family_size 贯通 prep**——`PrepCfg.family_size`（ge=1）透传 mod-check，verdict meta 落 family_size + adopt_alpha（subprocess 级 prep E2E 降档不立项：场数据管道 sqlite-only，现有集成测试已覆盖真判读 + 真证据包）；**探针内容签名**——`qualified_content_sha256`（合格行 tournament_id/date/static_weight 排序哈希）入 sig，同窗纯内容修订（计数与日期不变）判 backfill，旧快照 fresh 明示「计数与版本未变不保证内容未变」；9 新测 + 3 既有测试随命名更新
 
 - 对手构筑分布（task 160，审计 P1 结构性缺口）：prep yml 新增 `opponent_builds: {池内中文名: [decklist, ...]}` = 对手额外构筑（池代表表恒 build #1，实验名 `~bN` 后缀，`~` 免 slugify 碰撞）；mod-check 批次逐 build 判读格 + **保守门**（全正/零回吐/全显著逐 build 判定，最劣 build 驱动，防「均值好看、最劣改表崩盘」采纳陷阱）+ 期望 = 各 build 等权均值（`ModReport.cell_weights` = 对手场权 / build 数）；batch.json 注册键白名单校验（未知键显式报错），前缀模式遇 `~bN` 显式拒绝；证据包 decks.json 落对手构筑副本 + sha256；base-only 段同支持多构筑；存量 prep 定义零变化（36 夹具全兼容）；6 新测
@@ -39,6 +43,7 @@
 
 ### Changed
 
+- field-snap 探针 newer 判定收紧到合格口径（task 162，Grok 外部评审 2026-11-27 探针项采纳）：`_LATEST_TOURNAMENT_SQL` 复用 `QUALIFIED_WHERE` 单源（+`is_qual=0 AND is_team=0 AND static_weight IS NOT NULL`）——未加权/组队/资格赛永远进不了快照，不再触发 stale/newer 误报（真库实证：11-28/29 共 17 条未来赛事预告行使旧探针持续误报 newer；收紧后 detail 指向真实最新合格赛事 2026-11-22）；无漏报——未加权赛事加权完成后由 backfill 路径（qualified_count/content hash）判出；no_baseline 措辞对齐合格口径；5 新测
 - **M16 BC 开工门判据修订（PRD v0.7，2026-11-20 Owner 拍板）**：旧「v2.x 绝对 AUC ≥ 0.90」（v0.5）实证为 v1 尺子——task 155a spike 显示 560 维特征集天花板 ≈0.79（MLP 0.7867 vs ridge 0.7874 逐位打平，瓶颈 = 不可约随机性非模型类）；修订为同 60 局探针成对判据「≥95% 天花板参考 + Δ≥+0.05 vs 30 维基线」，含重锚协议（换代必重跑 spike）/ 临界复判（90–100% 带扩 120 局）/ 种子域不重叠三条款。**判决：eval-linear-v3 双条件过（0.7874 / 参考 0.7867 / 基线 0.7111）→ PASS，task 151/152 解冻**；t150 冻结脚本保留为历史件不再用于门判（探针实现 = t155a spike 的 sample_states/auc）；风险 review 五条款落 dig
 - 镜像局口径 v0.3（task 140，M14 gate review 裁决）：源缺镜像由「自然剔除」改为按 50% 默认计入——自然剔除对高份额构筑系统性不利；`assemble_matrix` 补 source="mirror" 对角格（源提供对角时源数据优先），快照自包含 100 格；复跑 field-pick 与 Owner 手算交叉对上（62.1/58.3/55.1 vs 62/58/55）
 - 卡池 v2.x 定向修订（task 135，依据 task 133 dig 建议档）：6 套高漂移表刷新为近窗（2026-11-01..14）冠军表 + 赛富豪土龙节节第 10 套入池；`config/target-pool.v2.yml` 修订（version 保持 2 + revised_at，task 068 原始锁定段保留为注释事实源）；近窗覆盖 85.25%

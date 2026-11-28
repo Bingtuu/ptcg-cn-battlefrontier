@@ -1,0 +1,17 @@
+# task 163 备赛演练 · 备选候选：沙奈朵（Gardevoir，base+mod 成对模式）
+# 选择依据：field-pick 新场期望胜率 59.2% 稳 rank 2；携 task 141 两刀改表
+# （task 152 已在 11-15 场头下验证 +5.5pp 条件期望、10/10 格全正全显著），
+# 新场头（+11-22 场）下复核改表是否维持成立。family_size=1：单一预注册改表，
+# 非扫描族（task 159 口径）。
+name: prep-t163-gardevoir
+pool: config/target-pool.v2.yml
+matrix_snap: results/matchup-snap-2026-11-22.json
+field: {date_from: "2026-11-01", date_to: "2026-11-22"}
+entry:
+  archetype: 沙奈朵
+  deck_id: "mik_moe:711854"
+  modified: experiments/t141-gardevoir-modified.deck.txt
+family_size: 1
+games_per_cell: 2000
+seed_start: 760000                                   # 域 760000..761999，两臂成对 CRN
+agents: heuristic

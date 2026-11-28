@@ -1,0 +1,14 @@
+# task 164 · 多龙巴鲁托 ACE SPEC 槽位：不公印章（base）vs 新冲天能量（mod）
+# 场窗与 task 163 一致（11-01..11-22，20 场）；矩阵快照复用；判读走 mod-check 四门。
+name: prep-t164-dragapult-neoupper
+pool: config/target-pool.v2.yml
+matrix_snap: results/matchup-snap-2026-11-22.json
+field: {date_from: "2026-11-01", date_to: "2026-11-22"}
+entry:
+  archetype: 多龙巴鲁托
+  deck_id: "mik_moe:677868"
+  modified: experiments/t164-dragapult-neoupper.deck.txt
+family_size: 1
+games_per_cell: 2000
+seed_start: 770000                                   # 域 770000..771999，两臂成对 CRN
+agents: heuristic

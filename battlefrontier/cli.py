@@ -248,7 +248,7 @@ def _cmd_field_snap(args: argparse.Namespace) -> int:
     """task 156：场快照导出 + 就绪探针。
 
     导出：--from/--to/--out 必给（上游 stats_usage 钉口径，见 runner/field_snap）。
-    探针（--probe）：上游最新赛事日期 vs --snap 窗口终点；退出码 0 = 新鲜，
+    探针（--probe）：上游最新合格赛事日期 vs --snap 窗口终点；退出码 0 = 新鲜，
     3 = 有新数据或无基线（建议刷新/建档）——刻意区别于通用错误码 1。
     """
     from battlefrontier.runner.field_snap import (
@@ -1277,7 +1277,7 @@ def main(argv: list[str] | None = None) -> int:
     fsn_p.add_argument("--to", dest="to_date", default=None, help="窗终点含（导出必填）")
     fsn_p.add_argument("--out", default=None, help="快照 JSON 输出路径（导出必填）")
     fsn_p.add_argument("--probe", action="store_true",
-                       help="就绪探针：上游最新赛事 vs 快照窗终点（退出码 0=新鲜 / 3=有新数据）")
+                       help="就绪探针：上游最新合格赛事 vs 快照窗终点（退出码 0=新鲜 / 3=有新数据）")
     fsn_p.add_argument("--snap", default=None, help="探针对比的既有快照路径")
     mc_p = sub.add_parser("mod-check", help="改表成对判读（task 156：同种子 CRN 逐格 Δ+门；task 157：--batch 批次模式）")
     mc_p.add_argument("--results", default=DEFAULT_RESULTS_PATH, help="结果库路径")

@@ -235,6 +235,76 @@ def test_probe_无签名旧快照_降级日期比对(tmp_path):
     assert "降级" in detail
 
 
+# ── task 162：newer 判定收紧到合格口径（未加权/组队/资格赛不误报）─────
+
+def _insert_row(db: str, tid: int, date: str, *, is_qual: int = 0,
+                is_team: int = 0, static_weight: float | None = 1.0) -> None:
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO v_tournament_weights VALUES (?,?,?,?,?,?,?,?)",
+                (tid, date, "cn", "master", 1.0, is_qual, is_team,
+                 static_weight))
+    con.commit()
+    con.close()
+
+
+def test_probe_窗外新增未加权赛事_still_fresh(tmp_path):
+    """task 162：窗外仅新增 static_weight IS NULL 赛事（未加权/预告，永远
+    进不了快照）→ 不判 stale。真库误报面：11-28/29 预告赛事行使探针持续
+    误报 newer。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    _insert_row(db, 99, "2026-11-20", static_weight=None)
+    status, _detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+
+
+def test_probe_窗外新增组队赛_still_fresh(tmp_path):
+    """task 162：窗外仅新增 is_team=1 赛事 → 不判 stale。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    _insert_row(db, 99, "2026-11-20", is_team=1)
+    status, _detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+
+
+def test_probe_窗外新增资格赛_still_fresh(tmp_path):
+    """task 162：窗外仅新增 is_qual=1 赛事 → 不判 stale。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    _insert_row(db, 99, "2026-11-20", is_qual=1)
+    status, _detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "fresh"
+
+
+def test_probe_窗外新增合格赛事_stale_newer(tmp_path):
+    """task 162 对照：窗外新增合格赛事 → 仍 stale/newer（收紧不误伤正报）。"""
+    db = _write_weights_db(tmp_path / "up.db", [
+        ("2026-11-10", "cn", "master"),
+        ("2026-11-15", "cn", "master"),
+    ])
+    _insert_row(db, 99, "2026-11-20")
+    status, detail = probe_field_freshness(db, _write_sig_snap(tmp_path / "snap.json"))
+    assert status == "stale"
+    assert "newer" in detail and "2026-11-20" in detail
+
+
+def test_probe_全库无合格赛事_no_baseline(tmp_path):
+    """task 162：库内仅有未加权/组队赛事 → 合格口径 MAX(date) 为空 →
+    no_baseline（不再把不合格赛事日期当「上游最新赛事」报出）。"""
+    db = _write_weights_db(tmp_path / "up.db", [])
+    _insert_row(db, 99, "2026-11-20", static_weight=None)
+    _insert_row(db, 100, "2026-11-21", is_team=1)
+    status, detail = probe_field_freshness(db, None)
+    assert status == "no_baseline"
+    assert "合格" in detail
+
+
 # ── task 161：内容签名（同窗纯内容修订检测 + 能力边界明示）──────────
 
 def test_export_sig_含内容签名(tmp_path, monkeypatch):

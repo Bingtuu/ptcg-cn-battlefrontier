@@ -1,7 +1,7 @@
 """task 156：bfsim field-snap——场快照导出 + 就绪探针。
 
 导出 = 上游 stats_usage 钉口径调用的产品化（t152_field_refresh.py 同款，
-调用参数逐键锁定，改口径须改测试）；探针 = 上游最新赛事日期 vs 既有快照
+调用参数逐键锁定，改口径须改测试）；探针 = 上游最新合格赛事日期 vs 既有快照
 窗口终点的就绪检查（Owner 规划 ③：回答「现在刷新能不能拿到新场」）。
 
 task 158：导出 meta 落签名 sig = {window, n_qualified, data_version}
@@ -43,13 +43,14 @@ STATS_USAGE_KW: dict = {
 # （FR-9.6「该指标实际参与的赛事数」）——division master-or-NULL、qual/team
 # 剔除、basis=cn、static_weight IS NOT NULL（task 158 独立复验实证：缺
 # static_weight 过滤时真库 41 vs meta 19，漏计过滤的 22 场）。
+# task 162：探针 newer 判定共享同一口径——未加权/组队/资格赛永远进不了
+# 快照，不得触发 stale/newer（真库 11-28/29 预告赛事误报面）。
 QUALIFIED_WHERE = ("(division = ? OR division IS NULL) "
                    "AND is_qual = 0 AND is_team = 0 "
                    "AND basis = ? "
                    "AND static_weight IS NOT NULL")
 _LATEST_TOURNAMENT_SQL = (
-    "SELECT MAX(date) FROM v_tournament_weights "
-    "WHERE basis='cn' AND (division='master' OR division IS NULL)")
+    f"SELECT MAX(date) FROM v_tournament_weights WHERE {QUALIFIED_WHERE}")
 
 
 def qualified_count(db_path: str | Path, date_from: str, date_to: str) -> int:
@@ -142,37 +143,38 @@ def probe_field_freshness(db_path: str | Path,
     """就绪探针：返回 (status, detail)。
 
     status ∈ {"no_baseline", "fresh", "stale"}：
-    no_baseline = 无既有快照（上游最新日期照报，供首次建窗参考）；
-    fresh = 上游最新赛事日期 ≤ 快照窗终点且签名一致（现在刷新拿不到新场）；
-    stale = 上游已超出窗终点（newer）∥ 同窗回填/数据版本变更（backfill，
+    no_baseline = 无既有快照（上游最新合格赛事日期照报，供首次建窗参考）；
+    fresh = 上游最新合格赛事日期 ≤ 快照窗终点且签名一致（现在刷新拿不到新场）；
+    stale = 上游合格赛事已超出窗终点（newer）∥ 同窗回填/数据版本变更（backfill，
     签名双判——MAX(date) 不动也判出）；无 sig 旧快照降级为纯日期比对并注明。
+    newer 判定与签名共享合格口径（task 162）：未加权/组队/资格赛不误报。
     """
     con = sqlite3.connect(str(db_path))
     try:
-        row = con.execute(_LATEST_TOURNAMENT_SQL).fetchone()
+        row = con.execute(_LATEST_TOURNAMENT_SQL, ("master", "cn")).fetchone()
     finally:
         con.close()
     latest = row[0] if row else None
     if latest is None:
-        return ("no_baseline", "上游 v_tournament_weights 无 cn/master 赛事记录")
+        return ("no_baseline", "上游 v_tournament_weights 无 cn/master 合格赛事记录")
 
     if snap_path is None or not Path(snap_path).exists():
-        return ("no_baseline", f"上游最新赛事 {latest}；无既有快照基线")
+        return ("no_baseline", f"上游最新合格赛事 {latest}；无既有快照基线")
 
     snap = json.loads(Path(snap_path).read_text(encoding="utf-8"))
     meta = snap.get("meta") or {}
     win_to = meta.get("date_to")
     if not win_to:
-        return ("no_baseline", f"上游最新赛事 {latest}；快照缺 meta.date_to 无法比对")
+        return ("no_baseline", f"上游最新合格赛事 {latest}；快照缺 meta.date_to 无法比对")
     if latest > win_to:
-        return ("stale", (f"上游最新赛事 {latest} 已超出快照窗终点 {win_to}"
+        return ("stale", (f"上游最新合格赛事 {latest} 已超出快照窗终点 {win_to}"
                           f"——刷新可拿到新数据（newer）"))
 
     sig = meta.get("sig")
     window = (sig or {}).get("window")
     if not (isinstance(window, list) and len(window) == 2
             and "n_qualified" in (sig or {}) and "data_version" in (sig or {})):
-        return ("fresh", (f"上游最新赛事 {latest} ≤ 快照窗终点 {win_to}"
+        return ("fresh", (f"上游最新合格赛事 {latest} ≤ 快照窗终点 {win_to}"
                           f"——现在刷新拿不到新场（旧快照无签名，仅日期比对降级）"))
 
     reasons: list[str] = []
@@ -189,11 +191,11 @@ def probe_field_freshness(db_path: str | Path,
         if c_now != content_sig:
             reasons.append("合格赛事内容签名变更（牌表/权重修订）")
     if reasons:
-        return ("stale", (f"上游最新赛事 {latest} 未超窗终点 {win_to}，"
+        return ("stale", (f"上游最新合格赛事 {latest} 未超窗终点 {win_to}，"
                           f"但签名不符：{'；'.join(reasons)}"
                           f"——刷新可取回修订数据（backfill）"))
     note = ("（无内容签名：计数与版本未变不保证内容未变）"
             if content_sig is None else "")
-    return ("fresh", (f"上游最新赛事 {latest} ≤ 快照窗终点 {win_to}，签名一致"
+    return ("fresh", (f"上游最新合格赛事 {latest} ≤ 快照窗终点 {win_to}，签名一致"
                       f"（n_qualified={n_now}）{note}"
                       f"——现在刷新拿不到新场"))
